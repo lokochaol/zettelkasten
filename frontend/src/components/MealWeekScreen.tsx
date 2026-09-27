@@ -165,7 +165,7 @@ export function MealWeekScreen() {
           </span>
         </p>
       )}
-      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs text-accent">{error}</p>}
+      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs whitespace-pre-line text-accent">{error}</p>}
       {syncMessage && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[11px] text-ink-soft">{syncMessage}</p>}
 
       {warnings.length > 0 && (

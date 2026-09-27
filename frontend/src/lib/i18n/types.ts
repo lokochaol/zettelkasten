@@ -157,6 +157,7 @@ export interface Dictionary {
     errorRateLimit: string;
     errorBadResponse: string;
     errorTruncated: string;
+    errorDetail: (detail: string) => string;
     errorApi: string;
     syncToCalendar: string;
     syncing: string;
