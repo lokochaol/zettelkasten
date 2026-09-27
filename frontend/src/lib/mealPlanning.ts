@@ -92,6 +92,11 @@ export interface MealPlanView {
   shoppingItems: ShoppingItem[];
   dayTotals: DayTotals[];
   estimatedYen: number;
+  /** How far the plan misses the brief it was written to. Recomputed on
+   * every read rather than stored: the check is pure, and a warning that
+   * only exists in the reply that generated it disappears the moment the
+   * owner switches panes. */
+  warnings: string[];
 }
 
 /** The week a date belongs to, starting on the owner's shopping day — the
@@ -127,12 +132,37 @@ export async function getPlan(ownerSub: string, weekStartDateKey: string): Promi
   });
   if (!plan) return null;
   const { meals, shoppingItems, ...rest } = plan;
+  return buildView(rest as MealPlan, meals, shoppingItems);
+}
+
+/** One place that turns stored rows into what the screen shows, so a plan
+ * read back looks exactly like one just generated — warnings included. */
+function buildView(plan: MealPlan, meals: PlannedMeal[], shoppingItems: ShoppingItem[]): MealPlanView {
+  const dayTotals = totalsFor(meals);
+  const estimatedYen = shoppingItems.reduce((sum, i) => sum + i.estimatedYen, 0);
+  const dates = Array.from({ length: DAYS_IN_PLAN }, (_, i) => shiftDateKey(plan.weekStartDateKey, i));
   return {
-    plan: rest as MealPlan,
+    plan,
     meals,
     shoppingItems,
-    dayTotals: totalsFor(meals),
-    estimatedYen: shoppingItems.reduce((sum, i) => sum + i.estimatedYen, 0),
+    dayTotals,
+    estimatedYen,
+    warnings: checkAgainstBrief(
+      dayTotals,
+      dates,
+      {
+        kcal: plan.targetKcal,
+        proteinG: plan.targetProteinG,
+        fiberG: plan.targetFiberG,
+        saltMaxG: plan.targetSaltMaxG,
+        weekdayCookMinutes: plan.weekdayCookMinutes,
+        cookSessionsPerWeek: plan.cookSessionsPerWeek,
+        readyMadeMealsPerWeek: plan.readyMadeMealsPerWeek,
+      },
+      estimatedYen,
+      plan.budgetYen,
+      cookingLoadOf(meals),
+    ),
   };
 }
 
@@ -355,6 +385,10 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
         targetKcal: t.targetKcal,
         targetProteinG: t.proteinG,
         targetFiberG: t.fiberG,
+        targetSaltMaxG: t.saltMaxG,
+        cookSessionsPerWeek: preference.cookSessionsPerWeek,
+        readyMadeMealsPerWeek: preference.readyMadeMealsPerWeek,
+        weekdayCookMinutes: preference.weekdayCookMinutes,
         budgetYen: preference.weeklyBudgetYen,
         promptSummary: brief,
         meals: { create: meals },
@@ -364,36 +398,17 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     });
   });
 
-  const dayTotals = totalsFor(plan.meals);
-  const estimatedYen = plan.shoppingItems.reduce((sum, i) => sum + i.estimatedYen, 0);
-  const warnings = checkAgainstBrief(
-    dayTotals,
-    dates,
-    {
-      kcal: t.targetKcal,
-      proteinG: t.proteinG,
-      fiberG: t.fiberG,
-      saltMaxG: t.saltMaxG,
-      weekdayCookMinutes: preference.weekdayCookMinutes,
-      cookSessionsPerWeek: preference.cookSessionsPerWeek,
-      readyMadeMealsPerWeek: preference.readyMadeMealsPerWeek,
-    },
-    estimatedYen,
-    preference.weeklyBudgetYen,
-    cookingLoadOf(plan.meals),
-  );
+  const { meals: planMeals, shoppingItems, ...rest } = plan;
+  const view = buildView(rest as MealPlan, planMeals, shoppingItems);
+  const warnings = [...view.warnings];
   // A cut-off reply is reported, never smoothed over: the days that did
   // arrive are usable, and the ones that didn't are already named above by
   // checkAgainstBrief. Saying why they're missing turns a puzzling gap
   // into an instruction — regenerate, or shorten the brief.
   if (truncated) warnings.unshift("AIの返答が長さの上限で途中で切れたため、一部が入っていません。もう一度作り直すと揃うことがあります。");
-  if (plan.shoppingItems.length === 0) warnings.push("買い物リストが入っていません（返答が途中で切れた可能性があります）。");
+  if (shoppingItems.length === 0) warnings.push("買い物リストが入っていません（返答が途中で切れた可能性があります）。");
 
-  const { meals: planMeals, shoppingItems, ...rest } = plan;
-  return {
-    view: { plan: rest as MealPlan, meals: planMeals, shoppingItems, dayTotals, estimatedYen },
-    warnings,
-  };
+  return { view: { ...view, warnings }, warnings };
 }
 
 export interface CookingLoad {

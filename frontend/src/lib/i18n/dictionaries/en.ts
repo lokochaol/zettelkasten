@@ -113,6 +113,7 @@ export const en: Dictionary = {
     generate: "Plan the week",
     regenerate: "Plan again",
     generating: "Planning… (about 30 seconds)",
+    generatingNote: "This takes a minute or two. Switching panes is fine — it keeps running and the plan is saved. Closing or reloading the tab can cut it off.",
     noPlan: "No plan for this week yet. One shopping trip covers seven days, planned against your nutrition targets, budget and cooking time.",
     slotBreakfast: "Breakfast",
     slotLunch: "Lunch",

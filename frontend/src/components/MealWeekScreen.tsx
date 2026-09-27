@@ -34,7 +34,10 @@ export function MealWeekScreen() {
   // list for a week has to be written a fortnight before anyone eats it.
   const [weekOffset, setWeekOffset] = useState(0);
   const [data, setData] = useState<MealWeekView | null>(null);
-  const [warnings, setWarnings] = useState<string[]>([]);
+  // Only what this run added on top of the stored check (a cut-off reply).
+  // The rest is recomputed server-side on every read, so switching panes
+  // mid-generation no longer loses it.
+  const [runWarnings, setRunWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [generating, startGenerating] = useTransition();
   const [, startSaving] = useTransition();
@@ -48,14 +51,25 @@ export function MealWeekScreen() {
     getMealWeekAction(anchorKey).then(setData);
   }, [anchorKey]);
 
+  // Switching panes is safe — the request keeps running and the plan is
+  // saved — but closing the tab can cut it off mid-call, which costs the
+  // owner an API call and leaves no plan. Worth one browser prompt.
+  useEffect(() => {
+    if (!generating) return;
+    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [generating]);
+
   if (!data) return <LoadingBlock label={t.common.loading} />;
 
   const dates = Array.from({ length: 7 }, (_, i) => shiftDateKey(data.weekStartDateKey, i));
   const view = data.view;
+  const warnings = [...new Set([...runWarnings, ...(view?.warnings ?? [])])];
 
   function generate() {
     setError(null);
-    setWarnings([]);
+    setRunWarnings([]);
     startGenerating(async () => {
       const res = await generateMealPlanAction(data!.weekStartDateKey, todayKey);
       if ("error" in res) {
@@ -63,7 +77,7 @@ export function MealWeekScreen() {
         return;
       }
       setData((prev) => (prev ? { ...prev, view: res.view } : prev));
-      setWarnings(res.warnings);
+      setRunWarnings(res.warnings);
     });
   }
 
@@ -165,6 +179,7 @@ export function MealWeekScreen() {
           </span>
         </p>
       )}
+      {generating && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[10.5px] text-ink-soft">{t.meals.generatingNote}</p>}
       {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs whitespace-pre-line text-accent">{error}</p>}
       {syncMessage && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[11px] text-ink-soft">{syncMessage}</p>}
 
