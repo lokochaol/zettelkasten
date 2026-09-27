@@ -146,7 +146,7 @@ export function CalendarTodaySection({
       {/* The schedule sits above the day's project notes — it's what the
           day looks like from the outside (calendar) plus what's still open
           in it (tasks), before the notes themselves. */}
-      <DayScheduleTimeline key={viewedDateKey} dateKey={viewedDateKey} timeZone={browserTimeZone} />
+      <DayScheduleTimeline dateKey={viewedDateKey} timeZone={browserTimeZone} />
 
       {viewedNotes === undefined ? (
         <LoadingBlock label={t.calendar.projectTaskLoading} />
