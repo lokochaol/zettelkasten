@@ -131,6 +131,12 @@ export interface Dictionary {
     slotBreakfast: string;
     slotLunch: string;
     slotDinner: string;
+    kindCook: string;
+    kindBatch: string;
+    kindReady: string;
+    prefCookSessions: string;
+    prefReadyMade: string;
+    loadSummary: (cookDays: number, batch: number, ready: number) => string;
     dayTotals: (kcal: number, proteinG: number, fiberG: number) => string;
     shoppingHeading: string;
     shoppingTotal: (yen: number, budget: number) => string;

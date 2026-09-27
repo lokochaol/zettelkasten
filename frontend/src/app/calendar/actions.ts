@@ -33,6 +33,7 @@ export interface DayMeal {
   slot: "BREAKFAST" | "LUNCH" | "DINNER";
   title: string;
   recipe: string;
+  kind: mealPlanning.MealKind;
   status: mealPlanning.MealStatus;
   replacementNote: string;
   kcal: number;
@@ -105,6 +106,7 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
     slot: meal.slot,
     title: meal.title,
     recipe: meal.recipe,
+    kind: meal.kind,
     status: meal.status,
     replacementNote: meal.replacementNote,
     kcal: meal.kcal,

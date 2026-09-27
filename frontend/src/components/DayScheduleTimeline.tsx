@@ -243,6 +243,11 @@ function MealRow({ meal, onLog }: { meal: DayMeal; onLog: (id: string, status: D
           <span className={`text-[11.5px] ${meal.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"}`}>
             {meal.title}
           </span>
+          {/* Whether tonight means cooking or just heating something up is
+              the first thing worth knowing when the day is already long. */}
+          <span className="ml-1.5 rounded bg-surface-alt px-1 py-px font-mono text-[9px] text-ink-soft">
+            {meal.kind === "COOK" ? t.meals.kindCook : meal.kind === "BATCH" ? t.meals.kindBatch : t.meals.kindReady}
+          </span>
           <span className="ml-1.5 font-mono text-[9px] text-ink-faint">
             {meal.kcal} kcal · {t.daySchedule.prep(meal.prepMinutes)}
           </span>
