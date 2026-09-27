@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
     return Number.isFinite(n) ? n : undefined;
   };
-  const dateKey = typeof payload.date === "string" ? payload.date.trim() : "";
+  const dateKey = typeof payload.date === "string" ? payload.date : String(payload.date ?? "");
   const steps = num(payload.steps);
 
   try {
