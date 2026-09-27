@@ -38,22 +38,27 @@ function hourOf(date: Date, timeZone: string): number {
  */
 export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; timeZone: string }) {
   const { t, locale } = useI18n();
-  const [view, setView] = useState<DayScheduleView | null>(null);
+  // The loaded day travels with its data. Remounting per day used to be
+  // the caller's job (key={dateKey}), but a keyed remount here left the
+  // previous day's block on screen and stacked one per step; owning the
+  // reset means there is only ever one of these in the tree.
+  const [loaded, setLoaded] = useState<{ dateKey: string; view: DayScheduleView } | null>(null);
   const [, startLogging] = useTransition();
+  // Never the previous day's schedule under today's heading: until the
+  // fetch for this day lands, this component has nothing to show.
+  const view = loaded?.dateKey === dateKey ? loaded.view : null;
 
   function logMeal(mealId: string, status: DayMeal["status"], note = "") {
     startLogging(async () => {
       const next = await setMealStatusAction(mealId, status, note, dateKey);
-      if (!("error" in next)) setView(next);
+      if (!("error" in next)) setLoaded({ dateKey, view: next });
     });
   }
 
-  // No reset before the fetch: the caller remounts this per day
-  // (key={dateKey}), so a new day already starts from a null view.
   useEffect(() => {
     let cancelled = false;
     getDayScheduleAction(dateKey).then((v) => {
-      if (!cancelled) setView(v);
+      if (!cancelled) setLoaded({ dateKey, view: v });
     });
     return () => {
       cancelled = true;
