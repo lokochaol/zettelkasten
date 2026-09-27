@@ -1,10 +1,17 @@
 import Link from "next/link";
 import { requireSession } from "@/lib/session";
-import { getZoteroSettingsAction, getAiSettingsAction, getDiscoveryScheduleAction } from "@/app/settings/actions";
+import {
+  getZoteroSettingsAction,
+  getAiSettingsAction,
+  getDiscoveryScheduleAction,
+  getGoogleCalendarSettingsAction,
+} from "@/app/settings/actions";
 import { ZoteroSettingsForm } from "@/components/ZoteroSettingsForm";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
 import { DiscoveryScheduleForm } from "@/components/DiscoveryScheduleForm";
 import { BulletLegendToggle } from "@/components/BulletLegendToggle";
+import { GoogleCalendarSettings } from "@/components/GoogleCalendarSettings";
+import { HealthSettings } from "@/components/HealthSettings";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderMenu } from "@/components/HeaderMenu";
@@ -12,11 +19,15 @@ import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
-export default async function SettingsPage() {
+export default async function SettingsPage(props: PageProps<"/settings">) {
+  const searchParams = await props.searchParams;
   const session = await requireSession();
   const zotero = await getZoteroSettingsAction();
   const ai = await getAiSettingsAction();
   const schedule = await getDiscoveryScheduleAction();
+  const googleCalendar = await getGoogleCalendarSettingsAction();
+  // Set by the OAuth callback redirect — see api/google-calendar/callback.
+  const googleCalendarResult = typeof searchParams.googleCalendar === "string" ? searchParams.googleCalendar : undefined;
   const dict = getDictionary(await getLocale());
 
   return (
@@ -71,6 +82,21 @@ export default async function SettingsPage() {
             <span className="text-accent">{"//"}</span> {dict.settings.zoteroHeading}
           </h2>
           <ZoteroSettingsForm initial={zotero} />
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
+            <span className="text-accent">{"//"}</span> {dict.health.targetsHeading}
+          </h2>
+          <HealthSettings />
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
+            <span className="text-accent">{"//"}</span> {dict.settings.googleCalendarHeading}
+          </h2>
+          <p className="font-mono text-[10.5px] text-ink-soft">{dict.settings.googleCalendarDescription}</p>
+          <GoogleCalendarSettings initial={googleCalendar} result={googleCalendarResult} />
         </section>
 
         <section className="flex flex-col gap-3">

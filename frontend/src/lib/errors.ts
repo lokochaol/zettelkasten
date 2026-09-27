@@ -13,6 +13,9 @@
 export type DomainErrorCode =
   | "keywordRequired"
   | "permanentNoteNotFound"
+  | "healthProfileInvalid"
+  | "healthGoalTooAggressive"
+  | "healthMetricInvalid"
   | "permanentNoteTitleRequired"
   | "permanentNoteContentRequired"
   | "indexKeywordTaken"

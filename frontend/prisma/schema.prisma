@@ -412,3 +412,109 @@ model AiCredential {
 
   @@map("ai_credential")
 }
+
+/// Per-user Google Calendar link — same "each owner brings their own"
+/// shape as ZoteroCredential/AiCredential, and the same reason: there is no
+/// app-wide calendar, only the owner's. The refresh token is the durable
+/// half (Google only hands it over once, on a consent with
+/// access_type=offline), so it's stored AES-256-GCM encrypted like every
+/// other third-party secret here; the access token is cached alongside it
+/// purely to avoid a refresh round-trip on every read, and is worthless
+/// after expiresAt.
+///
+/// Granted through an incremental-auth flow from Settings rather than at
+/// sign-in (see src/app/api/google-calendar/connect), so signing in never
+/// asks for calendar access unless the owner wants the integration.
+model GoogleCalendarCredential {
+  id                    String    @id @default(uuid())
+  ownerSub              String    @unique @map("owner_sub")
+  refreshTokenEncrypted String    @map("refresh_token_encrypted")
+  accessTokenEncrypted  String?   @map("access_token_encrypted")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  /// Which calendar the timeline reads and writes. "primary" unless the
+  /// owner ever picks another one.
+  calendarId            String    @default("primary") @map("calendar_id")
+  /// The space-separated scopes Google actually granted — checked before a
+  /// write, since a consent can come back with less than was asked for.
+  grantedScope          String    @map("granted_scope")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("google_calendar_credential")
+}
+
+enum BiologicalSex {
+  MALE
+  FEMALE
+}
+
+/// How much day-to-day movement the owner does, used only when there's no
+/// measured active energy to work from (see src/lib/nutritionTargets.ts).
+enum ActivityLevel {
+  SEDENTARY
+  LIGHT
+  MODERATE
+  ACTIVE
+}
+
+/// The things about a body that don't change day to day. Entered by hand
+/// once — HealthKit could supply some of it, but height and birth year
+/// aren't worth an extra Shortcut round trip, and sex and goal aren't in
+/// HealthKit in a form worth trusting.
+model HealthProfile {
+  ownerSub      String        @id @map("owner_sub")
+  heightCm      Float         @map("height_cm")
+  birthYear     Int           @map("birth_year")
+  sex           BiologicalSex
+  activityLevel ActivityLevel @default(LIGHT) @map("activity_level")
+  /// Target rate of weight change per week, in kg. Negative loses weight.
+  /// Bounded in the UI — an aggressive deficit is how a "healthy meals"
+  /// app ends up recommending something unhealthy.
+  weeklyKgDelta Float         @default(0) @map("weekly_kg_delta")
+  /// Weight to use until the phone starts sending one — without it the
+  /// targets can't be computed at all, and making the whole feature wait
+  /// on a Shortcut being set up correctly is a bad first run.
+  fallbackWeightKg Float?     @map("fallback_weight_kg")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+
+  @@map("health_profile")
+}
+
+/// One day's measurements, as sent by the iPhone Shortcut. Keyed by day
+/// rather than by sample: the Shortcut posts a daily summary, and a resend
+/// for the same day is a correction, not a second reading.
+model HealthDailyMetric {
+  id                String   @id @default(uuid())
+  ownerSub          String   @map("owner_sub")
+  /// "YYYY-MM-DD" in the owner's own time zone — the Shortcut runs on their
+  /// phone, so the date it sends is already local.
+  dateKey           String   @map("date_key")
+  weightKg          Float?   @map("weight_kg")
+  /// Apple's "active energy" — movement only, excluding resting burn, which
+  /// is why the TDEE calculation adds it to BMR rather than replacing it.
+  activeEnergyKcal  Float?   @map("active_energy_kcal")
+  steps             Int?
+  receivedAt        DateTime @default(now()) @map("received_at")
+
+  @@unique([ownerSub, dateKey])
+  @@index([ownerSub, dateKey])
+  @@map("health_daily_metric")
+}
+
+/// Bearer token for the Shortcut's POST. Stored encrypted rather than
+/// hashed because it has to be readable again: the owner sets the Shortcut
+/// up on a phone, and a token they can only see once is a token they will
+/// be re-issuing every time they edit that automation. Same AES-256-GCM
+/// storage as every other secret here.
+model HealthIngestToken {
+  ownerSub       String   @id @map("owner_sub")
+  tokenEncrypted String   @map("token_encrypted")
+  /// First 8 characters, kept in the clear so an incoming token can be
+  /// looked up without decrypting every row.
+  tokenPrefix    String   @unique @map("token_prefix")
+  lastUsedAt     DateTime? @map("last_used_at")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  @@map("health_ingest_token")
+}
