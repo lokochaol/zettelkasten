@@ -36,6 +36,17 @@ function indentWidth(line: string): number {
   return [...lead].reduce((width, ch) => width + (ch === "\t" ? 4 : 1), 0);
 }
 
+/**
+ * How much deeper a line has to sit before it counts as nested.
+ *
+ * A single column is not an indent, it's a stray space — and in a note
+ * typed by hand there are always a few. Treating one as a level turns the
+ * next top-level task into a child of the one above it, which reads as a
+ * structure the owner never wrote. Markdown draws the same line: two
+ * spaces or more, or nothing.
+ */
+const INDENT_STEP = 2;
+
 export function parseEntries(content: string): BulletEntry[] {
   const entries: BulletEntry[] = [];
   // Indent widths of the open ancestors. A deeper line pushes a level, a
@@ -45,8 +56,23 @@ export function parseEntries(content: string): BulletEntry[] {
     const m = ENTRY.exec(line);
     if (!m) return;
     const width = indentWidth(line);
-    while (stack.length > 0 && width < stack[stack.length - 1]) stack.pop();
-    if (stack.length === 0 || width > stack[stack.length - 1]) stack.push(width);
+    // The level this line belongs to is the one it is written closest to.
+    // Ties go outward: a line that isn't clearly indented isn't indented.
+    let level = stack.findIndex((open) => Math.abs(width - open) < INDENT_STEP);
+    if (level === -1 && (stack.length === 0 || width >= stack[stack.length - 1] + INDENT_STEP)) {
+      stack.push(width);
+      level = stack.length - 1;
+    } else if (level === -1) {
+      // Matches no open level: it belongs one step inside the deepest
+      // level it is clearly indented past. Written under a much deeper
+      // line, "  - d" is still a child of the "- a" above it, not a
+      // sibling of it.
+      level = stack.filter((open) => open <= width - INDENT_STEP).length;
+    }
+    stack.length = level + 1;
+    // The shallowest spelling of a level wins, so a real child of a
+    // slightly over-indented line still has room to nest under it.
+    stack[level] = Math.min(stack[level], width);
     const signifiers = m[1] ?? "";
     entries.push({
       glyph: m[2] as BulletEntry["glyph"],
