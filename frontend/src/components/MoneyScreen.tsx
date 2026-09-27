@@ -1,9 +1,16 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getMoneyDayAction, setCategoryBudgetAction, type MoneyDayView } from "@/app/money/actions";
+import {
+  getMonthlyTotalsAction,
+  getMoneyDayAction,
+  setCategoryBudgetAction,
+  type MoneyDayView,
+} from "@/app/money/actions";
+import { CsvImportPanel } from "@/components/CsvImportPanel";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { LoadingBlock } from "@/components/LoadingSpinner";
+import type { MonthTotal } from "@/lib/expenses";
 import { todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
@@ -18,11 +25,20 @@ export function MoneyScreen() {
   const { t } = useI18n();
   const todayKey = todayKeyValue();
   const [view, setView] = useState<MoneyDayView | null>(null);
+  const [trend, setTrend] = useState<MonthTotal[]>([]);
   const [, startSaving] = useTransition();
 
   useEffect(() => {
     getMoneyDayAction(todayKey).then(setView);
+    getMonthlyTotalsAction(todayKey).then(setTrend);
   }, [todayKey]);
+
+  // An import moves both halves of this screen at once — the month's
+  // categories and the twelve-month line — so both are re-read together.
+  function reload() {
+    getMoneyDayAction(todayKey).then(setView);
+    getMonthlyTotalsAction(todayKey).then(setTrend);
+  }
 
   if (!view) return <LoadingBlock label={t.common.loading} />;
 
@@ -97,7 +113,43 @@ export function MoneyScreen() {
         <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.money.paceNote}</p>
       </section>
 
-      <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.money.csvComingNote}</p>
+      <MonthlyTrend months={trend} heading={t.money.trendHeading} note={t.money.trendNote} />
+
+      <CsvImportPanel categories={view.categories} onImported={reload} />
     </div>
+  );
+}
+
+/**
+ * Twelve months of totals as bars.
+ *
+ * Scaled to the largest month rather than to a fixed ceiling: the point
+ * is the shape of the year — which months run hot — and a fixed axis
+ * would flatten that for anyone whose spending is steady.
+ */
+function MonthlyTrend({ months, heading, note }: { months: MonthTotal[]; heading: string; note: string }) {
+  const peak = Math.max(1, ...months.map((m) => m.totalYen));
+  return (
+    <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+      <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{heading}</p>
+      <div className="flex h-28 items-end gap-1.5">
+        {months.map((m) => (
+          <div key={m.month} className="group flex h-full min-w-0 flex-1 flex-col items-center gap-1">
+            <span className="font-mono text-[8.5px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100">
+              ¥{m.totalYen.toLocaleString()}
+            </span>
+            <div className="flex w-full flex-1 flex-col justify-end">
+              <div
+                className="w-full rounded-t bg-[var(--color-meal)]"
+                style={{ height: `${(m.totalYen / peak) * 100}%` }}
+                title={`${m.month} ¥${m.totalYen.toLocaleString()}`}
+              />
+            </div>
+            <span className="font-mono text-[8.5px] text-ink-faint">{m.month.slice(5)}</span>
+          </div>
+        ))}
+      </div>
+      <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{note}</p>
+    </section>
   );
 }

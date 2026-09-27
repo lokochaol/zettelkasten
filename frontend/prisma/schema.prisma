@@ -676,3 +676,42 @@ model CategoryBudget {
   @@unique([ownerSub, category])
   @@map("category_budget")
 }
+
+/// How one card or bank's CSV is shaped. Remembered per owner so the
+/// second import of the same statement is a drop, not a re-mapping —
+/// every issuer names its columns differently and none of them will
+/// change to suit us.
+model CsvImportProfile {
+  id           String   @id @default(uuid())
+  ownerSub     String   @map("owner_sub")
+  /// The owner's name for it: "楽天カード", "住信SBI" …
+  name         String
+  dateColumn   String   @map("date_column")
+  amountColumn String   @map("amount_column")
+  memoColumn   String   @map("memo_column")
+  /// Some issuers write outgoings as positive, others as negative. Stored
+  /// rather than guessed per file, because a sign flip silently turns a
+  /// month of spending into a month of income.
+  amountIsNegativeForSpending Boolean @default(false) @map("amount_is_negative_for_spending")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, name])
+  @@map("csv_import_profile")
+}
+
+/// "Anything whose description contains this goes in that category."
+/// Learned as the owner categorises imported rows, so the next statement
+/// arrives mostly sorted.
+model CategoryRule {
+  id       String @id @default(uuid())
+  ownerSub String @map("owner_sub")
+  /// Matched case-insensitively as a substring. Not a regex: these are
+  /// written by hand and a bad regex fails in ways that are hard to see.
+  keyword  String
+  category String
+
+  @@unique([ownerSub, keyword])
+  @@index([ownerSub])
+  @@map("category_rule")
+}

@@ -7,6 +7,9 @@ import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
 import { translateDomainError } from "@/lib/i18n/errors";
+import { getDictionary } from "@/lib/i18n/dictionary";
+import { parseCsv, guessMapping, type ColumnMapping } from "@/lib/csvImport";
+import { prisma } from "@/lib/db";
 
 export interface MoneyDayView {
   today: Expense[];
@@ -60,4 +63,84 @@ export async function setCategoryBudgetAction(
   await expenses.setCategoryBudget(ownerSub, category, monthlyYen);
   revalidatePath("/money");
   return expenses.monthSummary(ownerSub, dateKey);
+}
+
+/* ---------- statement import ---------- */
+
+export interface CsvPreview {
+  headers: string[];
+  mapping: ColumnMapping;
+  candidates: expenses.ImportCandidate[];
+  rows: Record<string, string>[];
+  profiles: { id: string; name: string; mapping: ColumnMapping }[];
+}
+
+/**
+ * Parses the pasted-in statement text and shows what importing it would
+ * do — including which rows are already in and which look like something
+ * typed by hand. Nothing is written until the owner confirms.
+ */
+export async function previewCsvAction(
+  text: string,
+  profileName: string,
+  overrides?: Partial<ColumnMapping>,
+): Promise<CsvPreview | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const { headers, rows } = parseCsv(text);
+  if (headers.length === 0 || rows.length === 0) {
+    return { error: (await getDictionary(await getLocale())).money.csvEmpty };
+  }
+  const saved = await prisma.csvImportProfile.findMany({ where: { ownerSub } });
+  const savedForName = saved.find((p) => p.name === profileName);
+  const guessed = guessMapping(headers);
+  const mapping: ColumnMapping = {
+    dateColumn: overrides?.dateColumn ?? savedForName?.dateColumn ?? guessed.dateColumn ?? headers[0],
+    amountColumn: overrides?.amountColumn ?? savedForName?.amountColumn ?? guessed.amountColumn ?? headers[0],
+    memoColumn: overrides?.memoColumn ?? savedForName?.memoColumn ?? guessed.memoColumn ?? headers[0],
+    amountIsNegativeForSpending:
+      overrides?.amountIsNegativeForSpending ?? savedForName?.amountIsNegativeForSpending ?? false,
+  };
+  return {
+    headers,
+    mapping,
+    rows,
+    candidates: await expenses.prepareImport(ownerSub, rows, mapping, profileName),
+    profiles: saved.map((p) => ({
+      id: p.id,
+      name: p.name,
+      mapping: {
+        dateColumn: p.dateColumn,
+        amountColumn: p.amountColumn,
+        memoColumn: p.memoColumn,
+        amountIsNegativeForSpending: p.amountIsNegativeForSpending,
+      },
+    })),
+  };
+}
+
+/** Commits the chosen rows and remembers the mapping under this profile
+ * name, so the next statement from the same issuer needs no mapping. */
+export async function importCsvAction(
+  profileName: string,
+  mapping: ColumnMapping,
+  selections: expenses.ImportSelection[],
+  learnedRules: { keyword: string; category: string }[],
+): Promise<expenses.ImportResult> {
+  const ownerSub = await requireOwnerSub();
+  const name = profileName.trim() || "明細";
+  await prisma.csvImportProfile.upsert({
+    where: { ownerSub_name: { ownerSub, name } },
+    create: { ownerSub, name, ...mapping },
+    update: mapping,
+  });
+  for (const rule of learnedRules) await expenses.learnCategoryRule(ownerSub, rule.keyword, rule.category);
+  const result = await expenses.commitImport(ownerSub, selections);
+  revalidatePath("/money");
+  revalidatePath("/calendar");
+  return result;
+}
+
+export async function getMonthlyTotalsAction(throughDateKey: string): Promise<expenses.MonthTotal[]> {
+  const ownerSub = await requireOwnerSub();
+  return expenses.monthlyTotals(ownerSub, throughDateKey);
 }

@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import { ValidationError } from "@/lib/errors";
+import { applyMapping, type ColumnMapping, type MappedRow } from "@/lib/csvImport";
 import type { Expense, ExpenseSource } from "@/generated/prisma/client";
 
 export type { Expense };
@@ -141,4 +142,159 @@ export async function knownCategories(ownerSub: string): Promise<string[]> {
   ]);
   const mine = [...new Set([...used.map((u) => u.category), ...budgeted.map((b) => b.category)])];
   return [...mine, ...DEFAULT_CATEGORIES.filter((c) => !mine.includes(c))];
+}
+
+/* ---------- importing statements ---------- */
+
+
+export interface ImportCandidate extends MappedRow {
+  category: string;
+  /** Already imported from a statement before — same fingerprint. */
+  alreadyImported: boolean;
+  /** Same day and amount as something typed in by hand. Not skipped
+   * automatically: a ¥500 coffee bought twice in a day is two expenses,
+   * and only the owner can tell that from a double entry. */
+  manualMatchId: string | null;
+}
+
+/** Applies a mapping, categorises what it can, and marks what looks like
+ * a duplicate — everything needed to show the owner a preview before
+ * anything is written. */
+export async function prepareImport(
+  ownerSub: string,
+  rows: Record<string, string>[],
+  mapping: ColumnMapping,
+  profileName: string,
+): Promise<ImportCandidate[]> {
+  const mapped = applyMapping(rows, mapping, profileName);
+  const usable = mapped.filter((r) => !r.problem);
+  const [rules, existing, manual] = await Promise.all([
+    prisma.categoryRule.findMany({ where: { ownerSub } }),
+    prisma.expense.findMany({
+      where: { ownerSub, externalKey: { in: usable.map((r) => r.externalKey) } },
+      select: { externalKey: true },
+    }),
+    prisma.expense.findMany({
+      where: { ownerSub, source: "MANUAL", dateKey: { in: [...new Set(usable.map((r) => r.dateKey))] } },
+      select: { id: true, dateKey: true, amountYen: true },
+    }),
+  ]);
+  const importedKeys = new Set(existing.map((e) => e.externalKey));
+  const claimedManual = new Set<string>();
+
+  return mapped.map((row) => {
+    if (row.problem) return { ...row, category: "", alreadyImported: false, manualMatchId: null };
+    const rule = rules.find((r) => row.memo.toLowerCase().includes(r.keyword.toLowerCase()));
+    // One manual entry can only explain one statement line, so a matched
+    // entry is claimed and won't be offered against a second row.
+    const match = manual.find(
+      (m) => !claimedManual.has(m.id) && m.dateKey === row.dateKey && m.amountYen === row.amountYen,
+    );
+    if (match) claimedManual.add(match.id);
+    return {
+      ...row,
+      category: rule?.category ?? "",
+      alreadyImported: importedKeys.has(row.externalKey),
+      manualMatchId: match?.id ?? null,
+    };
+  });
+}
+
+export interface ImportSelection {
+  externalKey: string;
+  dateKey: string;
+  amountYen: number;
+  memo: string;
+  category: string;
+  /** When set, this statement line replaces that hand-typed entry rather
+   * than joining it. */
+  replacesManualId: string | null;
+}
+
+export interface ImportResult {
+  imported: number;
+  replaced: number;
+  skipped: number;
+}
+
+/** Writes the chosen rows. Idempotent on externalKey, so importing an
+ * overlapping statement again adds only what's new. */
+export async function commitImport(ownerSub: string, selections: ImportSelection[]): Promise<ImportResult> {
+  let imported = 0;
+  let replaced = 0;
+  let skipped = 0;
+
+  for (const row of selections) {
+    const exists = await prisma.expense.findFirst({
+      where: { ownerSub, externalKey: row.externalKey },
+      select: { id: true },
+    });
+    if (exists) {
+      skipped++;
+      continue;
+    }
+    await prisma.$transaction(async (tx) => {
+      if (row.replacesManualId) {
+        const { count } = await tx.expense.deleteMany({
+          where: { id: row.replacesManualId, ownerSub, source: "MANUAL" },
+        });
+        if (count > 0) replaced++;
+      }
+      await tx.expense.create({
+        data: {
+          ownerSub,
+          dateKey: row.dateKey,
+          amountYen: row.amountYen,
+          category: row.category.trim() || "その他",
+          memo: row.memo,
+          source: "CSV",
+          externalKey: row.externalKey,
+        },
+      });
+      imported++;
+    });
+  }
+  return { imported, replaced, skipped };
+}
+
+/** Remembers "descriptions containing this go in that category", so the
+ * next statement arrives mostly sorted. */
+export async function learnCategoryRule(ownerSub: string, keyword: string, category: string): Promise<void> {
+  const trimmedKeyword = keyword.trim();
+  const trimmedCategory = category.trim();
+  if (!trimmedKeyword || !trimmedCategory) return;
+  await prisma.categoryRule.upsert({
+    where: { ownerSub_keyword: { ownerSub, keyword: trimmedKeyword } },
+    create: { ownerSub, keyword: trimmedKeyword, category: trimmedCategory },
+    update: { category: trimmedCategory },
+  });
+}
+
+/* ---------- the long view ---------- */
+
+export interface MonthTotal {
+  month: string;
+  totalYen: number;
+}
+
+/** Totals for the last `months` calendar months, oldest first, including
+ * the months with nothing in them — a gap in spending is a shape worth
+ * seeing, and dropping empty months would draw a misleading line. */
+export async function monthlyTotals(ownerSub: string, throughDateKey: string, months = 12): Promise<MonthTotal[]> {
+  const [year, month] = throughDateKey.slice(0, 7).split("-").map(Number);
+  const wanted: string[] = [];
+  for (let back = months - 1; back >= 0; back--) {
+    const d = new Date(Date.UTC(year, month - 1 - back, 1));
+    wanted.push(`${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, "0")}`);
+  }
+  const rows = await prisma.expense.findMany({
+    where: { ownerSub, dateKey: { gte: `${wanted[0]}-01` } },
+    select: { dateKey: true, amountYen: true },
+  });
+  const totals = new Map(wanted.map((m) => [m, 0]));
+  for (const row of rows) {
+    const m = monthOf(row.dateKey);
+    if (totals.has(m)) totals.set(m, (totals.get(m) ?? 0) + row.amountYen);
+  }
+  return wanted.map((month) => ({ month, totalYen: totals.get(month) ?? 0 }));
 }

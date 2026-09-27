@@ -96,7 +96,27 @@ export interface Dictionary {
     overBudget: string;
     aheadOfPace: string;
     paceNote: string;
-    csvComingNote: string;
+    importHeading: string;
+    importIntro: string;
+    csvEmpty: string;
+    profileNameLabel: string;
+    profileNamePlaceholder: string;
+    pasteLabel: string;
+    orChooseFile: string;
+    columnDate: string;
+    columnAmount: string;
+    columnMemo: string;
+    negativeIsSpending: string;
+    previewHeading: (usable: number, total: number) => string;
+    alreadyImported: string;
+    manualMatch: string;
+    replaceManual: string;
+    rowProblem: string;
+    doImport: (n: number) => string;
+    importing: string;
+    importResult: (imported: number, replaced: number, skipped: number) => string;
+    trendHeading: string;
+    trendNote: string;
     dashboardHeading: string;
   };
   meals: {
