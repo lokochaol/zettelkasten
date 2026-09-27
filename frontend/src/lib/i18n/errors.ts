@@ -52,6 +52,10 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.coopPlanMissing;
     case "coopOrderNotFound":
       return dict.coopOrderNotFound;
+    case "timeBlockInvalid":
+      return dict.timeBlockInvalid;
+    case "timeBlockNotFound":
+      return dict.timeBlockNotFound;
     case "projectNotFound":
       return dict.projectNotFound;
     case "projectNameRequired":

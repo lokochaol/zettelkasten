@@ -15,6 +15,8 @@ import { openTasks } from "@/lib/bulletJournal";
 import { getTimeZone } from "@/lib/preferences/preferences";
 import * as mealPlanning from "@/lib/mealPlanning";
 import * as health from "@/lib/health";
+import * as timeBlocks from "@/lib/timeBlocks";
+import type { TimeBlock } from "@/lib/timeBlocks";
 
 export async function listTodayProjectNotesAction(dateKey: string): Promise<TodayProjectNote[]> {
   const ownerSub = await requireOwnerSub();
@@ -74,6 +76,10 @@ export interface DayNutrition {
 
 export type DayScheduleView = {
   tasks: DayScheduleTask[];
+  /** Time the owner blocked out by hand. Separate from events: these are
+   * not in anyone's calendar, they're this app's own record of when a
+   * task is meant to happen. */
+  blocks: TimeBlock[];
   meals: DayMeal[];
   nutrition: DayNutrition | null;
 } & (
@@ -101,10 +107,11 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
     projectTaskNotes.listAllProjectsTodayNotes(ownerSub, dateKey),
     getTimeZone(),
   ]);
-  const [scheduled, targetsNow, metric] = await Promise.all([
+  const [scheduled, targetsNow, metric, blocks] = await Promise.all([
     mealPlanning.scheduledMealsForDay(ownerSub, dateKey, timeZone),
     health.currentTargets(ownerSub, dateKey),
     health.getDailyMetric(ownerSub, dateKey),
+    timeBlocks.listForDay(ownerSub, dateKey),
   ]);
   const meals: DayMeal[] = scheduled.map(({ meal, start, end }) => ({
     id: meal.id,
@@ -153,11 +160,11 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
 
   try {
     const events = await googleCalendar.listDayEvents(ownerSub, dateKey, timeZone);
-    return { calendar: "linked", events, tasks, meals, nutrition };
+    return { calendar: "linked", events, tasks, meals, nutrition, blocks };
   } catch (e) {
-    if (e instanceof googleCalendar.GoogleCalendarNotLinkedError) return { calendar: "not_linked", tasks, meals, nutrition };
-    if (e instanceof googleCalendar.GoogleCalendarAuthError) return { calendar: "reauth_required", tasks, meals, nutrition };
-    if (e instanceof googleCalendar.GoogleCalendarApiError) return { calendar: "error", tasks, meals, nutrition };
+    if (e instanceof googleCalendar.GoogleCalendarNotLinkedError) return { calendar: "not_linked", tasks, meals, nutrition, blocks };
+    if (e instanceof googleCalendar.GoogleCalendarAuthError) return { calendar: "reauth_required", tasks, meals, nutrition, blocks };
+    if (e instanceof googleCalendar.GoogleCalendarApiError) return { calendar: "error", tasks, meals, nutrition, blocks };
     throw e;
   }
 }
@@ -217,5 +224,31 @@ export async function setMealStatusAction(
   }
   revalidatePath("/calendar");
   revalidatePath("/meals");
+  return getDayScheduleAction(dateKey);
+}
+
+/**
+ * Puts a block of time on the day.
+ *
+ * The day's open tasks are offered as titles in the UI, but the title is
+ * free text: half of what takes an hour was never written down as a task,
+ * and refusing to schedule it would just send the owner elsewhere.
+ */
+export async function addTimeBlockAction(input: timeBlocks.TimeBlockInput): Promise<DayScheduleView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await timeBlocks.add(ownerSub, input);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/calendar");
+  return getDayScheduleAction(input.dateKey);
+}
+
+export async function removeTimeBlockAction(id: string, dateKey: string): Promise<DayScheduleView> {
+  const ownerSub = await requireOwnerSub();
+  await timeBlocks.remove(ownerSub, id);
+  revalidatePath("/calendar");
   return getDayScheduleAction(dateKey);
 }
