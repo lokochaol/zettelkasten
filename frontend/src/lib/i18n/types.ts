@@ -57,6 +57,8 @@ export interface Dictionary {
     projectsLabel: string;
     discoveryLabel: string;
     calendarLabel: string;
+    mealsLabel: string;
+    moneyLabel: string;
   };
   confirmDialog: {
     confirmLabel: string;

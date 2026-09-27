@@ -40,6 +40,8 @@ export const en: Dictionary = {
     projectsLabel: "Projects",
     discoveryLabel: "Discovery",
     calendarLabel: "Calendar",
+    mealsLabel: "Meals",
+    moneyLabel: "Money",
   },
   confirmDialog: {
     confirmLabel: "Add",
