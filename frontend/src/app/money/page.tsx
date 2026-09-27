@@ -1,0 +1,36 @@
+import Link from "next/link";
+import { requireSession } from "@/lib/session";
+import { MoneyScreen } from "@/components/MoneyScreen";
+import { HeaderMenu } from "@/components/HeaderMenu";
+import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
+import { getLocale } from "@/lib/i18n/locale";
+import { getDictionary } from "@/lib/i18n/dictionary";
+
+export default async function MoneyPage() {
+  const session = await requireSession();
+  const dict = getDictionary(await getLocale());
+
+  return (
+    <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
+      <div className="flex w-full max-w-[760px] flex-col gap-8">
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            href="/calendar"
+            className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
+          >
+            <span className="text-accent">&lt;</span> {dict.nav.calendarLabel}
+          </Link>
+          <HeaderMenu>
+            <div className="flex w-full flex-col items-end gap-1.5 border-b border-line pb-2.5">
+              <HeaderAccountBadge email={session.user?.email ?? dict.common.unknownEmail} />
+              <Link href="/settings" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
+                {dict.nav.settingsLabel}
+              </Link>
+            </div>
+          </HeaderMenu>
+        </div>
+        <MoneyScreen />
+      </div>
+    </main>
+  );
+}

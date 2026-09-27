@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
-export type ZettelkastenMainView = "notes" | "projects" | "calendar";
+export type ZettelkastenMainView = "notes" | "projects" | "calendar" | "discovery";
 
 /** Simple line-icon glyphs — no emoji, so they read consistently with the
  * rest of the HUD's monochrome/mono-label visual language across themes
@@ -38,6 +38,19 @@ function CalendarIcon() {
       <path d="M1.5 6.5H14.5" stroke="currentColor" strokeWidth="1.3" />
       <path d="M4.5 1.5V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       <path d="M11.5 1.5V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A magnifier over a page — "look outward from what's written here",
+ * which is what discovery does. */
+function DiscoveryIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.4" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M10.3 10.3L14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <path d="M5.2 6.4H8.8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M5.2 8.4H7.6" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
     </svg>
   );
 }
@@ -102,6 +115,9 @@ export function ZettelkastenSideActionBar({
       </ActionBarButton>
       <ActionBarButton active={active === "calendar"} label={t.nav.calendarLabel} onClick={() => select("calendar")}>
         <CalendarIcon />
+      </ActionBarButton>
+      <ActionBarButton active={active === "discovery"} label={t.nav.discoveryLabel} onClick={() => select("discovery")}>
+        <DiscoveryIcon />
       </ActionBarButton>
     </div>
   );

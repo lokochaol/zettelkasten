@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDayScheduleAction, type DayScheduleView } from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
+import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 
@@ -63,9 +64,10 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   const timed = events.filter((e) => !e.allDay && e.start);
   const allDay = events.filter((e) => e.allDay);
 
-  // The axis covers the working day, widened to whatever the day actually holds.
-  const starts = timed.map((e) => hourOf(e.start as Date, timeZone));
-  const ends = timed.map((e) => hourOf((e.end ?? e.start) as Date, timeZone));
+  // The axis covers the working day, widened to whatever the day actually
+  // holds — meals included, since breakfast is usually before the events.
+  const starts = [...timed.map((e) => hourOf(e.start as Date, timeZone)), ...view.meals.map((m) => hourOf(new Date(m.start), timeZone))];
+  const ends = [...timed.map((e) => hourOf((e.end ?? e.start) as Date, timeZone)), ...view.meals.map((m) => hourOf(new Date(m.end), timeZone))];
   const from = Math.floor(Math.min(DEFAULT_FROM, ...starts));
   const to = Math.ceil(Math.max(DEFAULT_TO, ...ends));
   const hours = Array.from({ length: to - from }, (_, i) => from + i);
@@ -83,6 +85,8 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           <span className="font-mono text-[9.5px] text-ink-faint">{t.daySchedule.eventCount(events.length)}</span>
         )}
       </div>
+
+      {view.nutrition && <NutritionSummary nutrition={view.nutrition} />}
 
       <div className="flex gap-4 rounded-xl border border-line bg-surface p-4">
         {/* 予定 — hour axis */}
@@ -120,7 +124,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                       href={e.htmlLink ?? undefined}
                       target="_blank"
                       rel="noreferrer"
-                      className="absolute right-0 left-12 overflow-hidden rounded-md border-l-2 border-accent bg-accent-soft px-2 py-1 transition-colors hover:bg-accent/15"
+                      className="absolute left-12 w-[48%] overflow-hidden rounded-md border-l-2 border-accent bg-accent-soft px-2 py-1 transition-colors hover:bg-accent/15"
                       style={{ top, height }}
                     >
                       <p className="truncate text-[11.5px] font-semibold text-ink">{e.title}</p>
@@ -131,7 +135,26 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                     </a>
                   );
                 })}
-                {timed.length === 0 && (
+                {view.meals.map((m) => {
+                  const start = new Date(m.start);
+                  const end = new Date(m.end);
+                  const top = (hourOf(start, timeZone) - from) * HOUR_PX;
+                  const height = Math.max(20, (hourOf(end, timeZone) - hourOf(start, timeZone)) * HOUR_PX - 2);
+                  return (
+                    <div
+                      key={m.id}
+                      title={m.recipe}
+                      className="absolute right-0 w-[46%] overflow-hidden rounded-md border-l-2 border-[var(--color-meal)] bg-[var(--color-meal-soft)] px-2 py-1"
+                      style={{ top, height }}
+                    >
+                      <p className="truncate text-[11px] font-semibold text-ink">{m.title}</p>
+                      <p className="truncate font-mono text-[9px] text-ink-soft">
+                        {m.kcal} kcal · {timeLabel(start)}
+                      </p>
+                    </div>
+                  );
+                })}
+                {timed.length === 0 && view.meals.length === 0 && (
                   <p className="absolute top-2 left-12 font-mono text-[10px] text-ink-faint">{t.daySchedule.noEvents}</p>
                 )}
               </div>
@@ -139,8 +162,27 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           )}
         </div>
 
-        {/* タスク — read out of the day's notes */}
-        <div className="w-[300px] shrink-0 border-l border-line pl-4">
+        {/* 食事とタスク */}
+        <div className="flex w-[300px] shrink-0 flex-col gap-4 border-l border-line pl-4">
+          {view.meals.length > 0 && (
+            <div>
+              <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.daySchedule.mealsHeading}</p>
+              <ul className="flex flex-col gap-1.5">
+                {view.meals.map((m) => (
+                  <li key={m.id} className="flex items-baseline gap-2">
+                    <span className="font-mono text-[9px] text-[var(--color-meal)]">{t.daySchedule.slot[m.slot]}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="text-[11.5px] text-ink">{m.title}</span>
+                      <span className="ml-1.5 font-mono text-[9px] text-ink-faint">
+                        {m.kcal} kcal · {t.daySchedule.prep(m.prepMinutes)}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <div>
           <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">
             {t.daySchedule.openTasks(view.tasks.length)}
           </p>
@@ -159,10 +201,63 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
               ))}
             </ul>
           )}
-          <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">{t.daySchedule.tasksSource}</p>
+            <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">{t.daySchedule.tasksSource}</p>
+          </div>
+          <div className="border-t border-line pt-3">
+            <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.money.dashboardHeading}</p>
+            <ExpenseQuickEntry dateKey={dateKey} compact />
+          </div>
         </div>
       </div>
     </section>
+  );
+}
+
+/** Today against its brief: what the body spent, what the plan provides,
+ * and whether the nutrients that are easy to miss actually land. Shown as
+ * planned-vs-target rather than a single "calories left" number, because a
+ * day can hit its calories and still be short on protein or fibre — which
+ * is the whole reason the planner works in nutrients. */
+function NutritionSummary({ nutrition: n }: { nutrition: NonNullable<DayScheduleView["nutrition"]> }) {
+  const { t } = useI18n();
+  const burn = n.activeEnergyKcal;
+  const short = (planned: number, target: number) => planned < target * 0.9;
+  return (
+    <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3">
+      <Stat label={t.daySchedule.statTarget} value={`${n.targetKcal} kcal`} />
+      <Stat
+        label={t.daySchedule.statPlanned}
+        value={`${Math.round(n.plannedKcal)} kcal`}
+        tone={n.plannedKcal === 0 ? "faint" : Math.abs(n.plannedKcal - n.targetKcal) > 150 ? "warn" : "ok"}
+      />
+      <Stat
+        label={t.health.protein}
+        value={`${Math.round(n.plannedProteinG)} / ${n.targetProteinG} g`}
+        tone={n.plannedKcal === 0 ? "faint" : short(n.plannedProteinG, n.targetProteinG) ? "warn" : "ok"}
+      />
+      <Stat
+        label={t.health.fiber}
+        value={`${Math.round(n.plannedFiberG)} / ${n.targetFiberG} g`}
+        tone={n.plannedKcal === 0 ? "faint" : short(n.plannedFiberG, n.targetFiberG) ? "warn" : "ok"}
+      />
+      <Stat
+        label={t.health.salt}
+        value={`${n.plannedSaltG.toFixed(1)} / ${n.saltMaxG} g`}
+        tone={n.plannedKcal === 0 ? "faint" : n.plannedSaltG > n.saltMaxG ? "warn" : "ok"}
+      />
+      {burn !== null && <Stat label={t.daySchedule.statBurn} value={`${Math.round(burn)} kcal`} />}
+      {n.weightKg !== null && <Stat label={t.daySchedule.statWeight} value={`${n.weightKg} kg`} />}
+    </div>
+  );
+}
+
+function Stat({ label, value, tone = "plain" }: { label: string; value: string; tone?: "plain" | "ok" | "warn" | "faint" }) {
+  const color = tone === "warn" ? "text-accent" : tone === "faint" ? "text-ink-faint" : "text-ink";
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">{label}</span>
+      <span className={`text-[13px] font-bold ${color}`}>{value}</span>
+    </div>
   );
 }
 

@@ -8,8 +8,6 @@ import { AiProvider } from "@/lib/aiCredentials";
 import type { AiCredentialSummary } from "@/lib/aiCredentials";
 import * as googleCalendarCredentials from "@/lib/googleCalendarCredentials";
 import type { GoogleCalendarSummary } from "@/lib/googleCalendarCredentials";
-import * as discovery from "@/lib/discovery";
-import type { DiscoverySchedule } from "@/lib/discovery";
 import * as health from "@/lib/health";
 import { EncryptionConfigError } from "@/lib/crypto";
 import { ValidationError } from "@/lib/errors";
@@ -94,17 +92,6 @@ export async function saveAiSettingsAction(input: {
 export async function removeAiSettingsAction(): Promise<void> {
   const ownerSub = await requireOwnerSub();
   await aiCredentials.remove(ownerSub);
-  revalidatePath("/settings");
-}
-
-export async function getDiscoveryScheduleAction(): Promise<DiscoverySchedule> {
-  const ownerSub = await requireOwnerSub();
-  return discovery.getSchedule(ownerSub);
-}
-
-export async function saveDiscoveryScheduleAction(input: DiscoverySchedule): Promise<void> {
-  const ownerSub = await requireOwnerSub();
-  await discovery.saveSchedule(ownerSub, input);
   revalidatePath("/settings");
 }
 

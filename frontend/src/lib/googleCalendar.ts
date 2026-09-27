@@ -1,5 +1,6 @@
 import { dayBoundsUtc } from "@/lib/dateKey";
 import * as credentials from "@/lib/googleCalendarCredentials";
+import { scopeAllowsWrite } from "@/lib/googleCalendarCredentials";
 
 /**
  * Thin Google Calendar v3 client, scoped to what the day timeline needs.
@@ -146,4 +147,61 @@ export async function listDayEvents(ownerSub: string, dateKey: string, timeZone:
   const json = await res.json();
   if (!res.ok) throw new GoogleCalendarApiError(res.status, json.error?.message ?? "calendar request failed");
   return ((json.items ?? []) as GoogleEventResource[]).filter((e) => e.status !== "cancelled").map(toEvent);
+}
+
+export interface EventDraft {
+  summary: string;
+  description: string;
+  start: Date;
+  end: Date;
+  timeZone: string;
+}
+
+function ensureWritable(grantedScope: string) {
+  if (!scopeAllowsWrite(grantedScope)) {
+    throw new GoogleCalendarAuthError("The calendar link was granted read-only");
+  }
+}
+
+async function writeEvent(ownerSub: string, draft: EventDraft, eventId: string | null): Promise<string> {
+  const { token, calendarId, grantedScope } = await accessTokenFor(ownerSub);
+  ensureWritable(grantedScope);
+  const base = `${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events`;
+  const res = await fetch(eventId ? `${base}/${encodeURIComponent(eventId)}` : base, {
+    method: eventId ? "PATCH" : "POST",
+    headers: { authorization: `Bearer ${token}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      summary: draft.summary,
+      description: draft.description,
+      start: { dateTime: draft.start.toISOString(), timeZone: draft.timeZone },
+      end: { dateTime: draft.end.toISOString(), timeZone: draft.timeZone },
+    }),
+  });
+  if (res.status === 401) throw new GoogleCalendarAuthError("Google rejected the access token");
+  // A stored id can point at an event deleted in Google directly; that's a
+  // stale pointer, not a failure — fall through to creating a new one.
+  if ((res.status === 404 || res.status === 410) && eventId) return writeEvent(ownerSub, draft, null);
+  const json = await res.json();
+  if (!res.ok) throw new GoogleCalendarApiError(res.status, json.error?.message ?? "calendar write failed");
+  return json.id as string;
+}
+
+/** Creates the event, or updates it in place when `eventId` is a event we
+ * wrote before — so re-syncing a week doesn't leave duplicates behind. */
+export async function upsertEvent(ownerSub: string, draft: EventDraft, eventId: string | null): Promise<string> {
+  return writeEvent(ownerSub, draft, eventId);
+}
+
+/** Deleting something already gone is success, not an error — the caller
+ * wanted it absent and it is. */
+export async function deleteEvent(ownerSub: string, eventId: string): Promise<void> {
+  const { token, calendarId, grantedScope } = await accessTokenFor(ownerSub);
+  ensureWritable(grantedScope);
+  const res = await fetch(`${API_BASE}/calendars/${encodeURIComponent(calendarId)}/events/${encodeURIComponent(eventId)}`, {
+    method: "DELETE",
+    headers: { authorization: `Bearer ${token}` },
+  });
+  if (res.status === 401) throw new GoogleCalendarAuthError("Google rejected the access token");
+  if (res.ok || res.status === 404 || res.status === 410) return;
+  throw new GoogleCalendarApiError(res.status, "calendar delete failed");
 }

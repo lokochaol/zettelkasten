@@ -98,6 +98,10 @@ model QuickNote {
   // or "found nothing" both count — only a failed provider call leaves it
   // untouched, see src/lib/discovery.ts). Drives the least-recently-run-first
   // rotation when there are more active notes than one run's cap allows.
+  /// Opt-in: discovery only ever looks at notes the owner picked in the
+  /// 探索 tab. It spends tokens on their own API key and most scraps never
+  /// want it, so "every active note" was the wrong default.
+  discoveryEnabled   Boolean  @default(false) @map("discovery_enabled")
   discoveryLastRunAt DateTime? @map("discovery_last_run_at")
 
   promotionSourceLinks PromotionSourceQuickNote[]
@@ -373,7 +377,10 @@ model DiscoveryRunStatus {
 model DiscoverySchedule {
   id          String   @id @default(uuid())
   ownerSub    String   @unique @map("owner_sub")
-  timesPerDay Int      @default(2) @map("times_per_day")
+  /// 0 means discovery never runs on a schedule; the owner can still
+  /// trigger it by hand. This is the default — an unattended job spending
+  /// someone's API credits should be something they switched on.
+  timesPerDay Int      @default(0) @map("times_per_day")
   hour1       Int      @default(7) @map("hour1")
   hour2       Int      @default(19) @map("hour2")
   updatedAt   DateTime @updatedAt @map("updated_at")
@@ -517,4 +524,255 @@ model HealthIngestToken {
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("health_ingest_token")
+}
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+/// The constraints a week's menu has to satisfy that aren't about the
+/// body — money, time, and things the owner won't eat. Kept apart from
+/// HealthProfile because these change with life rather than with weight.
+model MealPreference {
+  ownerSub          String   @id @map("owner_sub")
+  /// Food budget for one week, in yen. The monthly figure the owner thinks
+  /// in is divided down when they enter it — the planner buys by the week.
+  weeklyBudgetYen   Int      @default(8000) @map("weekly_budget_yen")
+  /// Minutes of cooking the owner will actually do on a weekday. The single
+  /// most effective constraint on whether a plan survives contact with a
+  /// Tuesday.
+  weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
+  /// 0 = Sunday. The one shopping trip the whole week is planned around.
+  shoppingWeekday   Int      @default(1) @map("shopping_weekday")
+  /// Free text, passed to the planner as-is: "パクチーが苦手", "夜は炭水化物少なめ".
+  dislikes          String   @default("")
+  /// Kept separate from dislikes so it can be stated to the model as a hard
+  /// constraint rather than a preference.
+  allergies         String   @default("")
+  /// When each meal happens, as minutes from midnight. The planner doesn't
+  /// choose these — a meal is at the time the owner eats, not a time an
+  /// AI picked — and they're what places meals on the day's timeline and
+  /// in Google Calendar.
+  breakfastMinutes  Int      @default(420) @map("breakfast_minutes")
+  lunchMinutes      Int      @default(750) @map("lunch_minutes")
+  dinnerMinutes     Int      @default(1140) @map("dinner_minutes")
+  /// 0 = Sunday. The weekday the Coop Deli van comes. Ordering is planned
+  /// backwards from this, not from the shopping trip: the delivery has to
+  /// land before the week it feeds begins.
+  coopDeliveryWeekday Int    @default(2) @map("coop_delivery_weekday")
+  /// How many days before delivery the order closes. A week for Coop Deli;
+  /// kept as a number because the deadline is the thing that actually
+  /// bites, and it differs by area.
+  coopOrderLeadDays Int      @default(7) @map("coop_order_lead_days")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("meal_preference")
+}
+
+/// One week's menu. Keyed by the week's first day so regenerating replaces
+/// rather than accumulates.
+model MealPlan {
+  id                String   @id @default(uuid())
+  ownerSub          String   @map("owner_sub")
+  weekStartDateKey  String   @map("week_start_date_key")
+  /// The targets the plan was generated against, stored as they were at the
+  /// time — weight and activity move, and a plan should be read against the
+  /// brief it was actually written to.
+  targetKcal        Int      @map("target_kcal")
+  targetProteinG    Int      @map("target_protein_g")
+  targetFiberG      Int      @map("target_fiber_g")
+  budgetYen         Int      @map("budget_yen")
+  /// What the model was told, kept for debugging a plan that came out odd.
+  promptSummary     String   @map("prompt_summary")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  meals         PlannedMeal[]
+  shoppingItems ShoppingItem[]
+
+  @@unique([ownerSub, weekStartDateKey])
+  @@index([ownerSub, weekStartDateKey])
+  @@map("meal_plan")
+}
+
+model PlannedMeal {
+  id          String   @id @default(uuid())
+  planId      String   @map("plan_id")
+  plan        MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dateKey     String   @map("date_key")
+  slot        MealSlot
+  title       String
+  /// Ingredients and method, as plain text — same "a note is text" stance
+  /// the rest of the app takes.
+  recipe      String
+  kcal        Int
+  proteinG    Float    @map("protein_g")
+  fatG        Float    @map("fat_g")
+  carbG       Float    @map("carb_g")
+  fiberG      Float    @map("fiber_g")
+  saltG       Float    @map("salt_g")
+  prepMinutes Int      @map("prep_minutes")
+  /// Set once the meal has been written into Google Calendar, so a re-sync
+  /// updates that event instead of creating a second one.
+  googleEventId String? @map("google_event_id")
+
+  @@unique([planId, dateKey, slot])
+  @@index([planId, dateKey])
+  @@map("planned_meal")
+}
+
+model ShoppingItem {
+  id           String   @id @default(uuid())
+  planId       String   @map("plan_id")
+  plan         MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  category     String
+  name         String
+  quantity     String
+  estimatedYen Int      @map("estimated_yen")
+  checked      Boolean  @default(false)
+  /// Position within its category, as the planner ordered it.
+  sortOrder    Int      @map("sort_order")
+
+  @@index([planId])
+  @@map("shopping_item")
+}
+
+enum ExpenseSource {
+  /// Typed in at the time of spending — the day-to-day half.
+  MANUAL
+  /// Came from an imported statement CSV — the long-term half.
+  CSV
+}
+
+/// One expense. Category is a free string rather than an enum: what
+/// someone tracks changes with their life, and a migration is the wrong
+/// thing to need when it does. CategoryBudget names the ones that matter.
+model Expense {
+  id        String        @id @default(uuid())
+  ownerSub  String        @map("owner_sub")
+  /// "YYYY-MM-DD" in the owner's own time zone, like every other day key
+  /// here — spending belongs to the day it felt like, not to UTC.
+  dateKey   String        @map("date_key")
+  /// Yen, whole numbers. No currency column: this is a single-currency app
+  /// for a single person, and a nullable currency nobody sets is worse
+  /// than none.
+  amountYen Int           @map("amount_yen")
+  category  String
+  memo      String        @default("")
+  source    ExpenseSource @default(MANUAL)
+  /// Set on imported rows: a stable fingerprint of the statement line, so
+  /// re-importing an overlapping CSV doesn't duplicate what's already in.
+  externalKey String?     @map("external_key")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@unique([ownerSub, externalKey])
+  @@index([ownerSub, dateKey])
+  @@map("expense")
+}
+
+/// A monthly ceiling for one category. Absent means the category is
+/// tracked but not budgeted — which is a normal state, not zero.
+model CategoryBudget {
+  id         String   @id @default(uuid())
+  ownerSub   String   @map("owner_sub")
+  category   String
+  monthlyYen Int      @map("monthly_yen")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, category])
+  @@map("category_budget")
+}
+
+/// How one card or bank's CSV is shaped. Remembered per owner so the
+/// second import of the same statement is a drop, not a re-mapping —
+/// every issuer names its columns differently and none of them will
+/// change to suit us.
+model CsvImportProfile {
+  id           String   @id @default(uuid())
+  ownerSub     String   @map("owner_sub")
+  /// The owner's name for it: "楽天カード", "住信SBI" …
+  name         String
+  dateColumn   String   @map("date_column")
+  amountColumn String   @map("amount_column")
+  memoColumn   String   @map("memo_column")
+  /// Some issuers write outgoings as positive, others as negative. Stored
+  /// rather than guessed per file, because a sign flip silently turns a
+  /// month of spending into a month of income.
+  amountIsNegativeForSpending Boolean @default(false) @map("amount_is_negative_for_spending")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, name])
+  @@map("csv_import_profile")
+}
+
+/// "Anything whose description contains this goes in that category."
+/// Learned as the owner categorises imported rows, so the next statement
+/// arrives mostly sorted.
+model CategoryRule {
+  id       String @id @default(uuid())
+  ownerSub String @map("owner_sub")
+  /// Matched case-insensitively as a substring. Not a regex: these are
+  /// written by hand and a bad regex fails in ways that are hard to see.
+  keyword  String
+  category String
+
+  @@unique([ownerSub, keyword])
+  @@index([ownerSub])
+  @@map("category_rule")
+}
+
+/// A proposed Coop Deli order for one week.
+///
+/// A proposal and nothing more: eフレンズ has no external ordering API, so
+/// nothing here is placed automatically. What the app can do honestly is
+/// work out what next-week-but-one needs, in generic ingredient names and
+/// estimated prices, and hand over a list to type in.
+model CoopOrder {
+  id               String   @id @default(uuid())
+  ownerSub         String   @map("owner_sub")
+  /// The week this delivery is meant to feed — the same key as the plan.
+  weekStartDateKey String   @map("week_start_date_key")
+  /// When the order closes, and when the van comes. Stored rather than
+  /// recomputed: the preference can change after an order is proposed, and
+  /// the deadline that was true when it was written is the useful one.
+  orderByDateKey   String   @map("order_by_date_key")
+  deliveryDateKey  String   @map("delivery_date_key")
+  /// Whether the list was consolidated into delivery-sized quantities, or
+  /// is a plain copy of the week's shopping list because no AI key was
+  /// configured. Shown, not hidden — the two are worth different trust.
+  refined          Boolean  @default(false)
+  note             String   @default("")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  items CoopOrderItem[]
+
+  @@unique([ownerSub, weekStartDateKey])
+  @@index([ownerSub, orderByDateKey])
+  @@map("coop_order")
+}
+
+model CoopOrderItem {
+  id           String    @id @default(uuid())
+  orderId      String    @map("order_id")
+  order        CoopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  category     String
+  /// A generic ingredient name, never a catalogue code: the app cannot see
+  /// the week's catalogue, and inventing product numbers would be a lie
+  /// that costs the owner a wrong delivery.
+  name         String
+  quantity     String
+  estimatedYen Int       @map("estimated_yen")
+  /// Fresh things a weekly delivery handles badly, and amounts too small to
+  /// be worth a delivery slot. Kept in the list rather than dropped, so the
+  /// owner knows they still need them.
+  localInstead Boolean   @default(false) @map("local_instead")
+  reason       String    @default("")
+  chosen       Boolean   @default(true)
+  sortOrder    Int       @map("sort_order")
+
+  @@index([orderId])
+  @@map("coop_order_item")
 }
