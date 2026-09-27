@@ -186,10 +186,8 @@ export async function proposeOrder(ownerSub: string, weekStartDateKey: string, t
   let refined = false;
 
   try {
-    const parsed = (await askForJson(ownerSub, SYSTEM_PROMPT, briefFor(plan.shoppingItems, weekStartDateKey, dates))) as {
-      items?: unknown;
-      note?: unknown;
-    };
+    const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, briefFor(plan.shoppingItems, weekStartDateKey, dates));
+    const parsed = value as { items?: unknown; note?: unknown };
     const proposed = (Array.isArray(parsed.items) ? parsed.items : [])
       .map((raw, i) => {
         const item = raw as RawItem;

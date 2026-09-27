@@ -163,7 +163,7 @@ const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立�
         {
           "slot": "BREAKFAST",
           "title": "料理名",
-          "recipe": "材料（分量つき）と作り方を短く。作り置きを使う場合はその旨も。",
+          "recipe": "材料（分量つき）と作り方。120字以内で簡潔に。作り置きを使う場合はその旨も。",
           "kcal": 480,
           "proteinG": 28,
           "fatG": 14,
@@ -180,7 +180,9 @@ const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立�
   ]
 }
 
-daysは7日分、各日のmealsはBREAKFAST・LUNCH・DINNERの3つを必ず含めること。`;
+daysは7日分、各日のmealsはBREAKFAST・LUNCH・DINNERの3つを必ず含めること。
+
+recipeは1食120字以内。7日×3食の全体が出力の上限に収まらないと、献立として読み取れずに失敗する。文章の長さより、7日分が最後まで出力されることを優先すること。`;
 
 interface RawMeal {
   slot?: unknown;
@@ -243,7 +245,8 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     preference.allergies ? `アレルギー（絶対に使わない）: ${preference.allergies}` : "アレルギー: なし",
   ].join("\n");
 
-  const parsed = (await askForJson(ownerSub, SYSTEM_PROMPT, brief)) as { days?: unknown; shopping?: unknown };
+  const { value, truncated } = await askForJson(ownerSub, SYSTEM_PROMPT, brief);
+  const parsed = value as { days?: unknown; shopping?: unknown };
 
   // A regenerated week starts unlogged: what was eaten belonged to the
   // meals that were replaced, not to these.
@@ -316,6 +319,12 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     saltMaxG: t.saltMaxG,
     weekdayCookMinutes: preference.weekdayCookMinutes,
   }, estimatedYen, preference.weeklyBudgetYen);
+  // A cut-off reply is reported, never smoothed over: the days that did
+  // arrive are usable, and the ones that didn't are already named above by
+  // checkAgainstBrief. Saying why they're missing turns a puzzling gap
+  // into an instruction — regenerate, or shorten the brief.
+  if (truncated) warnings.unshift("AIの返答が長さの上限で途中で切れたため、一部が入っていません。もう一度作り直すと揃うことがあります。");
+  if (plan.shoppingItems.length === 0) warnings.push("買い物リストが入っていません（返答が途中で切れた可能性があります）。");
 
   const { meals: planMeals, shoppingItems, ...rest } = plan;
   return {
