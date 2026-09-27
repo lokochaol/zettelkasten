@@ -45,19 +45,25 @@ export async function POST(request: NextRequest) {
   // Shortcuts sends numbers as strings depending on how the action is
   // wired up, so accept either rather than making the owner debug an
   // automation over a type.
-  const num = (v: unknown): number | null => {
-    if (v === undefined || v === null || v === "") return null;
+  //
+  // Undefined, not null, for anything missing: the store treats an absent
+  // field as "no information" and leaves whatever is already recorded for
+  // that day alone. A Shortcut that sends only steps must not erase the
+  // weight another request already filed under the same date.
+  const num = (v: unknown): number | undefined => {
+    if (v === undefined || v === null || v === "") return undefined;
     const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
-    return Number.isFinite(n) ? n : null;
+    return Number.isFinite(n) ? n : undefined;
   };
   const dateKey = typeof payload.date === "string" ? payload.date.trim() : "";
+  const steps = num(payload.steps);
 
   try {
     const metric = await health.recordDailyMetric(ownerSub, {
       dateKey,
       weightKg: num(payload.weightKg),
       activeEnergyKcal: num(payload.activeEnergyKcal),
-      steps: num(payload.steps) === null ? null : Math.round(num(payload.steps) as number),
+      steps: steps === undefined ? undefined : Math.round(steps),
     });
     return NextResponse.json({
       ok: true,

@@ -57,23 +57,31 @@ export interface MetricInput {
   steps?: number | null;
 }
 
-/** Upsert rather than insert: the Shortcut posts a daily summary, so a
+/**
+ * Upsert rather than insert: the Shortcut posts a daily summary, so a
  * second delivery for the same day is a corrected figure, not a second
- * reading to add up. */
+ * reading to add up.
+ *
+ * Only the fields actually sent are written. An absent field means "no
+ * information", never "clear it" — which matters because the metrics for
+ * one day don't all arrive together: a morning run sends today's weight
+ * while yesterday's energy and steps are the ones that are complete, so
+ * each day ends up written twice, from two different requests. Treating
+ * absence as null would have the second write wipe the first.
+ */
 export async function recordDailyMetric(ownerSub: string, input: MetricInput): Promise<HealthDailyMetric> {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateKey)) {
     throw new ValidationError("healthMetricInvalid", "date must be YYYY-MM-DD");
   }
-  const data = {
-    weightKg: input.weightKg ?? null,
-    activeEnergyKcal: input.activeEnergyKcal ?? null,
-    steps: input.steps ?? null,
-    receivedAt: new Date(),
+  const provided = {
+    ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
+    ...(input.activeEnergyKcal !== undefined ? { activeEnergyKcal: input.activeEnergyKcal } : {}),
+    ...(input.steps !== undefined ? { steps: input.steps } : {}),
   };
   return prisma.healthDailyMetric.upsert({
     where: { ownerSub_dateKey: { ownerSub, dateKey: input.dateKey } },
-    create: { ownerSub, dateKey: input.dateKey, ...data },
-    update: data,
+    create: { ownerSub, dateKey: input.dateKey, ...provided, receivedAt: new Date() },
+    update: { ...provided, receivedAt: new Date() },
   });
 }
 
