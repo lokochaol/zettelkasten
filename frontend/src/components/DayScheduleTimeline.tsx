@@ -202,7 +202,14 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           ) : (
             <ul className="flex flex-col gap-1.5">
               {view.tasks.map((task, i) => (
-                <li key={`${task.projectId}-${i}`} className="flex items-baseline gap-2">
+                <li
+                  key={`${task.projectId}-${task.line}-${i}`}
+                  className="flex items-baseline gap-2"
+                  // Indented rather than nested in a list: the depth comes
+                  // from the note's own indentation, and a subtask that
+                  // reads as one line of text should stay one line here.
+                  style={{ paddingLeft: task.depth * 14 }}
+                >
                   <span className="font-mono text-[11px] text-accent">{task.priority ? "*-" : "-"}</span>
                   <span className="min-w-0 flex-1">
                     <span className="text-[11.5px] text-ink">{task.text}</span>

@@ -26,6 +26,11 @@ export interface DayScheduleTask {
   projectName: string;
   text: string;
   priority: boolean;
+  /** Nesting under its parent task, for the indent. */
+  depth: number;
+  /** Which line of the project's note this is — its identity, since the
+   * note is the document and nothing here is stored twice. */
+  line: number;
 }
 
 export interface DayMeal {
@@ -132,16 +137,19 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
         weightKg: metric?.weightKg ?? null,
       }
     : null;
+  // Document order, not priority order: the tasks are a tree now, and a
+  // sort would tear children away from their parents. Ordering is the
+  // owner's to set, by moving lines — which is why they can.
   const tasks: DayScheduleTask[] = notes.flatMap((note) =>
     openTasks(note.content).map((entry) => ({
       projectId: note.projectId,
       projectName: note.projectName,
       text: entry.text,
       priority: entry.priority,
+      depth: entry.displayDepth,
+      line: entry.line,
     })),
   );
-  // Priority signifiers first, otherwise the project order the notes came in.
-  tasks.sort((a, b) => Number(b.priority) - Number(a.priority));
 
   try {
     const events = await googleCalendar.listDayEvents(ownerSub, dateKey, timeZone);
