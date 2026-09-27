@@ -6,6 +6,9 @@ import type { TodayProjectNote, ProjectTimelineMark, ProjectTaskNoteView } from 
 import * as quickNotes from "@/lib/quickNotes";
 import type { QuickNoteDetail } from "@/lib/quickNotes";
 import { requireOwnerSub } from "@/lib/session";
+import { ValidationError } from "@/lib/errors";
+import { getLocale } from "@/lib/i18n/locale";
+import { translateDomainError } from "@/lib/i18n/errors";
 import * as googleCalendar from "@/lib/googleCalendar";
 import type { CalendarEvent } from "@/lib/googleCalendar";
 import { openTasks } from "@/lib/bulletJournal";
@@ -30,6 +33,8 @@ export interface DayMeal {
   slot: "BREAKFAST" | "LUNCH" | "DINNER";
   title: string;
   recipe: string;
+  status: mealPlanning.MealStatus;
+  replacementNote: string;
   kcal: number;
   proteinG: number;
   fiberG: number;
@@ -51,6 +56,11 @@ export interface DayNutrition {
   plannedProteinG: number;
   plannedFiberG: number;
   plannedSaltG: number;
+  /** What was actually eaten, from the meals the owner confirmed. Kept
+   * apart from the planned figures rather than replacing them: the gap
+   * between the two is the interesting part, and collapsing them would
+   * show a day as short on protein when it simply hasn't been logged. */
+  intake: mealPlanning.DayIntake;
   /** Measured for the day, from the phone. */
   activeEnergyKcal: number | null;
   weightKg: number | null;
@@ -95,6 +105,8 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
     slot: meal.slot,
     title: meal.title,
     recipe: meal.recipe,
+    status: meal.status,
+    replacementNote: meal.replacementNote,
     kcal: meal.kcal,
     proteinG: meal.proteinG,
     fiberG: meal.fiberG,
@@ -113,6 +125,7 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
         plannedProteinG: meals.reduce((sum, m) => sum + m.proteinG, 0),
         plannedFiberG: meals.reduce((sum, m) => sum + m.fiberG, 0),
         plannedSaltG: meals.reduce((sum, m) => sum + m.saltG, 0),
+        intake: mealPlanning.intakeOf(scheduled.map(({ meal }) => meal)),
         activeEnergyKcal: metric?.activeEnergyKcal ?? null,
         weightKg: metric?.weightKg ?? null,
       }
@@ -169,4 +182,30 @@ export async function createQuickNoteForProjectAction(projectId: string): Promis
   revalidatePath("/scratch");
   revalidatePath(`/projects/${projectId}`);
   return note;
+}
+
+/**
+ * Records whether a planned meal was actually eaten.
+ *
+ * The whole day view comes back rather than just the meal: the day's
+ * intake, and whether it's still short on protein, changes with every
+ * answer, and that recalculation belongs on the server next to the
+ * targets.
+ */
+export async function setMealStatusAction(
+  mealId: string,
+  status: mealPlanning.MealStatus,
+  replacementNote: string,
+  dateKey: string,
+): Promise<DayScheduleView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await mealPlanning.setMealStatus(ownerSub, mealId, status, replacementNote);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/calendar");
+  revalidatePath("/meals");
+  return getDayScheduleAction(dateKey);
 }

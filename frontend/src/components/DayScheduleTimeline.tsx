@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { getDayScheduleAction, type DayScheduleView } from "@/app/calendar/actions";
+import { useEffect, useState, useTransition } from "react";
+import { getDayScheduleAction, setMealStatusAction, type DayMeal, type DayScheduleView } from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -39,6 +39,14 @@ function hourOf(date: Date, timeZone: string): number {
 export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; timeZone: string }) {
   const { t, locale } = useI18n();
   const [view, setView] = useState<DayScheduleView | null>(null);
+  const [, startLogging] = useTransition();
+
+  function logMeal(mealId: string, status: DayMeal["status"], note = "") {
+    startLogging(async () => {
+      const next = await setMealStatusAction(mealId, status, note, dateKey);
+      if (!("error" in next)) setView(next);
+    });
+  }
 
   // No reset before the fetch: the caller remounts this per day
   // (key={dateKey}), so a new day already starts from a null view.
@@ -147,9 +155,15 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                       className="absolute right-0 w-[46%] overflow-hidden rounded-md border-l-2 border-[var(--color-meal)] bg-[var(--color-meal-soft)] px-2 py-1"
                       style={{ top, height }}
                     >
-                      <p className="truncate text-[11px] font-semibold text-ink">{m.title}</p>
+                      <p
+                        className={`truncate text-[11px] font-semibold ${
+                          m.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"
+                        }`}
+                      >
+                        {m.title}
+                      </p>
                       <p className="truncate font-mono text-[9px] text-ink-soft">
-                        {m.kcal} kcal · {timeLabel(start)}
+                        {m.status === "REPLACED" ? t.daySchedule.logOther : `${m.kcal} kcal`} · {timeLabel(start)}
                       </p>
                     </div>
                   );
@@ -167,17 +181,9 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           {view.meals.length > 0 && (
             <div>
               <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.daySchedule.mealsHeading}</p>
-              <ul className="flex flex-col gap-1.5">
+              <ul className="flex flex-col gap-2">
                 {view.meals.map((m) => (
-                  <li key={m.id} className="flex items-baseline gap-2">
-                    <span className="font-mono text-[9px] text-[var(--color-meal)]">{t.daySchedule.slot[m.slot]}</span>
-                    <span className="min-w-0 flex-1">
-                      <span className="text-[11.5px] text-ink">{m.title}</span>
-                      <span className="ml-1.5 font-mono text-[9px] text-ink-faint">
-                        {m.kcal} kcal · {t.daySchedule.prep(m.prepMinutes)}
-                      </span>
-                    </span>
-                  </li>
+                  <MealRow key={m.id} meal={m} onLog={logMeal} />
                 ))}
               </ul>
             </div>
@@ -213,6 +219,64 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   );
 }
 
+/**
+ * One planned meal, and the one question the plan can't answer by itself:
+ * did it actually happen.
+ *
+ * Three answers, not a checkbox, because "no" splits into two different
+ * facts — the meal was skipped, or something else was eaten instead — and
+ * they mean opposite things for the day's totals. Unanswered stays
+ * unanswered: silence is not a skip.
+ */
+function MealRow({ meal, onLog }: { meal: DayMeal; onLog: (id: string, status: DayMeal["status"], note?: string) => void }) {
+  const { t } = useI18n();
+  const answers: [DayMeal["status"], string][] = [
+    ["EATEN", t.daySchedule.logAte],
+    ["SKIPPED", t.daySchedule.logSkipped],
+    ["REPLACED", t.daySchedule.logOther],
+  ];
+  return (
+    <li className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-2">
+        <span className="font-mono text-[9px] text-[var(--color-meal)]">{t.daySchedule.slot[meal.slot]}</span>
+        <span className="min-w-0 flex-1">
+          <span className={`text-[11.5px] ${meal.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"}`}>
+            {meal.title}
+          </span>
+          <span className="ml-1.5 font-mono text-[9px] text-ink-faint">
+            {meal.kcal} kcal · {t.daySchedule.prep(meal.prepMinutes)}
+          </span>
+        </span>
+      </div>
+      <div className="flex flex-wrap items-center gap-1">
+        {answers.map(([status, label]) => (
+          <button
+            key={status}
+            // Answering the same way again clears it: the fastest way back
+            // from a mis-tap, and the only way to return to "not yet said".
+            onClick={() => onLog(meal.id, meal.status === status ? "PLANNED" : status, meal.replacementNote)}
+            className={`rounded-full border px-2 py-0.5 font-mono text-[9px] transition-colors ${
+              meal.status === status
+                ? "border-accent bg-accent-soft text-accent"
+                : "border-line text-ink-faint hover:border-accent hover:text-accent"
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      {meal.status === "REPLACED" && (
+        <input
+          defaultValue={meal.replacementNote}
+          onBlur={(e) => e.target.value !== meal.replacementNote && onLog(meal.id, "REPLACED", e.target.value)}
+          placeholder={t.daySchedule.logOtherPlaceholder}
+          className="rounded border border-line bg-surface px-2 py-1 text-[10.5px] text-ink focus:border-accent focus:outline-none"
+        />
+      )}
+    </li>
+  );
+}
+
 /** Today against its brief: what the body spent, what the plan provides,
  * and whether the nutrients that are easy to miss actually land. Shown as
  * planned-vs-target rather than a single "calories left" number, because a
@@ -221,6 +285,10 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
 function NutritionSummary({ nutrition: n }: { nutrition: NonNullable<DayScheduleView["nutrition"]> }) {
   const { t } = useI18n();
   const burn = n.activeEnergyKcal;
+  const i = n.intake;
+  // Anything answered at all is enough to start showing the day as it
+  // actually went; before that, only the plan is known.
+  const logged = i.eaten + i.skipped + i.replaced;
   const short = (planned: number, target: number) => planned < target * 0.9;
   return (
     <div className="flex flex-wrap gap-x-6 gap-y-2 rounded-xl border border-line bg-surface px-4 py-3">
@@ -247,6 +315,43 @@ function NutritionSummary({ nutrition: n }: { nutrition: NonNullable<DaySchedule
       />
       {burn !== null && <Stat label={t.daySchedule.statBurn} value={`${Math.round(burn)} kcal`} />}
       {n.weightKg !== null && <Stat label={t.daySchedule.statWeight} value={`${n.weightKg} kg`} />}
+
+      {logged > 0 && (
+        <div className="flex w-full flex-wrap items-end gap-x-6 gap-y-2 border-t border-line pt-2.5">
+          <Stat
+            label={t.daySchedule.statActual}
+            value={`${Math.round(i.kcal)} kcal`}
+            tone={i.kcal === 0 ? "faint" : Math.abs(i.kcal - n.targetKcal) > 150 ? "warn" : "ok"}
+          />
+          <Stat
+            label={t.health.protein}
+            value={`${Math.round(i.proteinG)} / ${n.targetProteinG} g`}
+            tone={i.kcal === 0 ? "faint" : short(i.proteinG, n.targetProteinG) ? "warn" : "ok"}
+          />
+          <Stat
+            label={t.health.fiber}
+            value={`${Math.round(i.fiberG)} / ${n.targetFiberG} g`}
+            tone={i.kcal === 0 ? "faint" : short(i.fiberG, n.targetFiberG) ? "warn" : "ok"}
+          />
+          <Stat
+            label={t.health.salt}
+            value={`${i.saltG.toFixed(1)} / ${n.saltMaxG} g`}
+            tone={i.kcal === 0 ? "faint" : i.saltG > n.saltMaxG ? "warn" : "ok"}
+          />
+          {/* What the number leaves out, next to the number. An intake
+              figure that silently excludes three meals is worse than no
+              figure at all. */}
+          <span className="font-mono text-[9px] leading-relaxed text-ink-faint">
+            {[
+              i.unlogged > 0 ? t.daySchedule.intakeUnlogged(i.unlogged) : null,
+              i.replaced > 0 ? t.daySchedule.intakeReplaced(i.replaced) : null,
+              t.daySchedule.intakeNote,
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          </span>
+        </div>
+      )}
     </div>
   );
 }

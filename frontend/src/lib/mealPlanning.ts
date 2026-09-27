@@ -4,9 +4,9 @@ import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
 import * as googleCalendar from "@/lib/googleCalendar";
 import { currentTargets } from "@/lib/health";
 import { ValidationError } from "@/lib/errors";
-import type { MealPlan, MealPreference, MealSlot, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
+import type { MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
-export type { MealPreference, PlannedMeal, ShoppingItem };
+export type { MealPreference, MealStatus, PlannedMeal, ShoppingItem };
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 const DAYS_IN_PLAN = 7;
@@ -245,7 +245,9 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
 
   const parsed = (await askForJson(ownerSub, SYSTEM_PROMPT, brief)) as { days?: unknown; shopping?: unknown };
 
-  const meals: Array<Omit<PlannedMeal, "id" | "planId" | "googleEventId">> = [];
+  // A regenerated week starts unlogged: what was eaten belonged to the
+  // meals that were replaced, not to these.
+  const meals: Array<Omit<PlannedMeal, "id" | "planId" | "googleEventId" | "status" | "replacementNote">> = [];
   const days = Array.isArray(parsed.days) ? parsed.days : [];
   for (const rawDay of days) {
     const day = rawDay as { date?: unknown; meals?: unknown };
@@ -446,4 +448,62 @@ export async function syncWeekToCalendar(
 
 function slotLabelJa(slot: MealSlot): string {
   return slot === "BREAKFAST" ? "朝食" : slot === "LUNCH" ? "昼食" : "夕食";
+}
+
+/* ---------- what actually happened ---------- */
+
+export interface DayIntake {
+  /** Totals from the meals confirmed eaten, and only those. */
+  kcal: number;
+  proteinG: number;
+  fatG: number;
+  carbG: number;
+  fiberG: number;
+  saltG: number;
+  eaten: number;
+  skipped: number;
+  /** Eaten, but something else — so its nutrition is unknown and is not in
+   * the totals above. Counted separately so the UI can say the day's figure
+   * is incomplete instead of quietly under-reporting it. */
+  replaced: number;
+  /** Nothing said yet. Not "didn't eat": an unanswered meal is unknown, and
+   * treating it as a skip would tell the owner they are under target when
+   * they may simply not have logged lunch. */
+  unlogged: number;
+}
+
+/** Pure, so the same arithmetic serves the dashboard, a later week view,
+ * and the tests. */
+export function intakeOf(meals: Pick<PlannedMeal, "status" | "kcal" | "proteinG" | "fatG" | "carbG" | "fiberG" | "saltG">[]): DayIntake {
+  const intake: DayIntake = { kcal: 0, proteinG: 0, fatG: 0, carbG: 0, fiberG: 0, saltG: 0, eaten: 0, skipped: 0, replaced: 0, unlogged: 0 };
+  for (const meal of meals) {
+    if (meal.status === "EATEN") {
+      intake.kcal += meal.kcal;
+      intake.proteinG += meal.proteinG;
+      intake.fatG += meal.fatG;
+      intake.carbG += meal.carbG;
+      intake.fiberG += meal.fiberG;
+      intake.saltG += meal.saltG;
+      intake.eaten++;
+    } else if (meal.status === "SKIPPED") intake.skipped++;
+    else if (meal.status === "REPLACED") intake.replaced++;
+    else intake.unlogged++;
+  }
+  return intake;
+}
+
+/** Records what happened to one meal. The note belongs to REPLACED and is
+ * cleared otherwise, so a note can't outlive the answer it explained. */
+export async function setMealStatus(
+  ownerSub: string,
+  mealId: string,
+  status: MealStatus,
+  replacementNote = "",
+): Promise<PlannedMeal> {
+  const meal = await prisma.plannedMeal.findFirst({ where: { id: mealId, plan: { ownerSub } }, select: { id: true } });
+  if (!meal) throw new ValidationError("mealPlanNotFound", "Meal not found");
+  return prisma.plannedMeal.update({
+    where: { id: mealId },
+    data: { status, replacementNote: status === "REPLACED" ? replacementNote.trim().slice(0, 200) : "" },
+  });
 }

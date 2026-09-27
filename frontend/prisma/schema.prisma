@@ -526,6 +526,15 @@ model HealthIngestToken {
   @@map("health_ingest_token")
 }
 
+enum MealStatus {
+  PLANNED
+  EATEN
+  SKIPPED
+  REPLACED
+
+  @@map("meal_status")
+}
+
 enum MealSlot {
   BREAKFAST
   LUNCH
@@ -617,6 +626,16 @@ model PlannedMeal {
   /// Set once the meal has been written into Google Calendar, so a re-sync
   /// updates that event instead of creating a second one.
   googleEventId String? @map("google_event_id")
+  /// What actually happened. A plan is a proposal; the dietitian's half of
+  /// the job is the follow-up, and a day's real intake can only be known
+  /// by asking. PLANNED means nothing has been said yet — which is not the
+  /// same as "didn't eat it", and is never counted as either.
+  status        MealStatus @default(PLANNED)
+  /// What was eaten instead, when the answer was REPLACED. Free text, and
+  /// deliberately not turned into numbers: the app cannot know the
+  /// nutrition of a meal it never saw, and guessing would corrupt the one
+  /// figure the owner is meant to trust.
+  replacementNote String @default("") @map("replacement_note")
 
   @@unique([planId, dateKey, slot])
   @@index([planId, dateKey])
