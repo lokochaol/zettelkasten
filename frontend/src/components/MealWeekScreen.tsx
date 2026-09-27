@@ -14,7 +14,7 @@ import { LoadingBlock } from "@/components/LoadingSpinner";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
-import type { MealSlot } from "@/generated/prisma/client";
+import type { MealKind, MealSlot } from "@/generated/prisma/client";
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 
@@ -91,12 +91,16 @@ export function MealWeekScreen() {
         dinnerMinutes: next.dinnerMinutes,
         coopDeliveryWeekday: next.coopDeliveryWeekday,
         coopOrderLeadDays: next.coopOrderLeadDays,
+        cookSessionsPerWeek: next.cookSessionsPerWeek,
+        readyMadeMealsPerWeek: next.readyMadeMealsPerWeek,
       });
     });
   }
 
   const mealAt = (dateKey: string, slot: MealSlot) => view?.meals.find((m) => m.dateKey === dateKey && m.slot === slot);
   const totalsFor = (dateKey: string) => view?.dayTotals.find((d) => d.dateKey === dateKey);
+  const kindLabel = (kind: MealKind) =>
+    kind === "COOK" ? t.meals.kindCook : kind === "BATCH" ? t.meals.kindBatch : t.meals.kindReady;
   const slotLabel = (slot: MealSlot) =>
     slot === "BREAKFAST" ? t.meals.slotBreakfast : slot === "LUNCH" ? t.meals.slotLunch : t.meals.slotDinner;
 
@@ -150,8 +154,15 @@ export function MealWeekScreen() {
       </div>
 
       {view && (
-        <p className="font-mono text-[10.5px] text-ink-soft">
-          {t.meals.targetLine(view.plan.targetKcal, view.plan.targetProteinG, view.plan.targetFiberG, 7.5)}
+        <p className="flex flex-wrap gap-x-4 font-mono text-[10.5px] text-ink-soft">
+          <span>{t.meals.targetLine(view.plan.targetKcal, view.plan.targetProteinG, view.plan.targetFiberG, 7.5)}</span>
+          <span className="text-ink-faint">
+            {t.meals.loadSummary(
+              new Set(view.meals.filter((m) => m.kind === "COOK").map((m) => m.dateKey)).size,
+              view.meals.filter((m) => m.kind === "BATCH").length,
+              view.meals.filter((m) => m.kind === "READY").length,
+            )}
+          </span>
         </p>
       )}
       {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs text-accent">{error}</p>}
@@ -201,7 +212,16 @@ export function MealWeekScreen() {
                       {meal ? (
                         <>
                           <p className="text-[11px] leading-snug text-ink">{meal.title}</p>
-                          <p className="mt-0.5 font-mono text-[9px] text-ink-faint">
+                          <p className="mt-0.5 flex flex-wrap items-center gap-1 font-mono text-[9px] text-ink-faint">
+                            {/* Cooked, reheated, or opened — the thing you
+                                actually want to know when reading a week. */}
+                            <span
+                              className={`rounded px-1 py-px ${
+                                meal.kind === "COOK" ? "bg-accent-soft text-accent" : "bg-surface-alt text-ink-soft"
+                              }`}
+                            >
+                              {kindLabel(meal.kind)}
+                            </span>
                             {meal.kcal} kcal · {t.meals.prepMinutes(meal.prepMinutes)}
                           </p>
                         </>
@@ -314,6 +334,22 @@ export function MealWeekScreen() {
             <input
               defaultValue={data.preference.weekdayCookMinutes}
               onBlur={(e) => savePreference({ weekdayCookMinutes: Number(e.target.value) })}
+              inputMode="numeric"
+              className="w-full bg-transparent text-xs text-ink focus:outline-none"
+            />
+          </PrefField>
+          <PrefField label={t.meals.prefCookSessions}>
+            <input
+              defaultValue={data.preference.cookSessionsPerWeek}
+              onBlur={(e) => savePreference({ cookSessionsPerWeek: Number(e.target.value) })}
+              inputMode="numeric"
+              className="w-full bg-transparent text-xs text-ink focus:outline-none"
+            />
+          </PrefField>
+          <PrefField label={t.meals.prefReadyMade}>
+            <input
+              defaultValue={data.preference.readyMadeMealsPerWeek}
+              onBlur={(e) => savePreference({ readyMadeMealsPerWeek: Number(e.target.value) })}
               inputMode="numeric"
               className="w-full bg-transparent text-xs text-ink focus:outline-none"
             />

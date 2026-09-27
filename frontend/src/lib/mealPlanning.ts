@@ -4,11 +4,12 @@ import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
 import * as googleCalendar from "@/lib/googleCalendar";
 import { currentTargets } from "@/lib/health";
 import { ValidationError } from "@/lib/errors";
-import type { MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
+import type { MealKind, MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
-export type { MealPreference, MealStatus, PlannedMeal, ShoppingItem };
+export type { MealKind, MealPreference, MealStatus, PlannedMeal, ShoppingItem };
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
+const KINDS: MealKind[] = ["COOK", "BATCH", "READY"];
 const DAYS_IN_PLAN = 7;
 
 /* ---------- preferences ---------- */
@@ -30,6 +31,8 @@ export interface PreferenceInput {
   dinnerMinutes: number;
   coopDeliveryWeekday: number;
   coopOrderLeadDays: number;
+  cookSessionsPerWeek: number;
+  readyMadeMealsPerWeek: number;
 }
 
 export async function savePreference(ownerSub: string, input: PreferenceInput): Promise<MealPreference> {
@@ -41,6 +44,14 @@ export async function savePreference(ownerSub: string, input: PreferenceInput): 
   }
   if (!Number.isInteger(input.shoppingWeekday) || input.shoppingWeekday < 0 || input.shoppingWeekday > 6) {
     throw new ValidationError("mealPreferenceInvalid", "Shopping weekday must be 0-6");
+  }
+  if (!Number.isInteger(input.cookSessionsPerWeek) || input.cookSessionsPerWeek < 0 || input.cookSessionsPerWeek > 7) {
+    throw new ValidationError("mealPreferenceInvalid", "Cooking days must be 0-7");
+  }
+  // 21 is every meal in the week; anything above it is not a preference,
+  // it's a typo.
+  if (!Number.isInteger(input.readyMadeMealsPerWeek) || input.readyMadeMealsPerWeek < 0 || input.readyMadeMealsPerWeek > 21) {
+    throw new ValidationError("mealPreferenceInvalid", "Ready-made meals must be 0-21");
   }
   if (!Number.isInteger(input.coopDeliveryWeekday) || input.coopDeliveryWeekday < 0 || input.coopDeliveryWeekday > 6) {
     throw new ValidationError("mealPreferenceInvalid", "Delivery weekday must be 0-6");
@@ -149,10 +160,15 @@ const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立�
 3. 使い切る。同じ食材を複数の日・複数の料理に散らし、中途半端に余らないように数量を決める。
 4. 傷みやすいもの（葉物野菜・生魚・鶏肉）は週の前半に、日持ちするもの（根菜・冷凍・乾物）は後半に配置する。
 5. 予算を超えない。買い物リストの概算金額の合計が、指定された週予算以内に収まること。
-6. 平日の調理時間の上限を守る。超えそうな日は、前日の作り置きや冷凍を前提にした構成にする（その旨をrecipeに書く）。
-7. 苦手な食材は使わない。アレルギーの食材は、微量でも、出汁や調味料としても絶対に使わない。
-8. 日本の家庭で普通に手に入る食材と、現実的な価格にする。
-9. 栄養価は1食あたりの実際の量に基づいて見積もる。適当な丸め値ではなく、材料から計算した値にすること。
+6. 台所に立つ日を指定された回数までにする。これは1日あたりの調理時間の上限より優先度が高い。毎日15分ずつ作るのではなく、指定された日にまとめて作り、残りの日は作り置きの温め直し（BATCH）か冷凍食品・惣菜（READY）にする。
+   - まとめて作る日は buying/調理に時間をかけてよい。その日のCOOKの料理は、その日食べる分だけでなく、後の日のBATCH分も一緒に作る想定で分量を決め、recipeに「○食分作って冷蔵/冷凍」と書く。
+   - BATCHの料理には、どの日のどの料理の作り置きかをrecipeに書く。COOK側とBATCH側で食い違わないようにする。
+   - BATCHとREADYのprepMinutesは温め直しにかかる実際の時間（3〜10分程度）にする。
+   - 作り置きは冷蔵で3日、冷凍で1週間を目安にする。それを超える日に置かない。
+7. 冷凍食品・惣菜（READY）は指定された食数まで使ってよい。使う場合は、栄養目標を壊さないもの（たんぱく質が取れる・食塩が多すぎない）を選び、titleには一般的な商品の種類（例「冷凍の焼き魚」「冷凍うどん」）を書く。買い物リストにも入れる。
+8. 苦手な食材は使わない。アレルギーの食材は、微量でも、出汁や調味料としても絶対に使わない。
+9. 日本の家庭で普通に手に入る食材と、現実的な価格にする。
+10. 栄養価は1食あたりの実際の量に基づいて見積もる。適当な丸め値ではなく、材料から計算した値にすること。
 
 出力は次のJSONのみ。説明文・前置き・コードフェンスは書かない:
 {
@@ -162,6 +178,7 @@ const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立�
       "meals": [
         {
           "slot": "BREAKFAST",
+          "kind": "COOK",
           "title": "料理名",
           "recipe": "材料（分量つき）と作り方。120字以内で簡潔に。作り置きを使う場合はその旨も。",
           "kcal": 480,
@@ -180,12 +197,15 @@ const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立�
   ]
 }
 
+kindは COOK（その日に作る）/ BATCH（作り置きを食べる）/ READY（冷凍食品・惣菜）のいずれか。
+
 daysは7日分、各日のmealsはBREAKFAST・LUNCH・DINNERの3つを必ず含めること。
 
 recipeは1食120字以内。7日×3食の全体が出力の上限に収まらないと、献立として読み取れずに失敗する。文章の長さより、7日分が最後まで出力されることを優先すること。`;
 
 interface RawMeal {
   slot?: unknown;
+  kind?: unknown;
   title?: unknown;
   recipe?: unknown;
   kcal?: unknown;
@@ -240,7 +260,10 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     `  食塩相当量 ${t.saltMaxG} g 未満`,
     "",
     `週の食費: ${preference.weeklyBudgetYen} 円以内`,
-    `平日の調理時間: 1日あたり合計 ${preference.weekdayCookMinutes} 分以内（土日は多めでも可）`,
+    `台所に立つ日: 週 ${preference.cookSessionsPerWeek} 日まで（この日以外はCOOKの料理を置かない）`,`  → 買い物日 ${dates[0]} を1回目のまとめ調理の日にする`,
+    `冷凍食品・惣菜（READY）: 週 ${preference.readyMadeMealsPerWeek} 食まで`,
+    `まとめ調理をしない日の調理時間: 1食あたり10分以内（温め直しのみ）`,
+    `まとめ調理の日の調理時間: 1日あたり合計 ${Math.max(preference.weekdayCookMinutes, 60)} 分まで`,
     preference.dislikes ? `苦手・避けたいもの: ${preference.dislikes}` : "苦手な食材: 特になし",
     preference.allergies ? `アレルギー（絶対に使わない）: ${preference.allergies}` : "アレルギー: なし",
   ].join("\n");
@@ -262,9 +285,14 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
       if (!SLOTS.includes(slot)) continue;
       const title = str(m.title);
       if (!title) continue;
+      const rawKind = str(m.kind).toUpperCase() as MealKind;
       meals.push({
         dateKey,
         slot,
+        // An unlabelled meal counts as cooked — the pessimistic reading,
+        // so a model that omits the field can't quietly under-report how
+        // many evenings this plan actually costs.
+        kind: KINDS.includes(rawKind) ? rawKind : "COOK",
         title,
         recipe: str(m.recipe),
         kcal: Math.round(num(m.kcal)),
@@ -312,13 +340,22 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
 
   const dayTotals = totalsFor(plan.meals);
   const estimatedYen = plan.shoppingItems.reduce((sum, i) => sum + i.estimatedYen, 0);
-  const warnings = checkAgainstBrief(dayTotals, dates, {
-    kcal: t.targetKcal,
-    proteinG: t.proteinG,
-    fiberG: t.fiberG,
-    saltMaxG: t.saltMaxG,
-    weekdayCookMinutes: preference.weekdayCookMinutes,
-  }, estimatedYen, preference.weeklyBudgetYen);
+  const warnings = checkAgainstBrief(
+    dayTotals,
+    dates,
+    {
+      kcal: t.targetKcal,
+      proteinG: t.proteinG,
+      fiberG: t.fiberG,
+      saltMaxG: t.saltMaxG,
+      weekdayCookMinutes: preference.weekdayCookMinutes,
+      cookSessionsPerWeek: preference.cookSessionsPerWeek,
+      readyMadeMealsPerWeek: preference.readyMadeMealsPerWeek,
+    },
+    estimatedYen,
+    preference.weeklyBudgetYen,
+    cookingLoadOf(plan.meals),
+  );
   // A cut-off reply is reported, never smoothed over: the days that did
   // arrive are usable, and the ones that didn't are already named above by
   // checkAgainstBrief. Saying why they're missing turns a puzzling gap
@@ -333,16 +370,55 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
   };
 }
 
+export interface CookingLoad {
+  /** The days with at least one meal cooked from scratch. Named, not just
+   * counted, so the warning can say which evenings the plan is claiming. */
+  cookDays: string[];
+  batchMeals: number;
+  readyMeals: number;
+}
+
+/** How much kitchen time a plan actually asks for. Pure and exported for
+ * the same reason as checkAgainstBrief: this is the claim most worth
+ * checking, and the model is the last thing that should be trusted to
+ * check it. */
+export function cookingLoadOf(meals: Pick<PlannedMeal, "dateKey" | "kind">[]): CookingLoad {
+  return {
+    cookDays: [...new Set(meals.filter((m) => m.kind === "COOK").map((m) => m.dateKey))].sort(),
+    batchMeals: meals.filter((m) => m.kind === "BATCH").length,
+    readyMeals: meals.filter((m) => m.kind === "READY").length,
+  };
+}
+
 /** Recomputed totals vs the brief. Kept exported and pure so the check can
  * be re-run when a plan is read back, not only when it's generated. */
 export function checkAgainstBrief(
   dayTotals: DayTotals[],
   expectedDates: string[],
-  target: { kcal: number; proteinG: number; fiberG: number; saltMaxG: number; weekdayCookMinutes: number },
+  target: {
+    kcal: number;
+    proteinG: number;
+    fiberG: number;
+    saltMaxG: number;
+    weekdayCookMinutes: number;
+    cookSessionsPerWeek: number;
+    readyMadeMealsPerWeek: number;
+  },
   estimatedYen: number,
   budgetYen: number,
+  load?: CookingLoad,
 ): string[] {
   const warnings: string[] = [];
+  if (load) {
+    if (load.cookDays.length > target.cookSessionsPerWeek) {
+      warnings.push(
+        `台所に立つ日が ${load.cookDays.length} 日（希望は週 ${target.cookSessionsPerWeek} 日）: ${load.cookDays.join(", ")}`,
+      );
+    }
+    if (load.readyMeals > target.readyMadeMealsPerWeek) {
+      warnings.push(`冷凍食品・惣菜が ${load.readyMeals} 食（上限 ${target.readyMadeMealsPerWeek} 食）`);
+    }
+  }
   const missing = expectedDates.filter((d) => !dayTotals.some((t) => t.dateKey === d));
   if (missing.length > 0) warnings.push(`献立が入っていない日: ${missing.join(", ")}`);
 
@@ -360,7 +436,10 @@ export function checkAgainstBrief(
       warnings.push(`${t.dateKey}: 食塩相当量 ${t.saltG.toFixed(1)}g（上限 ${target.saltMaxG}g 超過）`);
     }
     const weekday = new Date(`${t.dateKey}T00:00:00Z`).getUTCDay();
-    if (weekday >= 1 && weekday <= 5 && t.prepMinutes > target.weekdayCookMinutes) {
+    // A batch-cooking day is meant to run long — that's the trade. Only
+    // the other days are held to the weekday cap.
+    const isCookDay = load ? load.cookDays.includes(t.dateKey) : false;
+    if (!isCookDay && weekday >= 1 && weekday <= 5 && t.prepMinutes > target.weekdayCookMinutes) {
       warnings.push(`${t.dateKey}: 調理 ${t.prepMinutes}分（平日の上限 ${target.weekdayCookMinutes}分 超過）`);
     }
   }
