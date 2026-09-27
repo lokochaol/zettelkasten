@@ -81,7 +81,11 @@ export async function generateMealPlanAction(
         truncated: dict.meals.errorTruncated,
         apiError: dict.meals.errorApi,
       };
-      return { error: byCode[e.code] ?? dict.meals.errorApi };
+      // The detail matters more than the category here: this app has one
+      // user, running it on their own key, and "couldn't read the reply"
+      // with nothing further is not something they can act on.
+      console.error("meal plan generation failed", e.code, e.message);
+      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
     }
     throw e;
   }
@@ -173,7 +177,8 @@ export async function proposeCoopOrderAction(
         truncated: dict.meals.errorTruncated,
         apiError: dict.meals.errorApi,
       };
-      return { error: byCode[e.code] ?? dict.meals.errorApi };
+      console.error("coop order proposal failed", e.code, e.message);
+      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
     }
     throw e;
   }

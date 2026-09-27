@@ -94,7 +94,7 @@ export function CoopOrderPanel({ weekStartDateKey, todayKey }: { weekStartDateKe
 
       <p className="text-[11px] leading-relaxed text-ink-soft">{t.meals.coopIntro}</p>
       {tooSoon && <p className="font-mono text-[10.5px] text-accent">{t.meals.coopTooSoon(data.targetWeekStartDateKey)}</p>}
-      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs text-accent">{error}</p>}
+      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs whitespace-pre-line text-accent">{error}</p>}
 
       {!order ? (
         <p className="font-mono text-[10.5px] text-ink-faint">{t.meals.coopNone}</p>

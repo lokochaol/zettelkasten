@@ -144,6 +144,7 @@ export const ja: Dictionary = {
     errorRateLimit: "AIの利用上限に達しました。時間をおいて試してください。",
     errorBadResponse: "AIの返答を献立として読み取れませんでした。もう一度お試しください。",
     errorTruncated: "AIの返答が長さの上限で途中で切れました。もう一度お試しください（繰り返す場合は、レシピが長すぎる可能性があります）。",
+    errorDetail: (detail) => `\n詳細: ${detail}`,
     errorApi: "AIへのリクエストが失敗しました。時間をおいて試してください。",
     syncToCalendar: "Googleカレンダーに書き出す",
     syncing: "書き出し中…",

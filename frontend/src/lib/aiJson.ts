@@ -37,6 +37,13 @@ function errorCodeForStatus(status: number): AiErrorCode {
   return "apiError";
 }
 
+/** Enough of the reply to recognise what went wrong — a refusal, a
+ * preamble, an error page — without pasting a whole week into a toast. */
+function snippet(text: string): string {
+  const oneLine = text.replace(/\s+/g, " ").trim();
+  return oneLine.length > 160 ? `${oneLine.slice(0, 160)}…` : oneLine;
+}
+
 /** Models wrap JSON in prose and code fences however much you ask them not
  * to, so take the outermost balanced object rather than trusting the reply
  * to be bare JSON. Refuses an incomplete document — callers that can use a
@@ -66,7 +73,9 @@ export interface LooseParse {
  */
 export function parseJsonLoose(text: string): LooseParse {
   const start = text.indexOf("{");
-  if (start === -1) throw new AiJsonError("invalidResponse", "no JSON object in the response");
+  if (start === -1) {
+    throw new AiJsonError("invalidResponse", `JSONが含まれていません。返答の冒頭: ${snippet(text)}`);
+  }
 
   const closers: string[] = [];
   // Where the last complete nested element ended, and what was still open
@@ -92,7 +101,7 @@ export function parseJsonLoose(text: string): LooseParse {
         try {
           return { value: JSON.parse(text.slice(start, i + 1)), truncated: false };
         } catch (e) {
-          throw new AiJsonError("invalidResponse", `response was not valid JSON: ${(e as Error).message}`);
+          throw new AiJsonError("invalidResponse", `JSONとして壊れています: ${(e as Error).message}。返答の冒頭: ${snippet(text)}`);
         }
       }
       lastCompleteIndex = i + 1;
@@ -100,7 +109,9 @@ export function parseJsonLoose(text: string): LooseParse {
     }
   }
 
-  if (lastCompleteIndex === -1) throw new AiJsonError("truncated", "the response was cut off before anything usable");
+  if (lastCompleteIndex === -1) {
+    throw new AiJsonError("truncated", `返答が使える所まで届く前に切れました。冒頭: ${snippet(text)}`);
+  }
   try {
     return { value: JSON.parse(text.slice(start, lastCompleteIndex) + lastCompleteClosers), truncated: true };
   } catch {

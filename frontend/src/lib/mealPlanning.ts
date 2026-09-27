@@ -275,16 +275,30 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
   // meals that were replaced, not to these.
   const meals: Array<Omit<PlannedMeal, "id" | "planId" | "googleEventId" | "status" | "replacementNote">> = [];
   const days = Array.isArray(parsed.days) ? parsed.days : [];
+  // Why rows were thrown away, kept so a failure can say what happened.
+  // "Couldn't read the reply" twice in a row with no further detail is not
+  // something anyone can act on.
+  const rejected = { dates: new Set<string>(), slots: new Set<string>(), untitled: 0, mealsSeen: 0 };
   for (const rawDay of days) {
     const day = rawDay as { date?: unknown; meals?: unknown };
     const dateKey = str(day.date);
-    if (!dates.includes(dateKey)) continue; // ignore a date the model invented
+    if (!dates.includes(dateKey)) {
+      rejected.dates.add(dateKey || "(空)");
+      continue; // a date the model invented — never silently re-homed
+    }
     for (const rawMeal of Array.isArray(day.meals) ? day.meals : []) {
+      rejected.mealsSeen++;
       const m = rawMeal as RawMeal;
       const slot = str(m.slot).toUpperCase() as MealSlot;
-      if (!SLOTS.includes(slot)) continue;
+      if (!SLOTS.includes(slot)) {
+        rejected.slots.add(str(m.slot) || "(空)");
+        continue;
+      }
       const title = str(m.title);
-      if (!title) continue;
+      if (!title) {
+        rejected.untitled++;
+        continue;
+      }
       const rawKind = str(m.kind).toUpperCase() as MealKind;
       meals.push({
         dateKey,
@@ -305,7 +319,19 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
       });
     }
   }
-  if (meals.length === 0) throw new AiJsonError("invalidResponse", "the plan contained no usable meals");
+  if (meals.length === 0) {
+    const why = [
+      `日=${days.length}`,
+      `食事=${rejected.mealsSeen}`,
+      rejected.dates.size > 0 ? `対象外の日付=${[...rejected.dates].slice(0, 3).join("/")}（対象は ${dates[0]}〜${dates[6]}）` : null,
+      rejected.slots.size > 0 ? `不明なslot=${[...rejected.slots].slice(0, 3).join("/")}` : null,
+      rejected.untitled > 0 ? `料理名なし=${rejected.untitled}` : null,
+      truncated ? "返答が途中で切れた" : null,
+    ]
+      .filter(Boolean)
+      .join(", ");
+    throw new AiJsonError(truncated ? "truncated" : "invalidResponse", `使える献立が1つもありませんでした（${why}）`);
+  }
 
   const shopping = (Array.isArray(parsed.shopping) ? parsed.shopping : []).map((rawItem, i) => {
     const item = rawItem as { category?: unknown; name?: unknown; quantity?: unknown; estimatedYen?: unknown };
