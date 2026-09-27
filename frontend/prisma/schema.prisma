@@ -518,3 +518,101 @@ model HealthIngestToken {
 
   @@map("health_ingest_token")
 }
+
+enum MealSlot {
+  BREAKFAST
+  LUNCH
+  DINNER
+}
+
+/// The constraints a week's menu has to satisfy that aren't about the
+/// body — money, time, and things the owner won't eat. Kept apart from
+/// HealthProfile because these change with life rather than with weight.
+model MealPreference {
+  ownerSub          String   @id @map("owner_sub")
+  /// Food budget for one week, in yen. The monthly figure the owner thinks
+  /// in is divided down when they enter it — the planner buys by the week.
+  weeklyBudgetYen   Int      @default(8000) @map("weekly_budget_yen")
+  /// Minutes of cooking the owner will actually do on a weekday. The single
+  /// most effective constraint on whether a plan survives contact with a
+  /// Tuesday.
+  weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
+  /// 0 = Sunday. The one shopping trip the whole week is planned around.
+  shoppingWeekday   Int      @default(1) @map("shopping_weekday")
+  /// Free text, passed to the planner as-is: "パクチーが苦手", "夜は炭水化物少なめ".
+  dislikes          String   @default("")
+  /// Kept separate from dislikes so it can be stated to the model as a hard
+  /// constraint rather than a preference.
+  allergies         String   @default("")
+  createdAt         DateTime @default(now()) @map("created_at")
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("meal_preference")
+}
+
+/// One week's menu. Keyed by the week's first day so regenerating replaces
+/// rather than accumulates.
+model MealPlan {
+  id                String   @id @default(uuid())
+  ownerSub          String   @map("owner_sub")
+  weekStartDateKey  String   @map("week_start_date_key")
+  /// The targets the plan was generated against, stored as they were at the
+  /// time — weight and activity move, and a plan should be read against the
+  /// brief it was actually written to.
+  targetKcal        Int      @map("target_kcal")
+  targetProteinG    Int      @map("target_protein_g")
+  targetFiberG      Int      @map("target_fiber_g")
+  budgetYen         Int      @map("budget_yen")
+  /// What the model was told, kept for debugging a plan that came out odd.
+  promptSummary     String   @map("prompt_summary")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  meals         PlannedMeal[]
+  shoppingItems ShoppingItem[]
+
+  @@unique([ownerSub, weekStartDateKey])
+  @@index([ownerSub, weekStartDateKey])
+  @@map("meal_plan")
+}
+
+model PlannedMeal {
+  id          String   @id @default(uuid())
+  planId      String   @map("plan_id")
+  plan        MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dateKey     String   @map("date_key")
+  slot        MealSlot
+  title       String
+  /// Ingredients and method, as plain text — same "a note is text" stance
+  /// the rest of the app takes.
+  recipe      String
+  kcal        Int
+  proteinG    Float    @map("protein_g")
+  fatG        Float    @map("fat_g")
+  carbG       Float    @map("carb_g")
+  fiberG      Float    @map("fiber_g")
+  saltG       Float    @map("salt_g")
+  prepMinutes Int      @map("prep_minutes")
+  /// Set once the meal has been written into Google Calendar, so a re-sync
+  /// updates that event instead of creating a second one.
+  googleEventId String? @map("google_event_id")
+
+  @@unique([planId, dateKey, slot])
+  @@index([planId, dateKey])
+  @@map("planned_meal")
+}
+
+model ShoppingItem {
+  id           String   @id @default(uuid())
+  planId       String   @map("plan_id")
+  plan         MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  category     String
+  name         String
+  quantity     String
+  estimatedYen Int      @map("estimated_yen")
+  checked      Boolean  @default(false)
+  /// Position within its category, as the planner ordered it.
+  sortOrder    Int      @map("sort_order")
+
+  @@index([planId])
+  @@map("shopping_item")
+}

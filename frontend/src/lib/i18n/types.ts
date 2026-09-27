@@ -81,6 +81,36 @@ export interface Dictionary {
       "!": string;
     };
   };
+  meals: {
+    heading: string;
+    weekRange: (start: string, end: string) => string;
+    generate: string;
+    regenerate: string;
+    generating: string;
+    noPlan: string;
+    slotBreakfast: string;
+    slotLunch: string;
+    slotDinner: string;
+    dayTotals: (kcal: number, proteinG: number, fiberG: number) => string;
+    shoppingHeading: string;
+    shoppingTotal: (yen: number, budget: number) => string;
+    warningsHeading: string;
+    warningsIntro: string;
+    prefHeading: string;
+    prefBudget: string;
+    prefCookMinutes: string;
+    prefShoppingDay: string;
+    prefDislikes: string;
+    prefAllergies: string;
+    weekdayNames: string[];
+    targetLine: (kcal: number, proteinG: number, fiberG: number, saltMaxG: number) => string;
+    errorNoAiKey: string;
+    errorAuth: string;
+    errorRateLimit: string;
+    errorBadResponse: string;
+    errorApi: string;
+    prepMinutes: (n: number) => string;
+  };
   health: {
     basicsHeading: string;
     heightLabel: string;
@@ -457,6 +487,9 @@ export interface Dictionary {
   errors: {
     keywordRequired: string;
     permanentNoteNotFound: string;
+    healthProfileMissing: string;
+    mealPreferenceInvalid: string;
+    mealPlanNotFound: string;
     healthProfileInvalid: string;
     healthGoalTooAggressive: string;
     healthMetricInvalid: string;
