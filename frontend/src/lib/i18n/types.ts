@@ -253,6 +253,9 @@ export interface Dictionary {
     openTasks: (n: number) => string;
     noTasks: string;
     tasksSource: string;
+    blockHeading: string;
+    blockMinutes: string;
+    blockTitlePlaceholder: string;
     mealsHeading: string;
     slot: { BREAKFAST: string; LUNCH: string; DINNER: string };
     prep: (n: number) => string;
@@ -599,6 +602,8 @@ export interface Dictionary {
     mealPlanNotFound: string;
     coopPlanMissing: string;
     coopOrderNotFound: string;
+    timeBlockInvalid: string;
+    timeBlockNotFound: string;
     healthProfileInvalid: string;
     healthGoalTooAggressive: string;
     healthMetricInvalid: string;

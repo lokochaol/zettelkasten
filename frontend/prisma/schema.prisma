@@ -828,3 +828,25 @@ model CoopOrderItem {
   @@index([orderId])
   @@map("coop_order_item")
 }
+
+/// A block of time the owner put on the day themselves.
+///
+/// Not everything that takes an hour is a calendar event or a meal. A task
+/// from the day's note needs somewhere to actually happen, and deciding
+/// when is the owner's job, not the planner's. Stored here rather than
+/// written to Google Calendar: the calendar may not be linked at all, and
+/// this has to work either way.
+model TimeBlock {
+  id              String   @id @default(uuid())
+  ownerSub        String   @map("owner_sub")
+  dateKey         String   @map("date_key")
+  /// Minutes from local midnight — a clock time, not an instant, so it
+  /// means the same thing whatever the owner's zone does that day.
+  startMinutes    Int      @map("start_minutes")
+  durationMinutes Int      @map("duration_minutes")
+  title           String
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  @@index([ownerSub, dateKey])
+  @@map("time_block")
+}

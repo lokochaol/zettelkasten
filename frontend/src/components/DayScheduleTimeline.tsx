@@ -1,7 +1,14 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { getDayScheduleAction, setMealStatusAction, type DayMeal, type DayScheduleView } from "@/app/calendar/actions";
+import {
+  addTimeBlockAction,
+  getDayScheduleAction,
+  removeTimeBlockAction,
+  setMealStatusAction,
+  type DayMeal,
+  type DayScheduleView,
+} from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -13,6 +20,11 @@ import { localeTag } from "@/lib/i18n/dictionary";
 const HOUR_PX = 44;
 const DEFAULT_FROM = 8;
 const DEFAULT_TO = 21;
+
+function clockLabel(minutes: number): string {
+  const wrapped = ((minutes % 1440) + 1440) % 1440;
+  return `${String(Math.floor(wrapped / 60)).padStart(2, "0")}:${String(wrapped % 60).padStart(2, "0")}`;
+}
 
 function hourOf(date: Date, timeZone: string): number {
   const parts = new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).formatToParts(date);
@@ -48,6 +60,10 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   // fetch for this day lands, this component has nothing to show.
   const view = loaded?.dateKey === dateKey ? loaded.view : null;
 
+  function removeBlock(id: string) {
+    startLogging(async () => setLoaded({ dateKey, view: await removeTimeBlockAction(id, dateKey) }));
+  }
+
   function logMeal(mealId: string, status: DayMeal["status"], note = "") {
     startLogging(async () => {
       const next = await setMealStatusAction(mealId, status, note, dateKey);
@@ -79,8 +95,16 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
 
   // The axis covers the working day, widened to whatever the day actually
   // holds — meals included, since breakfast is usually before the events.
-  const starts = [...timed.map((e) => hourOf(e.start as Date, timeZone)), ...view.meals.map((m) => hourOf(new Date(m.start), timeZone))];
-  const ends = [...timed.map((e) => hourOf((e.end ?? e.start) as Date, timeZone)), ...view.meals.map((m) => hourOf(new Date(m.end), timeZone))];
+  const starts = [
+    ...timed.map((e) => hourOf(e.start as Date, timeZone)),
+    ...view.meals.map((m) => hourOf(new Date(m.start), timeZone)),
+    ...view.blocks.map((b) => b.startMinutes / 60),
+  ];
+  const ends = [
+    ...timed.map((e) => hourOf((e.end ?? e.start) as Date, timeZone)),
+    ...view.meals.map((m) => hourOf(new Date(m.end), timeZone)),
+    ...view.blocks.map((b) => (b.startMinutes + b.durationMinutes) / 60),
+  ];
   const from = Math.floor(Math.min(DEFAULT_FROM, ...starts));
   const to = Math.ceil(Math.max(DEFAULT_TO, ...ends));
   const hours = Array.from({ length: to - from }, (_, i) => from + i);
@@ -104,81 +128,100 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
       <div className="flex gap-4 rounded-xl border border-line bg-surface p-4">
         {/* 予定 — hour axis */}
         <div className="min-w-0 flex-1">
-          {view.calendar !== "linked" ? (
-            <CalendarNotice state={view.calendar} />
-          ) : (
-            <>
-              {allDay.length > 0 && (
-                <div className="mb-2 flex flex-wrap gap-1.5">
-                  {allDay.map((e) => (
-                    <span key={e.id} className="rounded-full bg-accent-soft px-2.5 py-1 font-mono text-[10px] text-accent">
-                      {t.daySchedule.allDay} {e.title}
-                    </span>
-                  ))}
-                </div>
-              )}
-              <div className="relative" style={{ height: hours.length * HOUR_PX }}>
-                {hours.map((h, i) => (
-                  <div key={h} className="absolute right-0 left-0 flex items-start gap-2" style={{ top: i * HOUR_PX }}>
-                    <span className="w-9 shrink-0 pt-[1px] text-right font-mono text-[9.5px] text-ink-faint">
-                      {String(h).padStart(2, "0")}
-                    </span>
-                    <span className="mt-[7px] h-px flex-1 bg-line" />
-                  </div>
-                ))}
-                {timed.map((e) => {
-                  const s = e.start as Date;
-                  const en = (e.end ?? e.start) as Date;
-                  const top = (hourOf(s, timeZone) - from) * HOUR_PX;
-                  const height = Math.max(22, (hourOf(en, timeZone) - hourOf(s, timeZone)) * HOUR_PX - 2);
-                  return (
-                    <a
-                      key={e.id}
-                      href={e.htmlLink ?? undefined}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="absolute left-12 w-[48%] overflow-hidden rounded-md border-l-2 border-accent bg-accent-soft px-2 py-1 transition-colors hover:bg-accent/15"
-                      style={{ top, height }}
-                    >
-                      <p className="truncate text-[11.5px] font-semibold text-ink">{e.title}</p>
-                      <p className="truncate font-mono text-[9.5px] text-ink-soft">
-                        {timeLabel(s)}–{timeLabel(en)}
-                        {e.location ? ` · ${e.location}` : ""}
-                      </p>
-                    </a>
-                  );
-                })}
-                {view.meals.map((m) => {
-                  const start = new Date(m.start);
-                  const end = new Date(m.end);
-                  const top = (hourOf(start, timeZone) - from) * HOUR_PX;
-                  const height = Math.max(20, (hourOf(end, timeZone) - hourOf(start, timeZone)) * HOUR_PX - 2);
-                  return (
-                    <div
-                      key={m.id}
-                      title={m.recipe}
-                      className="absolute right-0 w-[46%] overflow-hidden rounded-md border-l-2 border-[var(--color-meal)] bg-[var(--color-meal-soft)] px-2 py-1"
-                      style={{ top, height }}
-                    >
-                      <p
-                        className={`truncate text-[11px] font-semibold ${
-                          m.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"
-                        }`}
-                      >
-                        {m.title}
-                      </p>
-                      <p className="truncate font-mono text-[9px] text-ink-soft">
-                        {m.status === "REPLACED" ? t.daySchedule.logOther : `${m.kcal} kcal`} · {timeLabel(start)}
-                      </p>
-                    </div>
-                  );
-                })}
-                {timed.length === 0 && view.meals.length === 0 && (
-                  <p className="absolute top-2 left-12 font-mono text-[10px] text-ink-faint">{t.daySchedule.noEvents}</p>
-                )}
-              </div>
-            </>
+          {view.calendar !== "linked" && <CalendarNotice state={view.calendar} />}
+          {allDay.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {allDay.map((e) => (
+                <span key={e.id} className="rounded-full bg-accent-soft px-2.5 py-1 font-mono text-[10px] text-accent">
+                  {t.daySchedule.allDay} {e.title}
+                </span>
+              ))}
+            </div>
           )}
+          <div className="relative" style={{ height: hours.length * HOUR_PX }}>
+              {hours.map((h, i) => (
+                <div key={h} className="absolute right-0 left-0 flex items-start gap-2" style={{ top: i * HOUR_PX }}>
+                  <span className="w-9 shrink-0 pt-[1px] text-right font-mono text-[9.5px] text-ink-faint">
+                    {String(h).padStart(2, "0")}
+                  </span>
+                  <span className="mt-[7px] h-px flex-1 bg-line" />
+                </div>
+              ))}
+              {timed.map((e) => {
+                const s = e.start as Date;
+                const en = (e.end ?? e.start) as Date;
+                const top = (hourOf(s, timeZone) - from) * HOUR_PX;
+                const height = Math.max(22, (hourOf(en, timeZone) - hourOf(s, timeZone)) * HOUR_PX - 2);
+                return (
+                  <a
+                    key={e.id}
+                    href={e.htmlLink ?? undefined}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="absolute left-12 w-[48%] overflow-hidden rounded-md border-l-2 border-accent bg-accent-soft px-2 py-1 transition-colors hover:bg-accent/15"
+                    style={{ top, height }}
+                  >
+                    <p className="truncate text-[11.5px] font-semibold text-ink">{e.title}</p>
+                    <p className="truncate font-mono text-[9.5px] text-ink-soft">
+                      {timeLabel(s)}–{timeLabel(en)}
+                      {e.location ? ` · ${e.location}` : ""}
+                    </p>
+                  </a>
+                );
+              })}
+              {view.blocks.map((b) => {
+              const top = (b.startMinutes / 60 - from) * HOUR_PX;
+              const height = Math.max(20, (b.durationMinutes / 60) * HOUR_PX - 2);
+              return (
+                <div
+                  key={b.id}
+                  className="group absolute left-12 w-[48%] overflow-hidden rounded-md border border-dashed border-accent/60 bg-surface px-2 py-1"
+                  style={{ top, height }}
+                >
+                  <div className="flex items-baseline gap-1.5">
+                    <p className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-ink">{b.title}</p>
+                    <button
+                      onClick={() => removeBlock(b.id)}
+                      className="font-mono text-[9px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent"
+                    >
+                      {t.common.delete}
+                    </button>
+                  </div>
+                  <p className="truncate font-mono text-[9.5px] text-ink-soft">
+                    {clockLabel(b.startMinutes)}–{clockLabel(b.startMinutes + b.durationMinutes)}
+                  </p>
+                </div>
+              );
+            })}
+            {view.meals.map((m) => {
+                const start = new Date(m.start);
+                const end = new Date(m.end);
+                const top = (hourOf(start, timeZone) - from) * HOUR_PX;
+                const height = Math.max(20, (hourOf(end, timeZone) - hourOf(start, timeZone)) * HOUR_PX - 2);
+                return (
+                  <div
+                    key={m.id}
+                    title={m.recipe}
+                    className="absolute right-0 w-[46%] overflow-hidden rounded-md border-l-2 border-[var(--color-meal)] bg-[var(--color-meal-soft)] px-2 py-1"
+                    style={{ top, height }}
+                  >
+                    <p
+                      className={`truncate text-[11px] font-semibold ${
+                        m.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"
+                      }`}
+                    >
+                      {m.title}
+                    </p>
+                    <p className="truncate font-mono text-[9px] text-ink-soft">
+                      {m.status === "REPLACED" ? t.daySchedule.logOther : `${m.kcal} kcal`} · {timeLabel(start)}
+                    </p>
+                  </div>
+                );
+              })}
+            {timed.length === 0 && view.meals.length === 0 && view.blocks.length === 0 && (
+              <p className="absolute top-2 left-12 font-mono text-[10px] text-ink-faint">{t.daySchedule.noEvents}</p>
+            )}
+          </div>
         </div>
 
         {/* 食事とタスク */}
@@ -202,7 +245,14 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           ) : (
             <ul className="flex flex-col gap-1.5">
               {view.tasks.map((task, i) => (
-                <li key={`${task.projectId}-${i}`} className="flex items-baseline gap-2">
+                <li
+                  key={`${task.projectId}-${task.line}-${i}`}
+                  className="flex items-baseline gap-2"
+                  // Indented rather than nested in a list: the depth comes
+                  // from the note's own indentation, and a subtask that
+                  // reads as one line of text should stay one line here.
+                  style={{ paddingLeft: task.depth * 14 }}
+                >
                   <span className="font-mono text-[11px] text-accent">{task.priority ? "*-" : "-"}</span>
                   <span className="min-w-0 flex-1">
                     <span className="text-[11.5px] text-ink">{task.text}</span>
@@ -213,6 +263,11 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
             </ul>
           )}
             <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">{t.daySchedule.tasksSource}</p>
+            <TimeBlockForm
+              dateKey={dateKey}
+              suggestions={view.tasks.map((task) => task.text)}
+              onAdded={(next) => setLoaded({ dateKey, view: next })}
+            />
           </div>
           <div className="border-t border-line pt-3">
             <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.money.dashboardHeading}</p>
@@ -221,6 +276,97 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
         </div>
       </div>
     </section>
+  );
+}
+
+/**
+ * Putting a task on the clock.
+ *
+ * The day's open tasks are offered as titles, because that is where most
+ * of these come from — but the field stays free text: plenty of what
+ * takes an hour was never written down as a task, and a picker that
+ * refused those would just send the owner to another app.
+ */
+function TimeBlockForm({
+  dateKey,
+  suggestions,
+  onAdded,
+}: {
+  dateKey: string;
+  suggestions: string[];
+  onAdded: (view: DayScheduleView) => void;
+}) {
+  const { t } = useI18n();
+  const [title, setTitle] = useState("");
+  const [start, setStart] = useState("09:00");
+  const [minutes, setMinutes] = useState("30");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, startAdding] = useTransition();
+  const listId = `tasks-${dateKey}`;
+
+  function submit() {
+    if (!title.trim()) return;
+    const [h, m] = start.split(":").map(Number);
+    setError(null);
+    startAdding(async () => {
+      const res = await addTimeBlockAction({
+        dateKey,
+        startMinutes: (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0),
+        durationMinutes: Number(minutes),
+        title,
+      });
+      if ("error" in res) {
+        setError(res.error);
+        return;
+      }
+      onAdded(res);
+      setTitle("");
+    });
+  }
+
+  return (
+    <div className="mt-3 flex flex-col gap-1.5 border-t border-line pt-3">
+      <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.daySchedule.blockHeading}</p>
+      <div className="flex flex-wrap items-center gap-1.5">
+        <input
+          type="time"
+          value={start}
+          onChange={(e) => setStart(e.target.value)}
+          className="rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[10.5px] text-ink focus:border-accent focus:outline-none"
+        />
+        <input
+          value={minutes}
+          onChange={(e) => setMinutes(e.target.value)}
+          inputMode="numeric"
+          aria-label={t.daySchedule.blockMinutes}
+          className="w-12 rounded-md border border-line bg-surface px-1.5 py-1 text-right font-mono text-[10.5px] text-ink focus:border-accent focus:outline-none"
+        />
+        <span className="font-mono text-[9.5px] text-ink-faint">{t.daySchedule.blockMinutes}</span>
+      </div>
+      <div className="flex items-center gap-1.5">
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && submit()}
+          list={listId}
+          placeholder={t.daySchedule.blockTitlePlaceholder}
+          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink focus:border-accent focus:outline-none"
+        />
+        <datalist id={listId}>
+          {suggestions.map((s) => (
+            <option key={s} value={s} />
+          ))}
+        </datalist>
+        <button
+          onClick={submit}
+          disabled={pending || !title.trim()}
+          className="btn-sheen rounded-md bg-accent px-2.5 py-1 font-mono text-[10px] font-semibold text-on-accent disabled:opacity-40"
+        >
+          {t.common.add}
+        </button>
+      </div>
+      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+    </div>
   );
 }
 
@@ -381,7 +527,7 @@ function CalendarNotice({ state }: { state: "not_linked" | "reauth_required" | "
   const body =
     state === "not_linked" ? t.daySchedule.notLinked : state === "reauth_required" ? t.daySchedule.reauthRequired : t.daySchedule.apiError;
   return (
-    <div className="flex h-full min-h-[96px] flex-col items-start justify-center gap-2.5">
+    <div className="mb-2 flex flex-wrap items-center gap-2.5">
       <p className="text-[11.5px] text-ink-soft">{body}</p>
       {state !== "error" && (
         <a
