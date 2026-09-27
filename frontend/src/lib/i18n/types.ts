@@ -158,6 +158,28 @@ export interface Dictionary {
     lunchAt: string;
     dinnerAt: string;
     prepMinutes: (n: number) => string;
+    thisWeek: string;
+    prevWeek: string;
+    nextWeek: string;
+    weeksAhead: (n: number) => string;
+    coopHeading: string;
+    coopIntro: string;
+    coopNoApiNote: string;
+    coopPropose: string;
+    coopRepropose: string;
+    coopProposing: string;
+    coopNone: string;
+    coopTooSoon: (weekLabel: string) => string;
+    coopDeadline: (orderBy: string, delivery: string) => string;
+    coopDaysLeft: (n: number) => string;
+    coopClosed: string;
+    coopUnrefined: string;
+    coopLocalInstead: string;
+    coopTotal: (yen: number) => string;
+    coopCopy: string;
+    coopCopied: string;
+    prefDeliveryDay: string;
+    prefOrderLeadDays: string;
   };
   health: {
     basicsHeading: string;
@@ -554,6 +576,8 @@ export interface Dictionary {
     expenseInvalid: string;
     expenseNotFound: string;
     mealPlanNotFound: string;
+    coopPlanMissing: string;
+    coopOrderNotFound: string;
     healthProfileInvalid: string;
     healthGoalTooAggressive: string;
     healthMetricInvalid: string;

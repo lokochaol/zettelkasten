@@ -9,6 +9,7 @@ import {
   toggleShoppingItemAction,
   type MealWeekView,
 } from "@/app/meals/actions";
+import { CoopOrderPanel } from "@/components/CoopOrderPanel";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -29,6 +30,9 @@ const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 export function MealWeekScreen() {
   const { t, locale } = useI18n();
   const todayKey = todayKeyValue();
+  // Weeks are navigable because ordering runs ahead of eating: the Coop
+  // list for a week has to be written a fortnight before anyone eats it.
+  const [weekOffset, setWeekOffset] = useState(0);
   const [data, setData] = useState<MealWeekView | null>(null);
   const [warnings, setWarnings] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
@@ -38,9 +42,11 @@ export function MealWeekScreen() {
   const [syncing, startSyncing] = useTransition();
   const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
+  const anchorKey = shiftDateKey(todayKey, weekOffset * 7);
+
   useEffect(() => {
-    getMealWeekAction(todayKey).then(setData);
-  }, [todayKey]);
+    getMealWeekAction(anchorKey).then(setData);
+  }, [anchorKey]);
 
   if (!data) return <LoadingBlock label={t.common.loading} />;
 
@@ -83,6 +89,8 @@ export function MealWeekScreen() {
         breakfastMinutes: next.breakfastMinutes,
         lunchMinutes: next.lunchMinutes,
         dinnerMinutes: next.dinnerMinutes,
+        coopDeliveryWeekday: next.coopDeliveryWeekday,
+        coopOrderLeadDays: next.coopOrderLeadDays,
       });
     });
   }
@@ -99,6 +107,28 @@ export function MealWeekScreen() {
         <span className="font-mono text-xs text-ink-soft">
           {t.meals.weekRange(formatDateKey(dates[0], localeTag(locale)), formatDateKey(dates[6], localeTag(locale)))}
         </span>
+        <div className="flex items-center gap-1">
+          <button
+            onClick={() => setWeekOffset((o) => o - 1)}
+            aria-label={t.meals.prevWeek}
+            className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-soft hover:border-accent hover:text-accent"
+          >
+            ‹
+          </button>
+          <button
+            onClick={() => setWeekOffset(0)}
+            className="rounded-md border border-line px-2 py-1 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
+          >
+            {t.meals.weeksAhead(weekOffset)}
+          </button>
+          <button
+            onClick={() => setWeekOffset((o) => o + 1)}
+            aria-label={t.meals.nextWeek}
+            className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-soft hover:border-accent hover:text-accent"
+          >
+            ›
+          </button>
+        </div>
         <div className="ml-auto flex items-center gap-2">
           {view && (
             <button
@@ -258,6 +288,8 @@ export function MealWeekScreen() {
         </section>
       )}
 
+      <CoopOrderPanel weekStartDateKey={data.weekStartDateKey} todayKey={todayKey} />
+
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
         <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.prefHeading}</p>
         <div className="grid grid-cols-2 gap-3">
@@ -289,6 +321,27 @@ export function MealWeekScreen() {
                 </option>
               ))}
             </select>
+          </PrefField>
+          <PrefField label={t.meals.prefDeliveryDay}>
+            <select
+              defaultValue={data.preference.coopDeliveryWeekday}
+              onChange={(e) => savePreference({ coopDeliveryWeekday: Number(e.target.value) })}
+              className="w-full bg-transparent text-xs text-ink focus:outline-none"
+            >
+              {t.meals.weekdayNames.map((name, i) => (
+                <option key={name} value={i}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </PrefField>
+          <PrefField label={t.meals.prefOrderLeadDays}>
+            <input
+              defaultValue={data.preference.coopOrderLeadDays}
+              onBlur={(e) => savePreference({ coopOrderLeadDays: Number(e.target.value) })}
+              inputMode="numeric"
+              className="w-full bg-transparent text-xs text-ink focus:outline-none"
+            />
           </PrefField>
           <PrefField label={t.meals.prefAllergies}>
             <input

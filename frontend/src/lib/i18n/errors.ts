@@ -46,6 +46,12 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.linkNotFound;
     case "discoveryCandidateNotFound":
       return dict.discoveryCandidateNotFound;
+    case "mealPlanNotFound":
+      return dict.mealPlanNotFound;
+    case "coopPlanMissing":
+      return dict.coopPlanMissing;
+    case "coopOrderNotFound":
+      return dict.coopOrderNotFound;
     case "projectNotFound":
       return dict.projectNotFound;
     case "projectNameRequired":
