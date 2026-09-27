@@ -40,6 +40,8 @@ export const ja: Dictionary = {
     projectsLabel: "プロジェクト",
     discoveryLabel: "探索",
     calendarLabel: "カレンダー",
+    mealsLabel: "食事",
+    moneyLabel: "お金",
   },
   confirmDialog: {
     confirmLabel: "追加",

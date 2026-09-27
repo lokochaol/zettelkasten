@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
-export type ZettelkastenMainView = "notes" | "projects" | "calendar" | "discovery";
+export type ZettelkastenMainView = "notes" | "projects" | "calendar" | "meals" | "money" | "discovery";
 
 /** Simple line-icon glyphs — no emoji, so they read consistently with the
  * rest of the HUD's monochrome/mono-label visual language across themes
@@ -38,6 +38,30 @@ function CalendarIcon() {
       <path d="M1.5 6.5H14.5" stroke="currentColor" strokeWidth="1.3" />
       <path d="M4.5 1.5V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
       <path d="M11.5 1.5V4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A bowl — the week's food, which is what this pane plans. */
+function MealsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M2 7.5H14C14 11 11.3 13.5 8 13.5C4.7 13.5 2 11 2 7.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+      <path d="M6 5C6 4 5.4 3.6 5.4 2.8C5.4 2.3 5.7 2 6 1.7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M9.4 5C9.4 4 8.8 3.6 8.8 2.8C8.8 2.3 9.1 2 9.4 1.7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A coin. Money in this app is a running total, not a wallet. */
+function MoneyIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.2" stroke="currentColor" strokeWidth="1.3" />
+      <path d="M5.8 5.4L8 8.2L10.2 5.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M8 8.2V11.8" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M6 8.9H10" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+      <path d="M6 10.5H10" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
     </svg>
   );
 }
@@ -115,6 +139,12 @@ export function ZettelkastenSideActionBar({
       </ActionBarButton>
       <ActionBarButton active={active === "calendar"} label={t.nav.calendarLabel} onClick={() => select("calendar")}>
         <CalendarIcon />
+      </ActionBarButton>
+      <ActionBarButton active={active === "meals"} label={t.nav.mealsLabel} onClick={() => select("meals")}>
+        <MealsIcon />
+      </ActionBarButton>
+      <ActionBarButton active={active === "money"} label={t.nav.moneyLabel} onClick={() => select("money")}>
+        <MoneyIcon />
       </ActionBarButton>
       <ActionBarButton active={active === "discovery"} label={t.nav.discoveryLabel} onClick={() => select("discovery")}>
         <DiscoveryIcon />

@@ -41,6 +41,8 @@ import { HeaderMenu } from "@/components/HeaderMenu";
 import { ZettelkastenSideActionBar, type ZettelkastenMainView } from "@/components/ZettelkastenSideActionBar";
 import { ZettelkastenProjectsPane } from "@/components/ZettelkastenProjectsPane";
 import { ZettelkastenCalendarPane } from "@/components/ZettelkastenCalendarPane";
+import { MealWeekScreen } from "@/components/MealWeekScreen";
+import { MoneyScreen } from "@/components/MoneyScreen";
 import { ZettelkastenDiscoveryPane } from "@/components/ZettelkastenDiscoveryPane";
 import { ZettelkastenProjectDetailPane } from "@/components/ZettelkastenProjectDetailPane";
 import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
@@ -268,6 +270,16 @@ export function ZettelkastenScreen({
         {!activeProjectId && mainView === "calendar" && (
           <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
             <ZettelkastenCalendarPane onOpenProject={(id) => openProject(id)} />
+          </div>
+        )}
+        {!activeProjectId && mainView === "meals" && (
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
+            <MealWeekScreen />
+          </div>
+        )}
+        {!activeProjectId && mainView === "money" && (
+          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
+            <MoneyScreen />
           </div>
         )}
         {!activeProjectId && mainView === "discovery" && (
