@@ -98,6 +98,10 @@ model QuickNote {
   // or "found nothing" both count — only a failed provider call leaves it
   // untouched, see src/lib/discovery.ts). Drives the least-recently-run-first
   // rotation when there are more active notes than one run's cap allows.
+  /// Opt-in: discovery only ever looks at notes the owner picked in the
+  /// 探索 tab. It spends tokens on their own API key and most scraps never
+  /// want it, so "every active note" was the wrong default.
+  discoveryEnabled   Boolean  @default(false) @map("discovery_enabled")
   discoveryLastRunAt DateTime? @map("discovery_last_run_at")
 
   promotionSourceLinks PromotionSourceQuickNote[]
@@ -373,7 +377,10 @@ model DiscoveryRunStatus {
 model DiscoverySchedule {
   id          String   @id @default(uuid())
   ownerSub    String   @unique @map("owner_sub")
-  timesPerDay Int      @default(2) @map("times_per_day")
+  /// 0 means discovery never runs on a schedule; the owner can still
+  /// trigger it by hand. This is the default — an unattended job spending
+  /// someone's API credits should be something they switched on.
+  timesPerDay Int      @default(0) @map("times_per_day")
   hour1       Int      @default(7) @map("hour1")
   hour2       Int      @default(19) @map("hour2")
   updatedAt   DateTime @updatedAt @map("updated_at")

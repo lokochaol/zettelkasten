@@ -33,7 +33,7 @@ export async function GET(request: NextRequest) {
   }
 
   const hour = discovery.tokyoHour(new Date());
-  const owners = await discovery.listOwnersWithActiveNotes();
+  const owners = await discovery.listOwnersWithDiscoveryEnabledNotes();
 
   let ownersRun = 0;
   let notesChecked = 0;
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     if (!discovery.isDueAtHour(schedule, hour)) continue;
 
     ownersRun++;
-    const result = await discovery.runForActiveNotes(ownerSub);
+    const result = await discovery.runForEnabledNotes(ownerSub);
     notesChecked += result.notesChecked;
     candidatesFound += result.candidatesFound;
   }

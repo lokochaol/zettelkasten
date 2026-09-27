@@ -55,6 +55,7 @@ export interface Dictionary {
     backToLiterature: string;
     toZettelkasten: string;
     projectsLabel: string;
+    discoveryLabel: string;
     calendarLabel: string;
   };
   confirmDialog: {
@@ -147,6 +148,20 @@ export interface Dictionary {
     reissueConfirmWarning: string;
     lastUsed: (when: string) => string;
     stepsUnit: string;
+  };
+  discoveryTab: {
+    heading: string;
+    description: string;
+    loading: string;
+    frequencyHeading: string;
+    timesPerDay: (n: number) => string;
+    timezoneNote: string;
+    offExplainer: string;
+    notesHeading: (enabled: number, total: number) => string;
+    noNotes: string;
+    candidateCount: (n: number) => string;
+    lastRun: (date: string) => string;
+    neverRun: string;
   };
   daySchedule: {
     heading: string;
@@ -402,13 +417,6 @@ export interface Dictionary {
     aiApiKeyPlaceholderExisting: string;
     aiApiKeyPlaceholderNew: string;
     aiApiKeyHelp: string;
-    discoveryScheduleHeading: string;
-    discoveryScheduleDescription: string;
-    discoveryTimesPerDayLabel: string;
-    discoveryTimesOnce: string;
-    discoveryTimesTwice: string;
-    discoveryHour1Label: string;
-    discoveryHour2Label: string;
     googleCalendarHeading: string;
     googleCalendarDescription: string;
     googleCalendarLinked: (calendarId: string) => string;

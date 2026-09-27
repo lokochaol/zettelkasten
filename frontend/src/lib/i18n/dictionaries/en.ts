@@ -38,6 +38,7 @@ export const en: Dictionary = {
     backToLiterature: "Back to Literature",
     toZettelkasten: "To Zettelkasten",
     projectsLabel: "Projects",
+    discoveryLabel: "Discovery",
     calendarLabel: "Calendar",
   },
   confirmDialog: {
@@ -141,6 +142,21 @@ export const en: Dictionary = {
     reissueConfirmWarning: "The Shortcut already set up on your iPhone will stop working until you paste the new token into it.",
     lastUsed: (when) => `Last received ${when}`,
     stepsUnit: "steps",
+  },
+  discoveryTab: {
+    heading: "Discovery rails",
+    description:
+      "For the Dash Off notes you pick, AI searches the web for related literature and news. It spends your own API key, so notes opt in one at a time, and nothing runs on a schedule unless you turn it on.",
+    loading: "Loading…",
+    frequencyHeading: "Scheduled runs",
+    timesPerDay: (n) => (n === 0 ? "Never" : `${n}× a day`),
+    timezoneNote: "Asia/Tokyo",
+    offExplainer: "Scheduled runs are off. You can still run it any time with the button below.",
+    notesHeading: (enabled, total) => `Notes to search (${enabled} of ${total} selected)`,
+    noNotes: "No active Dash Off notes.",
+    candidateCount: (n) => `${n} found`,
+    lastRun: (date) => `last ${date}`,
+    neverRun: "not yet run",
   },
   daySchedule: {
     heading: "Schedule & tasks",
@@ -400,14 +416,6 @@ export const en: Dictionary = {
     aiApiKeyPlaceholderExisting: "Enter only to change",
     aiApiKeyPlaceholderNew: "The API key you issued",
     aiApiKeyHelp: "Issue an API key from that provider's dashboard and enter it below.",
-    discoveryScheduleHeading: "Discovery frequency & time",
-    discoveryScheduleDescription:
-      "How many times a day, and at which Asia/Tokyo hour(s), to run discovery across all active Dash Off notes.",
-    discoveryTimesPerDayLabel: "Times per day",
-    discoveryTimesOnce: "Once",
-    discoveryTimesTwice: "Twice",
-    discoveryHour1Label: "First run time",
-    discoveryHour2Label: "Second run time",
     googleCalendarHeading: "Google Calendar",
     googleCalendarDescription:
       "Shows a timeline of the day's events and open tasks at the top of the calendar. Asks only for event access — your sign-in permissions don't change.",

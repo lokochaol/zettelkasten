@@ -3,12 +3,10 @@ import { requireSession } from "@/lib/session";
 import {
   getZoteroSettingsAction,
   getAiSettingsAction,
-  getDiscoveryScheduleAction,
   getGoogleCalendarSettingsAction,
 } from "@/app/settings/actions";
 import { ZoteroSettingsForm } from "@/components/ZoteroSettingsForm";
 import { AiSettingsForm } from "@/components/AiSettingsForm";
-import { DiscoveryScheduleForm } from "@/components/DiscoveryScheduleForm";
 import { BulletLegendToggle } from "@/components/BulletLegendToggle";
 import { GoogleCalendarSettings } from "@/components/GoogleCalendarSettings";
 import { HealthSettings } from "@/components/HealthSettings";
@@ -24,7 +22,6 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
   const session = await requireSession();
   const zotero = await getZoteroSettingsAction();
   const ai = await getAiSettingsAction();
-  const schedule = await getDiscoveryScheduleAction();
   const googleCalendar = await getGoogleCalendarSettingsAction();
   // Set by the OAuth callback redirect — see api/google-calendar/callback.
   const googleCalendarResult = typeof searchParams.googleCalendar === "string" ? searchParams.googleCalendar : undefined;
@@ -67,14 +64,6 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
           </h2>
           <p className="font-mono text-[10.5px] text-ink-soft">{dict.settings.aiDescription}</p>
           <AiSettingsForm initial={ai} />
-        </section>
-
-        <section className="flex flex-col gap-3">
-          <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
-            <span className="text-accent">{"//"}</span> {dict.settings.discoveryScheduleHeading}
-          </h2>
-          <p className="font-mono text-[10.5px] text-ink-soft">{dict.settings.discoveryScheduleDescription}</p>
-          <DiscoveryScheduleForm initial={schedule} />
         </section>
 
         <section className="flex flex-col gap-3">

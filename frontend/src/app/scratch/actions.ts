@@ -170,7 +170,7 @@ export async function getQuickNoteDetailAction(id: string): Promise<QuickNoteDet
  * tokens on notes checked moments ago). The cron itself never passes force. */
 export async function runDiscoveryAction(force = false): Promise<{ notesChecked: number; candidatesFound: number }> {
   const ownerSub = await requireOwnerSub();
-  const result = await discovery.runForActiveNotes(ownerSub, { force });
+  const result = await discovery.runForEnabledNotes(ownerSub, { force });
   revalidatePath("/scratch");
   return result;
 }
@@ -205,4 +205,31 @@ export async function writeNoteFromDiscoveryAction(
   const note = await discovery.writeNoteFromCandidate(ownerSub, candidateId, overrides);
   revalidatePath("/scratch");
   return note;
+}
+
+/* ---------- 探索タブ ---------- */
+
+export async function listDiscoveryNotesAction(): Promise<discovery.DiscoveryNoteRow[]> {
+  const ownerSub = await requireOwnerSub();
+  return discovery.listNotesForDiscoveryTab(ownerSub);
+}
+
+/** Opting a note in or out. Nothing runs here — the note simply joins (or
+ * leaves) the set the scheduled and manual runs look at. */
+export async function setNoteDiscoveryEnabledAction(quickNoteId: string, enabled: boolean): Promise<void> {
+  const ownerSub = await requireOwnerSub();
+  await discovery.setNoteDiscoveryEnabled(ownerSub, quickNoteId, enabled);
+  revalidatePath("/scratch");
+  revalidatePath("/zettelkasten");
+}
+
+export async function getDiscoveryScheduleAction(): Promise<discovery.DiscoverySchedule> {
+  const ownerSub = await requireOwnerSub();
+  return discovery.getSchedule(ownerSub);
+}
+
+export async function saveDiscoveryScheduleAction(input: discovery.DiscoverySchedule): Promise<void> {
+  const ownerSub = await requireOwnerSub();
+  await discovery.saveSchedule(ownerSub, input);
+  revalidatePath("/zettelkasten");
 }

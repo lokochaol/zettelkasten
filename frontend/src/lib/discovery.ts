@@ -415,7 +415,13 @@ async function recordRunStatus(
  * the same run — one broken credential would otherwise fail identically on
  * every remaining note, burning quota for nothing. A run that completes
  * without any note failing clears any previously recorded error. */
-export async function runForActiveNotes(
+/**
+ * Runs discovery over the notes the owner picked for it, not over every
+ * active note. Opting in per note is the whole point of the 探索 tab: the
+ * search spends the owner's own API credits, and most scraps are never
+ * worth spending them on.
+ */
+export async function runForEnabledNotes(
   ownerSub: string,
   options?: { force?: boolean },
 ): Promise<{ notesChecked: number; candidatesFound: number }> {
@@ -424,6 +430,7 @@ export async function runForActiveNotes(
     where: {
       ownerSub,
       status: "ACTIVE",
+      discoveryEnabled: true,
       ...(options?.force ? {} : { OR: [{ discoveryLastRunAt: null }, { discoveryLastRunAt: { lt: refreshCutoff } }] }),
     },
     select: { id: true },
@@ -450,11 +457,13 @@ export async function runForActiveNotes(
   return { notesChecked, candidatesFound };
 }
 
-/** Every owner with at least one active QuickNote — the cron route fans
- * runForActiveNotes out across all tenants with this. */
-export async function listOwnersWithActiveNotes(): Promise<string[]> {
+/** Every owner who has switched discovery on for at least one note — the
+ * cron route fans runForEnabledNotes out across all tenants with this.
+ * Owners who never opted a note in are skipped entirely rather than
+ * queried and found empty. */
+export async function listOwnersWithDiscoveryEnabledNotes(): Promise<string[]> {
   const rows = await prisma.quickNote.findMany({
-    where: { status: "ACTIVE" },
+    where: { status: "ACTIVE", discoveryEnabled: true },
     distinct: ["ownerSub"],
     select: { ownerSub: true },
   });
@@ -462,23 +471,29 @@ export async function listOwnersWithActiveNotes(): Promise<string[]> {
 }
 
 export interface DiscoverySchedule {
-  timesPerDay: 1 | 2;
+  /** 0 = never on a schedule. Manual runs still work. */
+  timesPerDay: 0 | 1 | 2;
   hour1: number;
   hour2: number;
 }
 
-const DEFAULT_SCHEDULE: DiscoverySchedule = { timesPerDay: 2, hour1: 7, hour2: 19 };
+/** Off by default. A background job that spends the owner's own API
+ * credits is something they should switch on, not something they discover
+ * running. */
+const DEFAULT_SCHEDULE: DiscoverySchedule = { timesPerDay: 0, hour1: 7, hour2: 19 };
 
-/** For the Settings screen. No row yet = the original fixed default
- * (twice a day, 7:00/19:00 Asia/Tokyo). */
 export async function getSchedule(ownerSub: string): Promise<DiscoverySchedule> {
   const row = await prisma.discoverySchedule.findUnique({ where: { ownerSub } });
   if (!row) return DEFAULT_SCHEDULE;
-  return { timesPerDay: row.timesPerDay === 1 ? 1 : 2, hour1: row.hour1, hour2: row.hour2 };
+  return { timesPerDay: clampTimes(row.timesPerDay), hour1: row.hour1, hour2: row.hour2 };
+}
+
+function clampTimes(value: number): 0 | 1 | 2 {
+  return value === 1 ? 1 : value === 2 ? 2 : 0;
 }
 
 export async function saveSchedule(ownerSub: string, input: DiscoverySchedule): Promise<void> {
-  const timesPerDay = input.timesPerDay === 1 ? 1 : 2;
+  const timesPerDay = clampTimes(input.timesPerDay);
   const hour1 = Math.min(23, Math.max(0, Math.round(input.hour1)));
   const hour2 = Math.min(23, Math.max(0, Math.round(input.hour2)));
   await prisma.discoverySchedule.upsert({
@@ -503,6 +518,7 @@ export function tokyoHour(at: Date): number {
  * discovery for one owner this pass. The manual "今すぐ探す" trigger never
  * calls this; it always runs immediately regardless of schedule. */
 export function isDueAtHour(schedule: DiscoverySchedule, hour: number): boolean {
+  if (schedule.timesPerDay === 0) return false;
   return hour === schedule.hour1 || (schedule.timesPerDay === 2 && hour === schedule.hour2);
 }
 
@@ -551,4 +567,41 @@ export async function writeNoteFromCandidate(
 ): Promise<QuickNoteDetail> {
   const literatureMemoId = await resolveLiteratureForCandidate(ownerSub, candidateId, overrides);
   return quickNotes.create(ownerSub, "SCRATCH", literatureMemoId);
+}
+
+export interface DiscoveryNoteRow {
+  id: string;
+  preview: string;
+  enabled: boolean;
+  candidateCount: number;
+  lastRunAt: Date | null;
+}
+
+/** The 探索 tab's list: every active note, whether it's opted in, and what
+ * discovery has found for it so far. */
+export async function listNotesForDiscoveryTab(ownerSub: string): Promise<DiscoveryNoteRow[]> {
+  const notes = await prisma.quickNote.findMany({
+    where: { ownerSub, status: "ACTIVE" },
+    orderBy: [{ discoveryEnabled: "desc" }, { encounteredAt: "desc" }],
+    select: {
+      id: true,
+      content: true,
+      discoveryEnabled: true,
+      discoveryLastRunAt: true,
+      _count: { select: { discoveryCandidates: true } },
+    },
+  });
+  return notes.map((n) => ({
+    id: n.id,
+    preview: n.content.split("\n").find((line) => line.trim())?.trim().slice(0, 120) ?? "",
+    enabled: n.discoveryEnabled,
+    candidateCount: n._count.discoveryCandidates,
+    lastRunAt: n.discoveryLastRunAt,
+  }));
+}
+
+export async function setNoteDiscoveryEnabled(ownerSub: string, quickNoteId: string, enabled: boolean): Promise<void> {
+  const note = await prisma.quickNote.findFirst({ where: { id: quickNoteId, ownerSub }, select: { id: true } });
+  if (!note) throw new NotFoundError("quickNoteNotFound", `QuickNote not found: ${quickNoteId}`);
+  await prisma.quickNote.update({ where: { id: quickNoteId }, data: { discoveryEnabled: enabled } });
 }

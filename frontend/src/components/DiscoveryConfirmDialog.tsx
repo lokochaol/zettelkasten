@@ -11,7 +11,7 @@ const RELOAD_DELAY_MS = 1200;
 /** Gate in front of the "今すぐ探す" force-refresh: it replaces every note's
  * current AI candidates and spends tokens on the owner's connected AI
  * account, bypassing the usual 12h-per-note cooldown (see
- * runForActiveNotes's `force` option) — worth a confirmation rather than
+ * runForEnabledNotes's `force` option) — worth a confirmation rather than
  * firing on a single misclick. Mounted at page level, outside HeaderMenu, so
  * it (and the events it drives — see discoveryConfirmEvent.ts /
  * discoveryRunEvent.ts) survive that menu closing the instant its trigger

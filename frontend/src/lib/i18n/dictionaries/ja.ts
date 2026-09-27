@@ -38,6 +38,7 @@ export const ja: Dictionary = {
     backToLiterature: "文献メモへ戻る",
     toZettelkasten: "ツェッテルカステンへ",
     projectsLabel: "プロジェクト",
+    discoveryLabel: "探索",
     calendarLabel: "カレンダー",
   },
   confirmDialog: {
@@ -141,6 +142,21 @@ export const ja: Dictionary = {
     reissueConfirmWarning: "今iPhoneに設定してあるショートカットは送信できなくなります。新しいトークンを貼り直す必要があります。",
     lastUsed: (when) => `最終受信 ${when}`,
     stepsUnit: "歩",
+  },
+  discoveryTab: {
+    heading: "探索レール",
+    description:
+      "選んだ走り書きについて、関連しそうな文献やニュースをAIがWeb検索します。検索は登録したご自身のAPIキーを消費するので、対象は1件ずつ選ぶ方式です。既定では自動実行しません。",
+    loading: "読み込み中…",
+    frequencyHeading: "自動実行の頻度",
+    timesPerDay: (n) => (n === 0 ? "自動実行しない" : `1日 ${n} 回`),
+    timezoneNote: "日本時間",
+    offExplainer: "自動実行はオフです。下の「今すぐ探す」からはいつでも実行できます。",
+    notesHeading: (enabled, total) => `探索する走り書き（${enabled} / ${total} 件を選択中）`,
+    noNotes: "アクティブな走り書きがありません。",
+    candidateCount: (n) => `候補 ${n}`,
+    lastRun: (date) => `前回 ${date}`,
+    neverRun: "未実行",
   },
   daySchedule: {
     heading: "その日の予定とタスク",
@@ -399,14 +415,6 @@ export const ja: Dictionary = {
     aiApiKeyPlaceholderExisting: "変更する場合のみ入力",
     aiApiKeyPlaceholderNew: "発行したAPIキー",
     aiApiKeyHelp: "各サービスの管理画面でAPIキーを発行し、下記に入力してください。",
-    discoveryScheduleHeading: "自動探索の頻度・時刻",
-    discoveryScheduleDescription:
-      "アクティブな走り書きすべてに対して、関連の自動探索を1日に何回・何時（日本時間）に行うかを設定します。",
-    discoveryTimesPerDayLabel: "1日の回数",
-    discoveryTimesOnce: "1回",
-    discoveryTimesTwice: "2回",
-    discoveryHour1Label: "1回目の時刻",
-    discoveryHour2Label: "2回目の時刻",
     googleCalendarHeading: "Googleカレンダー連携",
     googleCalendarDescription:
       "カレンダーの先頭に、その日の予定と未完了タスクのタイムラインを表示します。予定の読み書きの権限だけを求め、ログイン自体の権限は変わりません。",
