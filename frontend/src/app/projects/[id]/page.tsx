@@ -45,7 +45,7 @@ export default async function ProjectDetailPage(props: PageProps<"/projects/[id]
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
-      <div className="flex w-full max-w-[720px] flex-col gap-8">
+      <div className="flex w-full flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
           <Link
             href="/projects"
