@@ -33,7 +33,7 @@ export function ZettelkastenProjectsPane({ onOpenProject }: { onOpenProject: (id
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[720px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       <div className="flex flex-col gap-1.5">
         <h1 className="text-lg font-extrabold tracking-tight text-ink">{t.projects.heading}</h1>
         <p className="font-mono text-xs text-ink-soft">{t.projects.description}</p>

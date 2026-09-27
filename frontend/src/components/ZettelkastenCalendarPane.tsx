@@ -88,7 +88,7 @@ export function ZettelkastenCalendarPane({ onOpenProject }: { onOpenProject: (pr
 
   if (selectedDay) {
     return (
-      <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
+      <div className="flex w-full flex-col gap-6">
         <div className="flex items-center gap-3">
           <button
             onClick={() => setSelectedDay(null)}
@@ -113,7 +113,7 @@ export function ZettelkastenCalendarPane({ onOpenProject }: { onOpenProject: (pr
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-[860px] flex-col gap-6">
+    <div className="flex w-full flex-col gap-6">
       {view === "today" ? (
         <CalendarTodaySection onOpenProject={onOpenProject} headerRight={viewSwitch} />
       ) : (
