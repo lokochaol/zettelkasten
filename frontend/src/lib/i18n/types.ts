@@ -82,6 +82,23 @@ export interface Dictionary {
       "!": string;
     };
   };
+  money: {
+    heading: string;
+    monthProgress: (day: number, days: number) => string;
+    quickEntryHeading: string;
+    amountPlaceholder: string;
+    memoPlaceholder: string;
+    todayTotal: string;
+    foodProgress: (spent: number, budget: number, daysLeft: number) => string;
+    byCategoryHeading: string;
+    noSpend: string;
+    noBudget: string;
+    overBudget: string;
+    aheadOfPace: string;
+    paceNote: string;
+    csvComingNote: string;
+    dashboardHeading: string;
+  };
   meals: {
     heading: string;
     weekRange: (start: string, end: string) => string;
@@ -514,6 +531,8 @@ export interface Dictionary {
     permanentNoteNotFound: string;
     healthProfileMissing: string;
     mealPreferenceInvalid: string;
+    expenseInvalid: string;
+    expenseNotFound: string;
     mealPlanNotFound: string;
     healthProfileInvalid: string;
     healthGoalTooAggressive: string;

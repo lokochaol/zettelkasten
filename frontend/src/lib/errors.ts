@@ -17,6 +17,8 @@ export type DomainErrorCode =
   | "healthProfileMissing"
   | "mealPreferenceInvalid"
   | "mealPlanNotFound"
+  | "expenseInvalid"
+  | "expenseNotFound"
   | "healthGoalTooAggressive"
   | "healthMetricInvalid"
   | "permanentNoteTitleRequired"

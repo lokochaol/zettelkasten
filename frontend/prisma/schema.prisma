@@ -630,3 +630,49 @@ model ShoppingItem {
   @@index([planId])
   @@map("shopping_item")
 }
+
+enum ExpenseSource {
+  /// Typed in at the time of spending — the day-to-day half.
+  MANUAL
+  /// Came from an imported statement CSV — the long-term half.
+  CSV
+}
+
+/// One expense. Category is a free string rather than an enum: what
+/// someone tracks changes with their life, and a migration is the wrong
+/// thing to need when it does. CategoryBudget names the ones that matter.
+model Expense {
+  id        String        @id @default(uuid())
+  ownerSub  String        @map("owner_sub")
+  /// "YYYY-MM-DD" in the owner's own time zone, like every other day key
+  /// here — spending belongs to the day it felt like, not to UTC.
+  dateKey   String        @map("date_key")
+  /// Yen, whole numbers. No currency column: this is a single-currency app
+  /// for a single person, and a nullable currency nobody sets is worse
+  /// than none.
+  amountYen Int           @map("amount_yen")
+  category  String
+  memo      String        @default("")
+  source    ExpenseSource @default(MANUAL)
+  /// Set on imported rows: a stable fingerprint of the statement line, so
+  /// re-importing an overlapping CSV doesn't duplicate what's already in.
+  externalKey String?     @map("external_key")
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@unique([ownerSub, externalKey])
+  @@index([ownerSub, dateKey])
+  @@map("expense")
+}
+
+/// A monthly ceiling for one category. Absent means the category is
+/// tracked but not budgeted — which is a normal state, not zero.
+model CategoryBudget {
+  id         String   @id @default(uuid())
+  ownerSub   String   @map("owner_sub")
+  category   String
+  monthlyYen Int      @map("monthly_yen")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, category])
+  @@map("category_budget")
+}

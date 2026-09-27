@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { getDayScheduleAction, type DayScheduleView } from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
+import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 
@@ -201,6 +202,10 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
             </ul>
           )}
             <p className="mt-3 font-mono text-[9px] leading-relaxed text-ink-faint">{t.daySchedule.tasksSource}</p>
+          </div>
+          <div className="border-t border-line pt-3">
+            <p className="mb-2 font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.money.dashboardHeading}</p>
+            <ExpenseQuickEntry dateKey={dateKey} compact />
           </div>
         </div>
       </div>
