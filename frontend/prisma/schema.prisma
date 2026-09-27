@@ -412,3 +412,33 @@ model AiCredential {
 
   @@map("ai_credential")
 }
+
+/// Per-user Google Calendar link — same "each owner brings their own"
+/// shape as ZoteroCredential/AiCredential, and the same reason: there is no
+/// app-wide calendar, only the owner's. The refresh token is the durable
+/// half (Google only hands it over once, on a consent with
+/// access_type=offline), so it's stored AES-256-GCM encrypted like every
+/// other third-party secret here; the access token is cached alongside it
+/// purely to avoid a refresh round-trip on every read, and is worthless
+/// after expiresAt.
+///
+/// Granted through an incremental-auth flow from Settings rather than at
+/// sign-in (see src/app/api/google-calendar/connect), so signing in never
+/// asks for calendar access unless the owner wants the integration.
+model GoogleCalendarCredential {
+  id                    String    @id @default(uuid())
+  ownerSub              String    @unique @map("owner_sub")
+  refreshTokenEncrypted String    @map("refresh_token_encrypted")
+  accessTokenEncrypted  String?   @map("access_token_encrypted")
+  accessTokenExpiresAt  DateTime? @map("access_token_expires_at")
+  /// Which calendar the timeline reads and writes. "primary" unless the
+  /// owner ever picks another one.
+  calendarId            String    @default("primary") @map("calendar_id")
+  /// The space-separated scopes Google actually granted — checked before a
+  /// write, since a consent can come back with less than was asked for.
+  grantedScope          String    @map("granted_scope")
+  createdAt             DateTime  @default(now()) @map("created_at")
+  updatedAt             DateTime  @updatedAt @map("updated_at")
+
+  @@map("google_calendar_credential")
+}

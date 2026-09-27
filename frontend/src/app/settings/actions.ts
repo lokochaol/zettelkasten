@@ -6,6 +6,8 @@ import type { ZoteroCredentialSummary } from "@/lib/zoteroCredentials";
 import * as aiCredentials from "@/lib/aiCredentials";
 import { AiProvider } from "@/lib/aiCredentials";
 import type { AiCredentialSummary } from "@/lib/aiCredentials";
+import * as googleCalendarCredentials from "@/lib/googleCalendarCredentials";
+import type { GoogleCalendarSummary } from "@/lib/googleCalendarCredentials";
 import * as discovery from "@/lib/discovery";
 import type { DiscoverySchedule } from "@/lib/discovery";
 import { EncryptionConfigError } from "@/lib/crypto";
@@ -101,4 +103,20 @@ export async function saveDiscoveryScheduleAction(input: DiscoverySchedule): Pro
   const ownerSub = await requireOwnerSub();
   await discovery.saveSchedule(ownerSub, input);
   revalidatePath("/settings");
+}
+
+export async function getGoogleCalendarSettingsAction(): Promise<GoogleCalendarSummary | null> {
+  const ownerSub = await requireOwnerSub();
+  return googleCalendarCredentials.getSummary(ownerSub);
+}
+
+/** Drops the stored refresh token. The grant itself still exists in the
+ * owner's Google account until they revoke it there — worth saying in the
+ * UI if this ever grows a confirmation, but deleting our copy is what stops
+ * the app reading the calendar. */
+export async function disconnectGoogleCalendarAction(): Promise<void> {
+  const ownerSub = await requireOwnerSub();
+  await googleCalendarCredentials.remove(ownerSub);
+  revalidatePath("/settings");
+  revalidatePath("/calendar");
 }

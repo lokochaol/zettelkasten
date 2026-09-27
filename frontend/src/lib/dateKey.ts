@@ -53,3 +53,35 @@ export function formatDateKey(
 ): string {
   return new Date(`${dateKey}T00:00:00.000Z`).toLocaleDateString(localeTag, { ...options, timeZone: "UTC" });
 }
+
+/** Minutes `timeZone` is ahead of UTC at a given instant. */
+function offsetMinutesAt(instant: Date, timeZone: string): number {
+  const shown = new Intl.DateTimeFormat("en-US", { timeZone, timeZoneName: "longOffset" })
+    .formatToParts(instant)
+    .find((p) => p.type === "timeZoneName")?.value;
+  const m = /GMT([+-])(\d{2}):(\d{2})/.exec(shown ?? "");
+  return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;
+}
+
+/** The UTC instant of local midnight starting `dateKey` in `timeZone`.
+ *
+ * Needs two passes: the offset has to be read at the instant we're solving
+ * for, and we don't have that instant until we've applied an offset. The
+ * first guess uses the offset at the same wall-clock time in UTC, which is
+ * only wrong within a few hours of a DST transition; re-reading at the
+ * candidate settles it. */
+function localMidnightUtc(dateKey: string, timeZone: string): Date {
+  const wallClockAsUtc = Date.parse(`${dateKey}T00:00:00Z`);
+  const firstGuess = offsetMinutesAt(new Date(wallClockAsUtc), timeZone);
+  const candidate = wallClockAsUtc - firstGuess * 60_000;
+  const settled = offsetMinutesAt(new Date(candidate), timeZone);
+  return new Date(settled === firstGuess ? candidate : wallClockAsUtc - settled * 60_000);
+}
+
+/** The UTC instants that bracket a day key in `timeZone` — what a calendar
+ * API's timeMin/timeMax need. Both edges are real local midnights rather
+ * than start + 24h: a spring-forward day is 23 hours long, and a fixed 24
+ * would reach into the next day and pull in its first event. */
+export function dayBoundsUtc(dateKey: string, timeZone: string): { start: Date; end: Date } {
+  return { start: localMidnightUtc(dateKey, timeZone), end: localMidnightUtc(shiftDateKey(dateKey, 1), timeZone) };
+}

@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { CalendarTodayView } from "@/components/CalendarTodayView";
+import { DayScheduleTimeline } from "@/components/DayScheduleTimeline";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
@@ -50,6 +51,9 @@ export function CalendarTodaySection({
   const { t, locale } = useI18n();
   const { guard } = useUnsavedChanges();
   const todayKey = todayKeyValue();
+  // The browser's own zone: the timeline lays events out on an hour axis,
+  // so it needs the zone the owner reads clock times in, not the server's.
+  const browserTimeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
   const seededKey = initialNotesDateKey ?? todayKey;
   const [viewedDateKey, setViewedDateKey] = useState(todayKey);
   const [notesCache, setNotesCache] = useState<Record<string, TodayProjectNote[]>>(
@@ -138,6 +142,11 @@ export function CalendarTodaySection({
         </div>
         {headerRight}
       </div>
+
+      {/* The schedule sits above the day's project notes — it's what the
+          day looks like from the outside (calendar) plus what's still open
+          in it (tasks), before the notes themselves. */}
+      <DayScheduleTimeline key={viewedDateKey} dateKey={viewedDateKey} timeZone={browserTimeZone} />
 
       {viewedNotes === undefined ? (
         <LoadingBlock label={t.calendar.projectTaskLoading} />

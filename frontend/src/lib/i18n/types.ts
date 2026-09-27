@@ -81,6 +81,20 @@ export interface Dictionary {
       "!": string;
     };
   };
+  daySchedule: {
+    heading: string;
+    eventCount: (n: number) => string;
+    allDay: string;
+    noEvents: string;
+    openTasks: (n: number) => string;
+    noTasks: string;
+    tasksSource: string;
+    notLinked: string;
+    reauthRequired: string;
+    apiError: string;
+    connect: string;
+    reconnect: string;
+  };
   unsavedChanges: {
     title: string;
     body: string;
@@ -328,6 +342,16 @@ export interface Dictionary {
     discoveryTimesTwice: string;
     discoveryHour1Label: string;
     discoveryHour2Label: string;
+    googleCalendarHeading: string;
+    googleCalendarDescription: string;
+    googleCalendarLinked: (calendarId: string) => string;
+    googleCalendarReadonly: string;
+    googleCalendarConnect: string;
+    googleCalendarReconnect: string;
+    googleCalendarDisconnect: string;
+    googleCalendarResultLinked: string;
+    googleCalendarResultCancelled: string;
+    googleCalendarResultFailed: string;
     bulletLegendHeading: string;
     bulletLegendDescription: string;
     bulletLegendShow: string;
