@@ -26,6 +26,42 @@ used for local dev (or a new one), add:
 or a custom domain you attach afterward — either way, come back and add it
 here once you know it.)
 
+## 2b. Google Calendar (optional, but needed for the day timeline)
+
+Signing in only needs the basic profile scopes, which Google treats as
+non-sensitive — that's why login works on an unverified app. The calendar
+integration asks for `https://www.googleapis.com/auth/calendar.events`,
+which is a **sensitive** scope, and sensitive scopes are gated on who is
+allowed to consent. Getting `Error 403: access_denied` on the consent
+screen is that gate, not a bug in the request.
+
+In the [Google Auth Platform](https://console.cloud.google.com/auth/overview)
+section of the console:
+
+1. **Data access** → add the scope `.../auth/calendar.events`.
+2. **Audience** → this is the part that causes 403:
+   - If publishing status is **Testing**, only accounts listed under **Test
+     users** may consent. Add the Google account you sign in with. Note the
+     cost: in Testing, **refresh tokens expire after 7 days**, so the app
+     will ask you to re-link the calendar every week.
+   - **Publish app** moves it to production. A sensitive scope on an
+     unverified app shows an "unverified app" interstitial (continue via
+     *Advanced*), and there is a 100-user cap, but refresh tokens stop
+     expiring. For a single-user deployment this is usually the better
+     trade. Full verification is only worth starting if real users are
+     going to sign in.
+3. **APIs & Services → Library** → enable **Google Calendar API** for the
+   project. (A disabled API fails later, at the first calendar request
+   rather than at consent — worth ruling out while you're here.)
+4. **Credentials** → the same OAuth client used for login needs one more
+   authorized redirect URI:
+   `https://<your-vercel-domain>/api/google-calendar/callback`
+
+One more thing that produces the same 403: consenting while signed into a
+different Google account than the one you added — a Workspace account, for
+instance, whose admin blocks unconfigured third-party apps. Check the
+account shown in the top-right of the consent screen.
+
 ## 3. Deploy to Vercel
 
 1. Import this repository into [Vercel](https://vercel.com/new).
