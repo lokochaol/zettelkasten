@@ -10,7 +10,10 @@ import * as googleCalendarCredentials from "@/lib/googleCalendarCredentials";
 import type { GoogleCalendarSummary } from "@/lib/googleCalendarCredentials";
 import * as discovery from "@/lib/discovery";
 import type { DiscoverySchedule } from "@/lib/discovery";
+import * as health from "@/lib/health";
 import { EncryptionConfigError } from "@/lib/crypto";
+import { ValidationError } from "@/lib/errors";
+import { translateDomainError } from "@/lib/i18n/errors";
 import { requireOwnerSub } from "@/lib/session";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
@@ -119,4 +122,47 @@ export async function disconnectGoogleCalendarAction(): Promise<void> {
   await googleCalendarCredentials.remove(ownerSub);
   revalidatePath("/settings");
   revalidatePath("/calendar");
+}
+
+export interface HealthOverview {
+  profile: health.HealthProfile | null;
+  current: health.CurrentTargets | null;
+  recent: health.HealthDailyMetric[];
+  token: health.IngestTokenView | null;
+}
+
+export async function getHealthOverviewAction(todayKey: string): Promise<HealthOverview> {
+  const ownerSub = await requireOwnerSub();
+  const [profile, current, recent, token] = await Promise.all([
+    health.getProfile(ownerSub),
+    health.currentTargets(ownerSub, todayKey),
+    health.listRecentMetrics(ownerSub, 7),
+    health.getIngestToken(ownerSub),
+  ]);
+  return { profile, current, recent, token };
+}
+
+export async function saveHealthProfileAction(
+  input: health.ProfileInput,
+  todayKey: string,
+): Promise<{ current: health.CurrentTargets | null } | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await health.upsertProfile(ownerSub, input);
+    revalidatePath("/settings");
+    revalidatePath("/calendar");
+    return { current: await health.currentTargets(ownerSub, todayKey) };
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+}
+
+/** Issuing a new token silently breaks the automation already on the
+ * phone, so the UI confirms before calling this. */
+export async function issueHealthTokenAction(): Promise<health.IngestTokenView> {
+  const ownerSub = await requireOwnerSub();
+  const token = await health.issueIngestToken(ownerSub);
+  revalidatePath("/settings");
+  return token;
 }

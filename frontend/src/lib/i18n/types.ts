@@ -81,6 +81,43 @@ export interface Dictionary {
       "!": string;
     };
   };
+  health: {
+    basicsHeading: string;
+    heightLabel: string;
+    birthYearLabel: string;
+    sexLabel: string;
+    sexMale: string;
+    sexFemale: string;
+    activityLabel: string;
+    activitySedentary: string;
+    activityLight: string;
+    activityModerate: string;
+    activityActive: string;
+    goalLabel: string;
+    fallbackWeightLabel: string;
+    targetsHeading: string;
+    targetKcal: string;
+    protein: string;
+    fat: string;
+    carb: string;
+    fiber: string;
+    salt: string;
+    basisLine: (basal: number, maintenance: number, weightKg: number, basis: string) => string;
+    basisMeasured: (days: number) => string;
+    basisEstimated: string;
+    deficitLimited: string;
+    disclaimer: string;
+    syncHeading: string;
+    syncIntro: string;
+    syncSteps: string[];
+    tokenNotIssued: string;
+    issueToken: string;
+    reissueToken: string;
+    reissueConfirmTitle: string;
+    reissueConfirmWarning: string;
+    lastUsed: (when: string) => string;
+    stepsUnit: string;
+  };
   daySchedule: {
     heading: string;
     eventCount: (n: number) => string;
@@ -420,6 +457,9 @@ export interface Dictionary {
   errors: {
     keywordRequired: string;
     permanentNoteNotFound: string;
+    healthProfileInvalid: string;
+    healthGoalTooAggressive: string;
+    healthMetricInvalid: string;
     permanentNoteTitleRequired: string;
     permanentNoteContentRequired: string;
     projectNotFound: string;

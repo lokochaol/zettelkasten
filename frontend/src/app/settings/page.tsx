@@ -11,6 +11,7 @@ import { AiSettingsForm } from "@/components/AiSettingsForm";
 import { DiscoveryScheduleForm } from "@/components/DiscoveryScheduleForm";
 import { BulletLegendToggle } from "@/components/BulletLegendToggle";
 import { GoogleCalendarSettings } from "@/components/GoogleCalendarSettings";
+import { HealthSettings } from "@/components/HealthSettings";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderMenu } from "@/components/HeaderMenu";
@@ -81,6 +82,13 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
             <span className="text-accent">{"//"}</span> {dict.settings.zoteroHeading}
           </h2>
           <ZoteroSettingsForm initial={zotero} />
+        </section>
+
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
+            <span className="text-accent">{"//"}</span> {dict.health.targetsHeading}
+          </h2>
+          <HealthSettings />
         </section>
 
         <section className="flex flex-col gap-3">
