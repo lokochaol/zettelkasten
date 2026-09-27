@@ -78,6 +78,7 @@ export async function generateMealPlanAction(
         authError: dict.meals.errorAuth,
         rateLimitError: dict.meals.errorRateLimit,
         invalidResponse: dict.meals.errorBadResponse,
+        truncated: dict.meals.errorTruncated,
         apiError: dict.meals.errorApi,
       };
       return { error: byCode[e.code] ?? dict.meals.errorApi };
@@ -169,6 +170,7 @@ export async function proposeCoopOrderAction(
         authError: dict.meals.errorAuth,
         rateLimitError: dict.meals.errorRateLimit,
         invalidResponse: dict.meals.errorBadResponse,
+        truncated: dict.meals.errorTruncated,
         apiError: dict.meals.errorApi,
       };
       return { error: byCode[e.code] ?? dict.meals.errorApi };

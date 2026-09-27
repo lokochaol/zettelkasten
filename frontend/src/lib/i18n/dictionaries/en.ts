@@ -137,6 +137,7 @@ export const en: Dictionary = {
     errorAuth: "The AI key was rejected. Check it in Settings.",
     errorRateLimit: "The AI provider's usage limit was reached. Try again later.",
     errorBadResponse: "The AI's reply couldn't be read as a meal plan. Please try again.",
+    errorTruncated: "The AI's reply was cut off at its length limit. Try again — if it keeps happening, the recipes are running too long.",
     errorApi: "The request to the AI provider failed. Try again later.",
     syncToCalendar: "Write to Google Calendar",
     syncing: "Writing…",
