@@ -58,33 +58,6 @@ export interface MetricInput {
 }
 
 /**
- * Reads whatever Shortcuts ended up sending as the date.
- *
- * Being strict here was a mistake: the request comes from an automation
- * assembled by hand in a phone UI, where dropping a Date variable into a
- * text field (rather than the output of "Format Date") yields the locale's
- * description — 2026年9月28日 7:00 — and leaving the time format set gives
- * 2026-09-28 7:00. Both are unmistakably a date, and rejecting them only
- * sends someone back into Shortcuts to guess which of six fields was
- * wrong. Same reasoning as accepting "5,880" for a number.
- *
- * A leading date wins over anything following it: an ISO string from a
- * phone carries the local offset (2026-09-28T07:00:00+09:00), so its date
- * part is already the local day, which is exactly what a day key is.
- */
-export function parseDateKey(raw: string): string | null {
-  const text = raw.trim();
-  // YYYY-MM-DD / YYYY/M/D / YYYY年M月D日, optionally followed by a time.
-  const m = /^(\d{4})[-/年](\d{1,2})[-/月](\d{1,2})/.exec(text);
-  if (!m) return null;
-  const [, year, month, day] = m;
-  const monthNum = Number(month);
-  const dayNum = Number(day);
-  if (monthNum < 1 || monthNum > 12 || dayNum < 1 || dayNum > 31) return null;
-  return `${year}-${String(monthNum).padStart(2, "0")}-${String(dayNum).padStart(2, "0")}`;
-}
-
-/**
  * Upsert rather than insert: the Shortcut posts a daily summary, so a
  * second delivery for the same day is a corrected figure, not a second
  * reading to add up.
@@ -97,14 +70,16 @@ export function parseDateKey(raw: string): string | null {
  * absence as null would have the second write wipe the first.
  */
 export async function recordDailyMetric(ownerSub: string, input: MetricInput): Promise<HealthDailyMetric> {
-  const dateKey = parseDateKey(input.dateKey);
-  if (!dateKey) {
+  // One spelling, deliberately: the format is documented, the Shortcut is
+  // set up once, and a loose parser would let a misconfigured automation
+  // look like it was working. The received value is echoed back so a
+  // mismatch is diagnosable without another round trip.
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.dateKey)) {
     throw new ValidationError(
       "healthMetricInvalid",
-      `date must be a calendar date, e.g. 2026-09-28 (received: ${JSON.stringify(input.dateKey)})`,
+      `date must be YYYY-MM-DD (received: ${JSON.stringify(input.dateKey)})`,
     );
   }
-  input = { ...input, dateKey };
   const provided = {
     ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
     ...(input.activeEnergyKcal !== undefined ? { activeEnergyKcal: input.activeEnergyKcal } : {}),
