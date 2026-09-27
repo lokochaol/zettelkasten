@@ -19,6 +19,10 @@
   --color-line-strong: #454545;
   --color-accent: #ff3d1a;
   --color-accent-soft: color-mix(in srgb, #ff3d1a 16%, #121212);
+  /* Meals are a second kind of block on the day timeline; they need to be
+     distinguishable from calendar events at a glance, not just by position. */
+  --color-meal: #3fa06b;
+  --color-meal-soft: color-mix(in srgb, #3fa06b 18%, #121212);
   --color-on-accent: #f5f5f5;
   --color-link: #d8d8d8;
   --color-link-soft: #1c1c1c;
@@ -35,6 +39,8 @@
   --color-line-strong: #c6c9d1;
   --color-accent: #ff3d1a;
   --color-accent-soft: color-mix(in srgb, #ff3d1a 10%, #ffffff);
+  --color-meal: #1f7a4d;
+  --color-meal-soft: color-mix(in srgb, #1f7a4d 10%, #ffffff);
   --color-on-accent: #fffaf9;
   --color-link: #33353c;
   --color-link-soft: #eceef2;

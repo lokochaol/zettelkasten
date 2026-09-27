@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 import * as mealPlanning from "@/lib/mealPlanning";
 import type { MealPlanView, PreferenceInput } from "@/lib/mealPlanning";
 import { AiJsonError } from "@/lib/aiJson";
+import {
+  GoogleCalendarNotLinkedError,
+  GoogleCalendarAuthError,
+  GoogleCalendarApiError,
+} from "@/lib/googleCalendar";
 import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
@@ -73,4 +78,27 @@ export async function toggleShoppingItemAction(itemId: string, checked: boolean)
   const ownerSub = await requireOwnerSub();
   await mealPlanning.setShoppingItemChecked(ownerSub, itemId, checked);
   revalidatePath("/meals");
+}
+
+/**
+ * Writes the week's meals into Google Calendar. Separate from generating
+ * the plan on purpose: a plan is a proposal, and putting it into someone's
+ * real calendar is a decision they make after reading it.
+ */
+export async function syncMealsToCalendarAction(
+  weekStartDateKey: string,
+  timeZone: string,
+): Promise<{ written: number; failed: number } | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  try {
+    return await mealPlanning.syncWeekToCalendar(ownerSub, weekStartDateKey, timeZone);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    if (e instanceof GoogleCalendarNotLinkedError) return { error: dict.meals.syncNotLinked };
+    if (e instanceof GoogleCalendarAuthError) return { error: dict.meals.syncReauth };
+    if (e instanceof GoogleCalendarApiError) return { error: dict.meals.syncFailed };
+    throw e;
+  }
 }

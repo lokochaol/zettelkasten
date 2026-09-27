@@ -5,6 +5,7 @@ import {
   getMealWeekAction,
   generateMealPlanAction,
   saveMealPreferenceAction,
+  syncMealsToCalendarAction,
   toggleShoppingItemAction,
   type MealWeekView,
 } from "@/app/meals/actions";
@@ -34,6 +35,8 @@ export function MealWeekScreen() {
   const [generating, startGenerating] = useTransition();
   const [, startSaving] = useTransition();
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
+  const [syncing, startSyncing] = useTransition();
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
 
   useEffect(() => {
     getMealWeekAction(todayKey).then(setData);
@@ -58,6 +61,15 @@ export function MealWeekScreen() {
     });
   }
 
+  function syncToCalendar() {
+    setSyncMessage(null);
+    startSyncing(async () => {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
+      const res = await syncMealsToCalendarAction(data!.weekStartDateKey, timeZone);
+      setSyncMessage("error" in res ? res.error : t.meals.syncResult(res.written, res.failed));
+    });
+  }
+
   function savePreference(patch: Partial<MealWeekView["preference"]>) {
     const next = { ...data!.preference, ...patch };
     setData((prev) => (prev ? { ...prev, preference: next } : prev));
@@ -68,6 +80,9 @@ export function MealWeekScreen() {
         shoppingWeekday: next.shoppingWeekday,
         dislikes: next.dislikes,
         allergies: next.allergies,
+        breakfastMinutes: next.breakfastMinutes,
+        lunchMinutes: next.lunchMinutes,
+        dinnerMinutes: next.dinnerMinutes,
       });
     });
   }
@@ -84,13 +99,24 @@ export function MealWeekScreen() {
         <span className="font-mono text-xs text-ink-soft">
           {t.meals.weekRange(formatDateKey(dates[0], localeTag(locale)), formatDateKey(dates[6], localeTag(locale)))}
         </span>
-        <button
-          onClick={generate}
-          disabled={generating}
-          className="btn-sheen ml-auto rounded-full bg-accent px-4 py-2 font-mono text-xs font-semibold text-on-accent disabled:opacity-50"
-        >
-          {generating ? t.meals.generating : view ? t.meals.regenerate : t.meals.generate}
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          {view && (
+            <button
+              onClick={syncToCalendar}
+              disabled={syncing}
+              className="rounded-full border border-line-strong px-3.5 py-2 font-mono text-xs font-semibold text-ink-soft transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+            >
+              {syncing ? t.meals.syncing : t.meals.syncToCalendar}
+            </button>
+          )}
+          <button
+            onClick={generate}
+            disabled={generating}
+            className="btn-sheen rounded-full bg-accent px-4 py-2 font-mono text-xs font-semibold text-on-accent disabled:opacity-50"
+          >
+            {generating ? t.meals.generating : view ? t.meals.regenerate : t.meals.generate}
+          </button>
+        </div>
       </div>
 
       {view && (
@@ -99,6 +125,7 @@ export function MealWeekScreen() {
         </p>
       )}
       {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs text-accent">{error}</p>}
+      {syncMessage && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[11px] text-ink-soft">{syncMessage}</p>}
 
       {warnings.length > 0 && (
         <section className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent-soft p-4">
@@ -271,6 +298,24 @@ export function MealWeekScreen() {
             />
           </PrefField>
         </div>
+        <div className="grid grid-cols-3 gap-3">
+          {(
+            [
+              ["breakfastMinutes", t.meals.breakfastAt],
+              ["lunchMinutes", t.meals.lunchAt],
+              ["dinnerMinutes", t.meals.dinnerAt],
+            ] as const
+          ).map(([key, label]) => (
+            <PrefField key={key} label={label}>
+              <input
+                type="time"
+                defaultValue={minutesToTime(data.preference[key])}
+                onChange={(e) => savePreference({ [key]: timeToMinutes(e.target.value) })}
+                className="w-full bg-transparent text-xs text-ink focus:outline-none"
+              />
+            </PrefField>
+          ))}
+        </div>
         <PrefField label={t.meals.prefDislikes}>
           <input
             defaultValue={data.preference.dislikes}
@@ -281,6 +326,17 @@ export function MealWeekScreen() {
       </section>
     </div>
   );
+}
+
+/** Meal times are stored as minutes from midnight — a clock time, not an
+ * instant — so they mean the same thing on every day of the week. */
+function minutesToTime(minutes: number): string {
+  return `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+}
+
+function timeToMinutes(value: string): number {
+  const [h, m] = value.split(":").map(Number);
+  return (Number.isFinite(h) ? h : 0) * 60 + (Number.isFinite(m) ? m : 0);
 }
 
 function PrefField({ label, children }: { label: string; children: React.ReactNode }) {

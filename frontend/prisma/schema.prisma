@@ -551,6 +551,13 @@ model MealPreference {
   /// Kept separate from dislikes so it can be stated to the model as a hard
   /// constraint rather than a preference.
   allergies         String   @default("")
+  /// When each meal happens, as minutes from midnight. The planner doesn't
+  /// choose these — a meal is at the time the owner eats, not a time an
+  /// AI picked — and they're what places meals on the day's timeline and
+  /// in Google Calendar.
+  breakfastMinutes  Int      @default(420) @map("breakfast_minutes")
+  lunchMinutes      Int      @default(750) @map("lunch_minutes")
+  dinnerMinutes     Int      @default(1140) @map("dinner_minutes")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 

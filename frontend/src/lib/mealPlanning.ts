@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import { askForJson, AiJsonError } from "@/lib/aiJson";
-import { shiftDateKey } from "@/lib/dateKey";
+import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
+import * as googleCalendar from "@/lib/googleCalendar";
 import { currentTargets } from "@/lib/health";
 import { ValidationError } from "@/lib/errors";
 import type { MealPlan, MealPreference, MealSlot, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
@@ -24,6 +25,9 @@ export interface PreferenceInput {
   shoppingWeekday: number;
   dislikes: string;
   allergies: string;
+  breakfastMinutes: number;
+  lunchMinutes: number;
+  dinnerMinutes: number;
 }
 
 export async function savePreference(ownerSub: string, input: PreferenceInput): Promise<MealPreference> {
@@ -35,6 +39,11 @@ export async function savePreference(ownerSub: string, input: PreferenceInput): 
   }
   if (!Number.isInteger(input.shoppingWeekday) || input.shoppingWeekday < 0 || input.shoppingWeekday > 6) {
     throw new ValidationError("mealPreferenceInvalid", "Shopping weekday must be 0-6");
+  }
+  for (const minutes of [input.breakfastMinutes, input.lunchMinutes, input.dinnerMinutes]) {
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1439) {
+      throw new ValidationError("mealPreferenceInvalid", "Meal times must be within a day");
+    }
   }
   return prisma.mealPreference.upsert({
     where: { ownerSub },
@@ -338,4 +347,93 @@ export function checkAgainstBrief(
     warnings.push(`買い物リストの概算 ${estimatedYen.toLocaleString()}円（週予算 ${budgetYen.toLocaleString()}円 超過）`);
   }
   return warnings;
+}
+
+/* ---------- placing meals in time ---------- */
+
+/** Minutes past midnight for each slot, from the owner's preference. */
+export function slotMinutes(preference: MealPreference, slot: MealSlot): number {
+  return slot === "BREAKFAST" ? preference.breakfastMinutes : slot === "LUNCH" ? preference.lunchMinutes : preference.dinnerMinutes;
+}
+
+/** How long the block on the timeline is: the cooking the plan asked for,
+ * plus twenty minutes to actually eat it. A five-minute breakfast still
+ * takes a chunk out of a morning. */
+export function slotDurationMinutes(prepMinutes: number): number {
+  return Math.max(20, prepMinutes) + 20;
+}
+
+export interface ScheduledMeal {
+  meal: PlannedMeal;
+  start: Date;
+  end: Date;
+}
+
+/** The day's meals as instants, using the owner's local midnight so the
+ * times mean what the clock on their wall says. */
+export async function scheduledMealsForDay(
+  ownerSub: string,
+  dateKey: string,
+  timeZone: string,
+): Promise<ScheduledMeal[]> {
+  const [preference, meals] = await Promise.all([getPreference(ownerSub), getMealsForDay(ownerSub, dateKey)]);
+  return meals.map((meal) => {
+    const start = localTimeUtc(dateKey, slotMinutes(preference, meal.slot), timeZone);
+    return { meal, start, end: new Date(start.getTime() + slotDurationMinutes(meal.prepMinutes) * 60_000) };
+  });
+}
+
+/**
+ * Writes the week's meals into Google Calendar, one event each, updating
+ * the events already written rather than adding a second set. The event id
+ * is kept on the meal, so a meal replaced by a regenerated plan simply
+ * loses its pointer and the new one writes a fresh event.
+ *
+ * Partial success is the normal case worth designing for: if the calendar
+ * rejects the fourth of twenty-one events, the first three are already in
+ * the owner's calendar and should stay. So failures are counted and
+ * returned instead of unwinding.
+ */
+export async function syncWeekToCalendar(
+  ownerSub: string,
+  weekStartDateKey: string,
+  timeZone: string,
+): Promise<{ written: number; failed: number }> {
+  const preference = await getPreference(ownerSub);
+  const plan = await prisma.mealPlan.findUnique({
+    where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
+    include: { meals: { orderBy: [{ dateKey: "asc" }, { slot: "asc" }] } },
+  });
+  if (!plan) throw new ValidationError("mealPlanNotFound", "No plan for that week");
+
+  let written = 0;
+  let failed = 0;
+  for (const meal of plan.meals) {
+    const start = localTimeUtc(meal.dateKey, slotMinutes(preference, meal.slot), timeZone);
+    const end = new Date(start.getTime() + slotDurationMinutes(meal.prepMinutes) * 60_000);
+    try {
+      const eventId = await googleCalendar.upsertEvent(
+        ownerSub,
+        {
+          summary: `${slotLabelJa(meal.slot)} ${meal.title}`,
+          description: `${meal.kcal} kcal / P ${meal.proteinG}g F ${meal.fatG}g C ${meal.carbG}g\n\n${meal.recipe}`,
+          start,
+          end,
+          timeZone,
+        },
+        meal.googleEventId,
+      );
+      if (eventId !== meal.googleEventId) {
+        await prisma.plannedMeal.update({ where: { id: meal.id }, data: { googleEventId: eventId } });
+      }
+      written++;
+    } catch {
+      failed++;
+    }
+  }
+  return { written, failed };
+}
+
+function slotLabelJa(slot: MealSlot): string {
+  return slot === "BREAKFAST" ? "朝食" : slot === "LUNCH" ? "昼食" : "夕食";
 }

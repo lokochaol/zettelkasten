@@ -63,19 +63,30 @@ function offsetMinutesAt(instant: Date, timeZone: string): number {
   return m ? (m[1] === "-" ? -1 : 1) * (Number(m[2]) * 60 + Number(m[3])) : 0;
 }
 
-/** The UTC instant of local midnight starting `dateKey` in `timeZone`.
+/**
+ * The UTC instant of a wall-clock time on `dateKey` in `timeZone` —
+ * `minutesFromMidnight` is a time on a clock face, not an elapsed
+ * duration. The distinction only shows itself on a DST day: 07:00 is
+ * still 07:00 on the morning the clocks go forward, even though only six
+ * hours have passed since midnight, so adding 420 minutes to midnight
+ * would put breakfast at 08:00.
  *
  * Needs two passes: the offset has to be read at the instant we're solving
  * for, and we don't have that instant until we've applied an offset. The
  * first guess uses the offset at the same wall-clock time in UTC, which is
- * only wrong within a few hours of a DST transition; re-reading at the
- * candidate settles it. */
-function localMidnightUtc(dateKey: string, timeZone: string): Date {
-  const wallClockAsUtc = Date.parse(`${dateKey}T00:00:00Z`);
+ * only wrong within a few hours of a transition; re-reading at the
+ * candidate settles it.
+ */
+export function localTimeUtc(dateKey: string, minutesFromMidnight: number, timeZone: string): Date {
+  const wallClockAsUtc = Date.parse(`${dateKey}T00:00:00Z`) + minutesFromMidnight * 60_000;
   const firstGuess = offsetMinutesAt(new Date(wallClockAsUtc), timeZone);
   const candidate = wallClockAsUtc - firstGuess * 60_000;
   const settled = offsetMinutesAt(new Date(candidate), timeZone);
   return new Date(settled === firstGuess ? candidate : wallClockAsUtc - settled * 60_000);
+}
+
+function localMidnightUtc(dateKey: string, timeZone: string): Date {
+  return localTimeUtc(dateKey, 0, timeZone);
 }
 
 /** The UTC instants that bracket a day key in `timeZone` — what a calendar

@@ -110,6 +110,16 @@ export interface Dictionary {
     errorRateLimit: string;
     errorBadResponse: string;
     errorApi: string;
+    syncToCalendar: string;
+    syncing: string;
+    syncResult: (written: number, failed: number) => string;
+    syncNotLinked: string;
+    syncReauth: string;
+    syncFailed: string;
+    mealTimesHeading: string;
+    breakfastAt: string;
+    lunchAt: string;
+    dinnerAt: string;
     prepMinutes: (n: number) => string;
   };
   health: {
@@ -171,6 +181,13 @@ export interface Dictionary {
     openTasks: (n: number) => string;
     noTasks: string;
     tasksSource: string;
+    mealsHeading: string;
+    slot: { BREAKFAST: string; LUNCH: string; DINNER: string };
+    prep: (n: number) => string;
+    statTarget: string;
+    statPlanned: string;
+    statBurn: string;
+    statWeight: string;
     notLinked: string;
     reauthRequired: string;
     apiError: string;

@@ -192,3 +192,8 @@ export async function currentTargets(ownerSub: string, todayKey: string): Promis
     lastSyncedDateKey: window[0]?.dateKey ?? null,
   };
 }
+
+/** One day's measurements, or null when the phone hasn't sent that day. */
+export async function getDailyMetric(ownerSub: string, dateKey: string): Promise<HealthDailyMetric | null> {
+  return prisma.healthDailyMetric.findUnique({ where: { ownerSub_dateKey: { ownerSub, dateKey } } });
+}
