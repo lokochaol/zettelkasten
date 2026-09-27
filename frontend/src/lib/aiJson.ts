@@ -119,6 +119,31 @@ export function parseJsonLoose(text: string): LooseParse {
   }
 }
 
+/**
+ * An empty reply, told apart by why it is empty.
+ *
+ * A model that spends its whole token budget thinking returns HTTP 200
+ * with no text at all. Reported as "empty response" that looks like a bug
+ * in the app; named properly, it points at the one setting that fixes it.
+ */
+function emptyReply(outOfTokens: boolean, detail: string): AiJsonError {
+  return outOfTokens
+    ? new AiJsonError("truncated", `本文が空のまま出力の上限に達しました（AIが思考で枠を使い切った可能性）。${detail}`)
+    : new AiJsonError("invalidResponse", `本文が空の返答でした。${detail}`);
+}
+
+/** The provider's own error text, not just the status line — a 400 that
+ * says which field it disliked is worth reading. */
+async function apiError(provider: string, res: Response): Promise<AiJsonError> {
+  let body = "";
+  try {
+    body = snippet(await res.text());
+  } catch {
+    // The body is a bonus; the status is the fact.
+  }
+  return new AiJsonError(errorCodeForStatus(res.status), `${provider} API error: ${res.status} ${res.statusText}${body ? ` — ${body}` : ""}`);
+}
+
 interface AnthropicBlock {
   type: string;
   text?: string;
@@ -132,23 +157,34 @@ interface ProviderReply {
   truncated: boolean;
 }
 
-async function callAnthropic(apiKey: string, system: string, user: string, maxTokens: number): Promise<ProviderReply> {
+async function callAnthropic(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
-    body: JSON.stringify({ model: ANTHROPIC_MODEL, max_tokens: maxTokens, system, messages: [{ role: "user", content: user }] }),
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+      // Thinking is on by default on this model and is paid for out of the
+      // same token budget as the answer — which is how a week of meals
+      // came back empty. The brief here is long and prescriptive, and the
+      // result is verified afterwards either way, so the depth is better
+      // spent on the answer.
+      ...(tuned ? { output_config: { effort: "low" } } : {}),
+    }),
   });
-  if (!res.ok) throw new AiJsonError(errorCodeForStatus(res.status), `Anthropic API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await apiError("Anthropic", res);
   const data = (await res.json()) as { content?: AnthropicBlock[]; stop_reason?: string };
   const text = (data.content ?? [])
     .filter((b) => b.type === "text" && b.text)
     .map((b) => b.text)
     .join("");
-  if (!text) throw new AiJsonError("invalidResponse", "empty response");
+  if (!text) throw emptyReply(data.stop_reason === "max_tokens", `stop_reason=${data.stop_reason ?? "不明"}`);
   return { text, truncated: data.stop_reason === "max_tokens" };
 }
 
-async function callOpenAi(apiKey: string, system: string, user: string, maxTokens: number): Promise<ProviderReply> {
+async function callOpenAi(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
@@ -157,9 +193,12 @@ async function callOpenAi(apiKey: string, system: string, user: string, maxToken
       max_output_tokens: maxTokens,
       instructions: system,
       input: user,
+      // Same reason as Anthropic: reasoning tokens come out of the output
+      // budget on this model.
+      ...(tuned ? { reasoning: { effort: "low" } } : {}),
     }),
   });
-  if (!res.ok) throw new AiJsonError(errorCodeForStatus(res.status), `OpenAI API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await apiError("OpenAI", res);
   const data = (await res.json()) as {
     output_text?: string;
     output?: Array<{ content?: Array<{ type: string; text?: string }> }>;
@@ -173,28 +212,36 @@ async function callOpenAi(apiKey: string, system: string, user: string, maxToken
       .filter((c) => c.type === "output_text" && c.text)
       .map((c) => c.text)
       .join("");
-  if (!text) throw new AiJsonError("invalidResponse", "empty response");
-  return { text, truncated: data.status === "incomplete" || data.incomplete_details?.reason === "max_output_tokens" };
+  const cutOff = data.status === "incomplete" || data.incomplete_details?.reason === "max_output_tokens";
+  if (!text) throw emptyReply(cutOff, `status=${data.status ?? "不明"} reason=${data.incomplete_details?.reason ?? "なし"}`);
+  return { text, truncated: cutOff };
 }
 
-async function callGoogle(apiKey: string, system: string, user: string, maxTokens: number): Promise<ProviderReply> {
+async function callGoogle(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: "user", parts: [{ text: user }] }],
-      generationConfig: { maxOutputTokens: maxTokens, responseMimeType: "application/json" },
+      generationConfig: {
+        maxOutputTokens: maxTokens,
+        responseMimeType: "application/json",
+        // Same reason again: this model thinks by default, out of the same
+        // budget. A bounded budget leaves room for the answer.
+        ...(tuned ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
+      },
     }),
   });
-  if (!res.ok) throw new AiJsonError(errorCodeForStatus(res.status), `Google API error: ${res.status} ${res.statusText}`);
+  if (!res.ok) throw await apiError("Google", res);
   const data = (await res.json()) as {
     candidates?: Array<{ content?: { parts?: Array<{ text?: string }> }; finishReason?: string }>;
   };
   const candidate = data.candidates?.[0];
   const text = (candidate?.content?.parts ?? []).map((p) => p.text ?? "").join("");
-  if (!text) throw new AiJsonError("invalidResponse", "empty response");
-  return { text, truncated: candidate?.finishReason === "MAX_TOKENS" };
+  const cutOff = candidate?.finishReason === "MAX_TOKENS";
+  if (!text) throw emptyReply(cutOff, `finishReason=${candidate?.finishReason ?? "不明"}`);
+  return { text, truncated: cutOff };
 }
 
 /**
@@ -219,19 +266,30 @@ export async function askForJson(
   const credential = await aiCredentials.get(ownerSub);
   if (!credential) throw new AiJsonError("notConfigured", "No AI provider configured");
 
+  const call = (tuned: boolean): Promise<ProviderReply> => {
+    switch (credential.provider) {
+      case AiProvider.ANTHROPIC:
+        return callAnthropic(credential.apiKey, system, user, maxTokens, tuned);
+      case AiProvider.OPENAI:
+        return callOpenAi(credential.apiKey, system, user, maxTokens, tuned);
+      case AiProvider.GOOGLE:
+        return callGoogle(credential.apiKey, system, user, maxTokens, tuned);
+      default:
+        throw new AiJsonError("notConfigured", "Unknown provider");
+    }
+  };
+
   let reply: ProviderReply;
-  switch (credential.provider) {
-    case AiProvider.ANTHROPIC:
-      reply = await callAnthropic(credential.apiKey, system, user, maxTokens);
-      break;
-    case AiProvider.OPENAI:
-      reply = await callOpenAi(credential.apiKey, system, user, maxTokens);
-      break;
-    case AiProvider.GOOGLE:
-      reply = await callGoogle(credential.apiKey, system, user, maxTokens);
-      break;
-    default:
-      throw new AiJsonError("notConfigured", "Unknown provider");
+  try {
+    reply = await call(true);
+  } catch (e) {
+    // The reasoning-budget fields differ per provider and move over time.
+    // If one is rejected, the request itself is still good — retry it
+    // plain rather than reporting a failure the owner can do nothing
+    // about. A tuned request that merely came back empty is not retried:
+    // that would double the bill on their own key for the same answer.
+    if (!(e instanceof AiJsonError && e.code === "apiError")) throw e;
+    reply = await call(false);
   }
   const parsed = parseJsonLoose(reply.text);
   return { value: parsed.value, truncated: parsed.truncated || reply.truncated };
