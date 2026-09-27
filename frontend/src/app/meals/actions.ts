@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import * as mealPlanning from "@/lib/mealPlanning";
 import * as coopOrder from "@/lib/coopOrder";
+import * as expenses from "@/lib/expenses";
+import { shiftDateKey } from "@/lib/dateKey";
 import type { MealPlanView, PreferenceInput } from "@/lib/mealPlanning";
 import { AiJsonError } from "@/lib/aiJson";
 import {
@@ -20,13 +22,22 @@ export interface MealWeekView {
   weekStartDateKey: string;
   preference: mealPlanning.MealPreference;
   view: MealPlanView | null;
+  /** What was actually spent on food during this week, from the expenses
+   * the owner entered or imported. The plan's estimate is a guess made
+   * before the week; this is the answer, and the two side by side are how
+   * the next week's budget gets set honestly. */
+  foodSpentYen: number;
 }
 
 export async function getMealWeekAction(dateKey: string): Promise<MealWeekView> {
   const ownerSub = await requireOwnerSub();
   const preference = await mealPlanning.getPreference(ownerSub);
   const weekStartDateKey = mealPlanning.weekStartFor(dateKey, preference.shoppingWeekday);
-  return { weekStartDateKey, preference, view: await mealPlanning.getPlan(ownerSub, weekStartDateKey) };
+  const [view, foodSpentYen] = await Promise.all([
+    mealPlanning.getPlan(ownerSub, weekStartDateKey),
+    expenses.sumForRange(ownerSub, weekStartDateKey, shiftDateKey(weekStartDateKey, 6), expenses.FOOD_CATEGORY),
+  ]);
+  return { weekStartDateKey, preference, view, foodSpentYen };
 }
 
 export async function saveMealPreferenceAction(input: PreferenceInput): Promise<{ ok: true } | { error: string }> {

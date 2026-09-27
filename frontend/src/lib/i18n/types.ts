@@ -132,6 +132,8 @@ export interface Dictionary {
     dayTotals: (kcal: number, proteinG: number, fiberG: number) => string;
     shoppingHeading: string;
     shoppingTotal: (yen: number, budget: number) => string;
+    foodSpent: (spent: number, budget: number) => string;
+    foodSpentNote: string;
     warningsHeading: string;
     warningsIntro: string;
     prefHeading: string;
@@ -245,6 +247,14 @@ export interface Dictionary {
     prep: (n: number) => string;
     statTarget: string;
     statPlanned: string;
+    statActual: string;
+    logAte: string;
+    logSkipped: string;
+    logOther: string;
+    logOtherPlaceholder: string;
+    intakeUnlogged: (n: number) => string;
+    intakeReplaced: (n: number) => string;
+    intakeNote: string;
     statBurn: string;
     statWeight: string;
     notLinked: string;

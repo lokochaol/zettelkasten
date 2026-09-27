@@ -59,6 +59,27 @@ export async function listForDay(ownerSub: string, dateKey: string): Promise<Exp
   return prisma.expense.findMany({ where: { ownerSub, dateKey }, orderBy: { createdAt: "desc" } });
 }
 
+/** The food category the meal planner's budget is measured against. Plain
+ * string rather than an enum for the same reason the rest are: the owner
+ * renames their own categories, and this is the one the app ships with. */
+export const FOOD_CATEGORY = "食費";
+
+/** What was actually spent over a span of days, optionally in one
+ * category. Inclusive of both ends — the caller thinks in "this week",
+ * not in half-open ranges. */
+export async function sumForRange(
+  ownerSub: string,
+  fromDateKey: string,
+  toDateKey: string,
+  category?: string,
+): Promise<number> {
+  const { _sum } = await prisma.expense.aggregate({
+    where: { ownerSub, dateKey: { gte: fromDateKey, lte: toDateKey }, ...(category ? { category } : {}) },
+    _sum: { amountYen: true },
+  });
+  return _sum.amountYen ?? 0;
+}
+
 /** "YYYY-MM" for a day key — the month a day belongs to, without going
  * through Date and its timezone. */
 export function monthOf(dateKey: string): string {

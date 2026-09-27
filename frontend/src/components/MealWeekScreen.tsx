@@ -265,6 +265,15 @@ export function MealWeekScreen() {
               {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
             </span>
           </div>
+          {/* The estimate was made before the week; this is what the week
+              actually cost. Shown together because the gap is what makes
+              the next budget a real number rather than a wish. */}
+          <p
+            className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}
+          >
+            {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
+          </p>
+          <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>
           {[...new Set(view.shoppingItems.map((i) => i.category))].map((category) => (
             <div key={category} className="flex flex-col gap-1">
               <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{category}</p>
