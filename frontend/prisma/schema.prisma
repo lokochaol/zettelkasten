@@ -616,6 +616,14 @@ model MealPlan {
   targetKcal        Int      @map("target_kcal")
   targetProteinG    Int      @map("target_protein_g")
   targetFiberG      Int      @map("target_fiber_g")
+  /// The rest of the brief, stored for the same reason as the targets: so
+  /// the plan can be re-checked against what it was actually written to,
+  /// not against preferences that have since changed. Defaults cover the
+  /// plans that predate these columns.
+  targetSaltMaxG    Float    @default(7.5) @map("target_salt_max_g")
+  cookSessionsPerWeek Int    @default(2) @map("cook_sessions_per_week")
+  readyMadeMealsPerWeek Int  @default(5) @map("ready_made_meals_per_week")
+  weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
   budgetYen         Int      @map("budget_yen")
   /// What the model was told, kept for debugging a plan that came out odd.
   promptSummary     String   @map("prompt_summary")

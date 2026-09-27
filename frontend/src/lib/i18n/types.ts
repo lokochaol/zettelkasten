@@ -127,6 +127,7 @@ export interface Dictionary {
     generate: string;
     regenerate: string;
     generating: string;
+    generatingNote: string;
     noPlan: string;
     slotBreakfast: string;
     slotLunch: string;
