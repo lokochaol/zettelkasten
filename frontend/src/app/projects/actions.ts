@@ -79,9 +79,13 @@ export async function listLinkedNotesAction(
   return projects.listLinkedNotes(ownerSub, id);
 }
 
-export async function listRecentDaysAction(id: string, daysBack: number): Promise<DayStripEntry[]> {
+export async function listRecentDaysAction(
+  id: string,
+  daysBack: number,
+  todayKey: string,
+): Promise<DayStripEntry[]> {
   const ownerSub = await requireOwnerSub();
-  return projectTaskNotes.listRecentDays(ownerSub, id, daysBack);
+  return projectTaskNotes.listRecentDays(ownerSub, id, daysBack, todayKey);
 }
 
 export async function getProjectTaskNoteAction(id: string, dateKey: string): Promise<ProjectTaskNoteView> {

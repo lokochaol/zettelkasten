@@ -51,7 +51,7 @@ export function ZettelkastenProjectDetailPane({
       const [detail, linked, dayStrip, note] = await Promise.all([
         getProjectDetailAction(projectId),
         listLinkedNotesAction(projectId),
-        listRecentDaysAction(projectId, DAY_STRIP_SIZE),
+        listRecentDaysAction(projectId, DAY_STRIP_SIZE, todayKeyValue()),
         getProjectTaskNoteAction(projectId, selectedDate),
       ]);
       if (!cancelled) {

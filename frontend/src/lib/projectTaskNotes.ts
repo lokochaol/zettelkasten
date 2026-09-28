@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/db";
 import * as projects from "@/lib/projects";
+import { shiftDateKey } from "@/lib/dateKey";
 
 /**
  * A ProjectTaskNote's date is always handled as a plain "YYYY-MM-DD" string
@@ -57,26 +58,31 @@ export interface DayStripEntry {
 
 /** Backs the Project detail page's day-strip — the last `daysBack` days up
  * to and including today, oldest first. */
-export async function listRecentDays(ownerSub: string, projectId: string, daysBack: number): Promise<DayStripEntry[]> {
+/**
+ * The last few days, ending on the owner's own today.
+ *
+ * `todayKey` is passed in for the same reason listTimelineMarks takes one:
+ * the host's clock is UTC, so computing the strip here would end it on
+ * yesterday for anyone in JST until nine in the morning — while the note
+ * shown beside it is already on today's date, which is how the strip and
+ * the note came to disagree.
+ */
+export async function listRecentDays(
+  ownerSub: string,
+  projectId: string,
+  daysBack: number,
+  todayKey: string,
+): Promise<DayStripEntry[]> {
   await projects.requireOwnedProject(ownerSub, projectId);
-  const since = new Date();
-  since.setUTCDate(since.getUTCDate() - daysBack);
-  since.setUTCHours(0, 0, 0, 0);
+  const days = Array.from({ length: daysBack + 1 }, (_, i) => shiftDateKey(todayKey, i - daysBack));
 
   const rows = await prisma.projectTaskNote.findMany({
-    where: { projectId, date: { gte: since } },
+    where: { projectId, date: { gte: toDate(days[0]) } },
     select: { date: true, content: true },
   });
   const hasContentByDate = new Map(rows.map((r) => [toDateKey(r.date), r.content.trim().length > 0]));
 
-  const result: DayStripEntry[] = [];
-  for (let i = daysBack; i >= 0; i--) {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i);
-    const key = toDateKey(d);
-    result.push({ date: key, hasContent: hasContentByDate.get(key) ?? false });
-  }
-  return result;
+  return days.map((date) => ({ date, hasContent: hasContentByDate.get(date) ?? false }));
 }
 
 export interface TodayProjectNote {
