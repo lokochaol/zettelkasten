@@ -34,13 +34,16 @@ export default async function ProjectDetailPage(props: PageProps<"/projects/[id]
     throw e;
   }
 
+  // One "today" for the page: the strip of days and the note shown beside
+  // it have to agree about which day that is.
+  const todayKey = await getTodayKey();
   const [linkedNotes, days] = await Promise.all([
     projects.listLinkedNotes(ownerSub, id),
-    projectTaskNotes.listRecentDays(ownerSub, id, DAY_STRIP_SIZE),
+    projectTaskNotes.listRecentDays(ownerSub, id, DAY_STRIP_SIZE, todayKey),
   ]);
 
   const requestedDate = typeof searchParams.date === "string" ? searchParams.date : undefined;
-  const selectedDate = requestedDate ?? (await getTodayKey());
+  const selectedDate = requestedDate ?? todayKey;
   const selectedNote = await projectTaskNotes.getOrEmpty(ownerSub, id, selectedDate);
 
   return (
