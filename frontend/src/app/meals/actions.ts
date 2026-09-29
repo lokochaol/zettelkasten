@@ -32,7 +32,7 @@ export interface MealWeekView {
 export async function getMealWeekAction(dateKey: string): Promise<MealWeekView> {
   const ownerSub = await requireOwnerSub();
   const preference = await mealPlanning.getPreference(ownerSub);
-  const weekStartDateKey = mealPlanning.weekStartFor(dateKey, preference.shoppingWeekday);
+  const weekStartDateKey = mealPlanning.weekStartFor(dateKey, preference.weekStartWeekday);
   const [view, foodSpentYen] = await Promise.all([
     mealPlanning.getPlan(ownerSub, weekStartDateKey),
     expenses.sumForRange(ownerSub, weekStartDateKey, shiftDateKey(weekStartDateKey, 6), expenses.FOOD_CATEGORY),
@@ -141,7 +141,7 @@ export async function getCoopOrderAction(weekStartDateKey: string, todayKey: str
     weekStartDateKey,
     targetWeekStartDateKey: coopOrder.targetWeekStart(
       todayKey,
-      preference.shoppingWeekday,
+      preference.weekStartWeekday,
       preference.coopDeliveryWeekday,
       preference.coopOrderLeadDays,
     ),

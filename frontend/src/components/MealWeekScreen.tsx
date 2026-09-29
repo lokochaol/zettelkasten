@@ -98,6 +98,7 @@ export function MealWeekScreen() {
         weeklyBudgetYen: next.weeklyBudgetYen,
         weekdayCookMinutes: next.weekdayCookMinutes,
         shoppingWeekday: next.shoppingWeekday,
+        weekStartWeekday: next.weekStartWeekday,
         dislikes: next.dislikes,
         allergies: next.allergies,
         breakfastMinutes: next.breakfastMinutes,
@@ -368,6 +369,19 @@ export function MealWeekScreen() {
               inputMode="numeric"
               className="w-full bg-transparent text-xs text-ink focus:outline-none"
             />
+          </PrefField>
+          <PrefField label={t.meals.prefWeekStart}>
+            <select
+              defaultValue={data.preference.weekStartWeekday}
+              onChange={(e) => savePreference({ weekStartWeekday: Number(e.target.value) })}
+              className="w-full bg-transparent text-xs text-ink focus:outline-none"
+            >
+              {t.meals.weekdayNames.map((name, i) => (
+                <option key={name} value={i}>
+                  {name}
+                </option>
+              ))}
+            </select>
           </PrefField>
           <PrefField label={t.meals.prefShoppingDay}>
             <select

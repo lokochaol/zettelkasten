@@ -24,6 +24,7 @@ export interface PreferenceInput {
   weeklyBudgetYen: number;
   weekdayCookMinutes: number;
   shoppingWeekday: number;
+  weekStartWeekday: number;
   dislikes: string;
   allergies: string;
   breakfastMinutes: number;
@@ -44,6 +45,9 @@ export async function savePreference(ownerSub: string, input: PreferenceInput): 
   }
   if (!Number.isInteger(input.shoppingWeekday) || input.shoppingWeekday < 0 || input.shoppingWeekday > 6) {
     throw new ValidationError("mealPreferenceInvalid", "Shopping weekday must be 0-6");
+  }
+  if (!Number.isInteger(input.weekStartWeekday) || input.weekStartWeekday < 0 || input.weekStartWeekday > 6) {
+    throw new ValidationError("mealPreferenceInvalid", "Week start weekday must be 0-6");
   }
   if (!Number.isInteger(input.cookSessionsPerWeek) || input.cookSessionsPerWeek < 0 || input.cookSessionsPerWeek > 7) {
     throw new ValidationError("mealPreferenceInvalid", "Cooking days must be 0-7");
@@ -99,12 +103,25 @@ export interface MealPlanView {
   warnings: string[];
 }
 
-/** The week a date belongs to, starting on the owner's shopping day — the
- * plan is organised around the trip, not around Monday. */
-export function weekStartFor(dateKey: string, shoppingWeekday: number): string {
+/** The week a date belongs to, on the owner's own calendar — their week
+ * may start on a Monday, a Sunday, or the day they happen to shop. */
+export function weekStartFor(dateKey: string, weekStartWeekday: number): string {
   const date = new Date(`${dateKey}T00:00:00Z`);
-  const diff = (date.getUTCDay() - shoppingWeekday + 7) % 7;
+  const diff = (date.getUTCDay() - weekStartWeekday + 7) % 7;
   return shiftDateKey(dateKey, -diff);
+}
+
+/**
+ * The day the shopping is done for a given week.
+ *
+ * On or before the week it feeds, never inside it: a trip on Wednesday
+ * cannot supply Monday. When the shopping day is the week's own start
+ * day that is the first day itself; otherwise it is the most recent one
+ * before it — a Saturday shop for a week that starts on Monday.
+ */
+export function shoppingDayFor(weekStartDateKey: string, shoppingWeekday: number): string {
+  const startWeekday = new Date(`${weekStartDateKey}T00:00:00Z`).getUTCDay();
+  return shiftDateKey(weekStartDateKey, -((startWeekday - shoppingWeekday + 7) % 7));
 }
 
 function totalsFor(meals: PlannedMeal[]): DayTotals[] {
@@ -276,11 +293,18 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
   }
   const t = targetsNow.targets;
   const dates = Array.from({ length: DAYS_IN_PLAN }, (_, i) => shiftDateKey(weekStartDateKey, i));
+  const shoppingDay = shoppingDayFor(weekStartDateKey, preference.shoppingWeekday);
+  const daysBefore = Math.round(
+    (Date.parse(`${weekStartDateKey}T00:00:00Z`) - Date.parse(`${shoppingDay}T00:00:00Z`)) / 86_400_000,
+  );
 
   const composition = targetsNow.composition;
   const brief = [
     `対象の7日間: ${dates.join(", ")}`,
-    `買い物日: ${dates[0]}（この日に1回だけ買い物をする）`,
+    `買い物日: ${shoppingDay}（この日に1回だけ買い物をする）`,
+    ...(shoppingDay !== dates[0]
+      ? [`  ※ 買い物は週が始まる${daysBefore}日前です。傷みやすいものは、買った日から数えて何日もつかで配置してください。`]
+      : []),
     "",
     ...(composition && composition.current.leanMassKg !== null
       ? [
@@ -309,7 +333,8 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     `  食塩相当量 ${t.saltMaxG} g 未満`,
     "",
     `週の食費: ${preference.weeklyBudgetYen} 円以内`,
-    `台所に立つ日: 週 ${preference.cookSessionsPerWeek} 日まで（この日以外はCOOKの料理を置かない）`,`  → 買い物日 ${dates[0]} を1回目のまとめ調理の日にする`,
+    `台所に立つ日: 週 ${preference.cookSessionsPerWeek} 日まで（この日以外はCOOKの料理を置かない）`,
+    `  → ${dates[0]}（週の初日）を1回目のまとめ調理の日にする`,
     `冷凍食品・惣菜（READY）: 週 ${preference.readyMadeMealsPerWeek} 食まで`,
     `まとめ調理をしない日の調理時間: 1食あたり10分以内（温め直しのみ）`,
     `まとめ調理の日の調理時間: 1日あたり合計 ${Math.max(preference.weekdayCookMinutes, 60)} 分まで`,

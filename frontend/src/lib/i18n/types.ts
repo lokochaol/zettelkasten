@@ -189,6 +189,7 @@ export interface Dictionary {
     prefBudget: string;
     prefCookMinutes: string;
     prefShoppingDay: string;
+    prefWeekStart: string;
     prefDislikes: string;
     prefAllergies: string;
     weekdayNames: string[];
