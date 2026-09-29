@@ -18,7 +18,10 @@ import { ValidationError } from "@/lib/errors";
  *
  *   POST /api/health/ingest
  *   Authorization: Bearer hk_…
- *   { "date": "2026-09-28", "weightKg": 68.4, "activeEnergyKcal": 620, "steps": 9210 }
+ *   {
+ *     "date": "2026-09-28", "weightKg": 68.4, "activeEnergyKcal": 620,
+ *     "bodyFatPercent": 14.2, "leanBodyMassKg": 58.7, "steps": 9210
+ *   }
  *
  * Every field but `date` is optional: a day the phone recorded steps but no
  * weight is a normal day, not a malformed request.
@@ -57,12 +60,19 @@ export async function POST(request: NextRequest) {
   };
   const dateKey = typeof payload.date === "string" ? payload.date : String(payload.date ?? "");
   const steps = num(payload.steps);
+  // Health stores a body fat percentage as a fraction (0.142), and some
+  // scales' own apps write a percentage (14.2). Both arrive here; a
+  // figure below 1 is a fraction, since nobody has 0.9% body fat.
+  const rawFat = num(payload.bodyFatPercent);
+  const bodyFatPercent = rawFat === undefined ? undefined : rawFat > 0 && rawFat < 1 ? rawFat * 100 : rawFat;
 
   try {
     const metric = await health.recordDailyMetric(ownerSub, {
       dateKey,
       weightKg: num(payload.weightKg),
       activeEnergyKcal: num(payload.activeEnergyKcal),
+      bodyFatPercent,
+      leanBodyMassKg: num(payload.leanBodyMassKg),
       steps: steps === undefined ? undefined : Math.round(steps),
     });
     return NextResponse.json({
@@ -70,6 +80,8 @@ export async function POST(request: NextRequest) {
       date: metric.dateKey,
       weightKg: metric.weightKg,
       activeEnergyKcal: metric.activeEnergyKcal,
+      bodyFatPercent: metric.bodyFatPercent,
+      leanBodyMassKg: metric.leanBodyMassKg,
       steps: metric.steps,
     });
   } catch (e) {
