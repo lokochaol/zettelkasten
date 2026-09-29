@@ -1,4 +1,3 @@
-import { HudFrame } from "@/components/HudFrame";
 import {
   LinkedNotesDiagram,
   TwoStageFlowDiagram,
@@ -6,133 +5,506 @@ import {
   NoFoldersDiagram,
   AppMapDiagram,
 } from "@/components/guide/GuideDiagrams";
-
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
-      <span className="text-accent">{"//"}</span> {children}
-    </p>
-  );
-}
-
-function DiagramFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <HudFrame active={false} innerClassName="flex items-center justify-center rounded-xl px-6 py-8">
-      {children}
-    </HudFrame>
-  );
-}
+import {
+  Chapter,
+  Code,
+  Contents,
+  DiagramFrame,
+  Eyebrow,
+  KeyTable,
+  PageSection,
+  Points,
+  Prose,
+  Rhythm,
+  Steps,
+} from "@/components/guide/GuideParts";
 
 export function GuideContentJa() {
   return (
     <div className="flex flex-col gap-16">
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-5">
         <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">Guide</p>
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink text-balance">
-          ツェッテルカステンってなに？
-        </h1>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          ツェッテルカステン（Zettelkasten、ドイツ語で「メモ箱」）は、社会学者ニクラス・ルーマンが実践し、ゾンケ・アーレンス『TAKE
-          NOTES!』で紹介された、メモを<strong className="text-ink">育てる</strong>ための方法です。
-          特別な才能や記憶力は要りません。ルールはとてもシンプルで、ほとんどが「メモとメモをつなぐ」ことに関するものです。
-        </p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">このアプリの使い方</h1>
+        <Prose>
+          個人のメモ・計画・記録・追跡を1箇所にまとめる道具です。思いついたことを書き留め、育てたい考えをつなぎ、
+          今日の予定とタスクを見て、1週間の食事と1年のお金を組み立てる — それぞれ別のアプリでやっていたことを、
+          同じ場所で、互いに参照しあう形で扱います。
+        </Prose>
+        <Contents
+          heading="目次"
+          items={[
+            { id: "overview", label: "全体のかたち" },
+            { id: "setup", label: "最初に設定すること" },
+            { id: "rhythm", label: "毎日・毎週・毎月" },
+            { id: "write", label: "書く — 走り書き・ツェッテルカステン・文献メモ" },
+            { id: "plan", label: "組む・記録する — カレンダー・プロジェクト・献立・家計" },
+            { id: "body", label: "体と栄養の目標" },
+            { id: "find", label: "探す・整える — 探索・検索・設定" },
+          ]}
+        />
       </section>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>1. メモは、つながって初めて意味を持つ</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          ツェッテルカステンの核心は、メモそのものではなく<strong className="text-ink">メモとメモの間のリンク</strong>に価値を置くことです。1枚のメモは、他のメモと結びついたときに初めて「知識」になります。
-        </p>
-        <DiagramFrame>
-          <LinkedNotesDiagram leftLabel="バラバラのメモ" rightLabel="つながったメモ" />
-        </DiagramFrame>
-      </section>
+      <Chapter id="overview" kicker="Overview" title="全体のかたち">
+        <Points
+          items={[
+            {
+              title: "入り口は索引",
+              body: (
+                <>
+                  <Code>/</Code> を開くと全ページの一覧が、それぞれ何をする場所かの一行と一緒に並びます。どのページでも左上には今いるページのパスが出ていて、押すと同じ索引が開きます。
+                </>
+              ),
+            },
+            {
+              title: "毎日見る6つは、左のアイコンバーで切り替える",
+              body: (
+                <>
+                  <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/money</Code>{" "}
+                  <Code>/discovery</Code> は同じ枠の中に出て、左端のアイコンバーが常に見えています。今日の予定、残っているタスク、食べるもの、使ったお金 — ひと続きに見るものなので、行き来は一瞥で済むようにしてあります。
+                </>
+              ),
+            },
+            {
+              title: "それ以外は、用があって行って戻るページ",
+              body: "走り書き・文献メモ・検索・ガイド・設定、それにプロジェクトの詳細は、左上にパスだけがある素のページです。",
+            },
+            {
+              title: "AIは、あなた自身のキーで動く",
+              body: "アプリはAIのキーを持っていません。設定で登録したClaude / ChatGPT / Gemini のどれかのキーを使って動き、料金もそのキーにかかります。AIを使うのは、献立の作成、コープデリの注文案、週1回の家計の助言、PDF明細の読み取り、探索レールの5つだけで、キーが無くてもそれ以外はすべて使えます。",
+            },
+            {
+              title: "オフラインでも書ける",
+              body: "電波が切れても走り書きなどの操作は保留され、つながり次第自動で保存されます。ホーム画面やDockに追加しておけば、オフラインのまま起動することもできます。",
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>2. 2段階で書く — 走り書きと永久保存版</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          ツェッテルカステンでは、まず思考の断片を気軽に書き留める段階（走り書き／fleeting
-          notes）と、後からそれを選び、自分の言葉で書き直し、既存のメモとリンクさせて初めて「永久保存版」として箱に加える段階を分けます。
-          走り書きは使い捨てで構いません — 価値があるものだけが、書き直されてツェッテルカステンに残ります。
-        </p>
-        <DiagramFrame>
-          <TwoStageFlowDiagram fleetingLabel="走り書き（一時的）" arrowLabel="選んで書き直す" permanentLabel="永久保存版（リンク済み）" />
-        </DiagramFrame>
-      </section>
+      <Chapter
+        id="setup"
+        kicker="Setup"
+        title="最初に設定すること"
+        intro="どれも後からで構いませんが、入れておくほど他の画面が埋まります。上から順に効き目が大きいものです。"
+      >
+        <Steps
+          items={[
+            {
+              title: "AIのキー（/settings）",
+              body: "Claude・ChatGPT・Gemini のどれか1つ。献立・家計の助言・PDF明細・探索がこれで動きます。",
+            },
+            {
+              title: "Googleカレンダー連携（/settings）",
+              body: "その日の予定がカレンダーの「今日の流れ」に並びます。献立の食事をGoogleカレンダーに書き出すには、連携のときに書き込みも許可してください。",
+            },
+            {
+              title: "家計の前提（/money）",
+              body: "手取り・生活できる最低額・予備費、家賃やサブスクや分割払い、貯金の目標。ここが入ると、毎月の予算が自動で埋まるようになります。",
+            },
+            {
+              title: "体の基礎情報とiPhoneのヘルスケア（/settings）",
+              body: "身長・生まれ年・性別・活動レベルから1日の栄養目標を出します。iPhoneのショートカットで毎朝、体重・消費エネルギー・歩数（体組成計があれば体脂肪率も）を送るようにすると、推定ではなく実測で目標が決まります。手順は設定画面にあります。",
+            },
+            {
+              title: "献立の条件（/meals）",
+              body: "週の食費、平日の調理時間、買い物の曜日、週の開始曜日、苦手なもの・アレルギー、台所に立つ日数。コープデリを使うなら宅配の曜日と注文締切も。",
+            },
+            {
+              title: "Zotero（/settings、文献を扱うなら）",
+              body: "文献メモを作るときに、Zoteroのライブラリから書誌情報を検索して取り込めるようになります。",
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>3. 保存位置は、関係を考えて丁寧に選ぶ</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          永久保存版メモをどこに保存するか決める操作は、今まで書き溜めてきたメモ（知識）のどこに新しい知識を位置づけるかを、既存のメモとの関係を考えながら丁寧に選ぶ、という意味を持ちます。
-          メモは基本的に時系列に並び、リンクによって網の目のようにつながっていきます。頻繁に辿り着きたい場所だけ、少数の「索引」キーワードとして目印を立てておけば十分です。
-        </p>
-        <DiagramFrame>
-          <NoFoldersDiagram folderLabel="フォルダ分け（しない）" indexLabel="少数の索引" />
-        </DiagramFrame>
-      </section>
+      <Chapter
+        id="rhythm"
+        kicker="Rhythm"
+        title="毎日・毎週・毎月"
+        intro="機能は多いですが、触る頻度で分けると多くありません。"
+      >
+        <Rhythm
+          columns={[
+            {
+              label: "毎日",
+              items: [
+                "/calendar を開いて、今日の流れと未完了のタスクを見る",
+                "思いついたことは /dash-off に走り書き",
+                "その日のタスクメモを書き、終わったら x に",
+                "食事ごとに「食べた／抜いた／別のもの」",
+                "お金を使ったらその場で入力",
+              ],
+            },
+            {
+              label: "毎週",
+              items: [
+                "/meals で献立を作り、1回で買い物",
+                "コープデリの注文案を締切までに",
+                "/money で「今週の助言をもらう」",
+                "残したい走り書きをツェッテルカステンへ（放っておくと1週間で片付く）",
+              ],
+            },
+            {
+              label: "毎月",
+              items: [
+                "月の予算は最初に開いたときに自動で作られるので、中身を確認",
+                "カードの明細を取り込む（CSVでもPDFでも）",
+                "1年の見通しで、苦しくなる月がないか見る",
+              ],
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>4. リンクすることで、過去のメモが生き続ける</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          永久保存版メモは、必ずすでにあるメモや索引と最低ひとつのリンクを結んで初めて箱に収められます。この「常に既存の知識に関連付ける」というひと手間があるからこそ、過去に書いたメモは孤立して忘れられることなく、新しいメモから再び参照され、生き続けます。
-          ルーマンが実物のカードに <code className="rounded bg-surface-alt px-1.5 py-0.5 text-[11px] text-ink">21/3d7a26</code>{" "}
-          のような住所を振り、既存の2枚の間に新しいカードをいくらでも挿し込めるようにしたのも、この「常にどこかとの関係の中に位置づける」ための工夫です。番号を振り直す必要がないので、時系列を保ちながら思考の枝分かれにも対応できます。
-        </p>
-        <DiagramFrame>
-          <InsertionDiagram label="AとBの間に、いつでも新しいメモを挿し込める" />
-        </DiagramFrame>
-      </section>
-
-      <section className="flex flex-col gap-4 border-t border-line pt-12">
-        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">How this app works</p>
-        <h2 className="text-2xl font-extrabold tracking-tight text-ink">このアプリでの使い方</h2>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          このアプリの「走り書き（Dash Off）」と「ツェッテルカステン」は、そのまま上の2段階に対応しています。
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-5">
-        <DiagramFrame>
-          <AppMapDiagram
-            dashOffLabel="① 走り書き"
-            promoteLabel="選んで昇格"
-            zettelkastenLabel="② ツェッテルカステン"
-            literatureLabel="文献メモ（両方から参照）"
+      <Chapter id="write" kicker="Write" title="書く" intro="考えは、まず雑に書き、残したいものだけを丁寧に書き直す。この二段構えがこのアプリの芯です。">
+        <PageSection
+          id="dash-off"
+          path="/dash-off"
+          name="走り書き"
+          lead="思いついた順に、体裁を気にせず書き留める場所です。書いた順に並び、その場で追記できます。"
+        >
+          <Points
+            items={[
+              {
+                title: "使い捨てが前提",
+                body: "プロジェクトに紐づいていない走り書きは、書いてから7日たつと自動でアーカイブされます。残したいものはツェッテルカステンに書き直すか、プロジェクトに紐づけてください。机の上がいつまでも散らからないための仕組みです。",
+              },
+              {
+                title: "プロジェクトと文献メモを付けられる",
+                body: "走り書きを開くと、どのプロジェクトのものか、どの文献を読んで書いたものかを付けられます。",
+              },
+              {
+                title: "コード・図・画像",
+                body: (
+                  <>
+                    <Code>```言語</Code> で囲むとコード、<Code>```mermaid</Code> で図、<Code>![](URL)</Code> で画像として表示されます。
+                  </>
+                ),
+              },
+              {
+                title: "探索レールの候補",
+                body: "/discovery で選んだ走り書きには、AIが見つけた関連する文献やニュースが「関連」としてぶら下がります。",
+              },
+            ]}
           />
-        </DiagramFrame>
-        <ol className="flex flex-col gap-4">
-          {[
+        </PageSection>
+
+        <PageSection
+          id="zettelkasten"
+          path="/zettelkasten"
+          name="ツェッテルカステン"
+          lead={
+            <>
+              走り書きの中から育てたいものを選び、自分の言葉で書き直して、既存のメモのあいだに置く場所です。社会学者ニクラス・ルーマンが実践し、ゾンケ・アーレンス『TAKE
+              NOTES!』で紹介された方法（Zettelkasten、ドイツ語で「メモ箱」）をそのまま形にしています。ルールはシンプルで、ほとんどが「メモとメモをつなぐ」ことに関するものです。
+            </>
+          }
+        >
+          <div className="flex flex-col gap-10 pt-2">
+            <div className="flex flex-col gap-4">
+              <Eyebrow>メモは、つながって初めて意味を持つ</Eyebrow>
+              <Prose>
+                価値はメモそのものではなく<strong className="text-ink">メモとメモの間のリンク</strong>にあります。1枚のメモは、他のメモと結びついたときに初めて「知識」になります。
+              </Prose>
+              <DiagramFrame>
+                <LinkedNotesDiagram leftLabel="バラバラのメモ" rightLabel="つながったメモ" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>2段階で書く — 走り書きと永久保存版</Eyebrow>
+              <Prose>
+                思考の断片を気軽に書き留める段階（走り書き）と、それを選び、自分の言葉で書き直し、既存のメモとリンクさせて「永久保存版」として箱に加える段階を分けます。走り書きは使い捨てで構いません。価値があるものだけが書き直されて残ります。
+              </Prose>
+              <DiagramFrame>
+                <TwoStageFlowDiagram fleetingLabel="走り書き（一時的）" arrowLabel="選んで書き直す" permanentLabel="永久保存版（リンク済み）" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>保存位置は、関係を考えて選ぶ。フォルダは作らない</Eyebrow>
+              <Prose>
+                永久保存版メモをどこに置くかは、これまでの知識のどこに新しい知識を位置づけるかを、既存のメモとの関係を考えながら選ぶことです。メモは1本の順序に並び、リンクで網の目のようにつながります。頻繁に辿り着きたい場所にだけ、少数の「索引」を立てておけば十分です。
+              </Prose>
+              <DiagramFrame>
+                <NoFoldersDiagram folderLabel="フォルダ分け（しない）" indexLabel="少数の索引" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>リンクすることで、過去のメモが生き続ける</Eyebrow>
+              <Prose>
+                永久保存版メモは、既存のメモか索引と最低1つリンクを結んで初めて箱に入ります。このひと手間があるから、過去のメモは孤立して忘れられず、新しいメモから参照され続けます。ルーマンは実物のカードに{" "}
+                <Code>21/3d7a26</Code> のような住所を振り、既存の2枚の間に新しいカードをいくらでも挿し込めるようにしました。番号を振り直さずに、時系列を保ったまま思考の枝分かれに対応するための工夫です。
+              </Prose>
+              <DiagramFrame>
+                <InsertionDiagram label="AとBの間に、いつでも新しいメモを挿し込める" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>この画面での流れ</Eyebrow>
+              <DiagramFrame>
+                <AppMapDiagram
+                  dashOffLabel="① 走り書き"
+                  promoteLabel="選んで昇格"
+                  zettelkastenLabel="② ツェッテルカステン"
+                  literatureLabel="文献メモ（両方から参照）"
+                />
+              </DiagramFrame>
+              <Steps
+                items={[
+                  {
+                    title: "右の列（③）から走り書きを選ぶ",
+                    body: "育てたいものを1件でも複数でも選び、「選択した○件から永久保存版メモを作成」。走り書きなしで直接書くこともできます（「＋ 永久保存版メモ」）。",
+                  },
+                  {
+                    title: "真ん中（②）で書き直す",
+                    body: "タイトルを付け、自分の言葉で書き直します。他の永久保存版メモか索引へのリンクを最低1つ、関係性を一言添えて付けます。元の走り書きに付いていた文献メモは引き継がれます。",
+                  },
+                  {
+                    title: "左の列（①）で保存位置を選ぶ",
+                    body: "「山」をドリルダウンして、既存の2件の間の帯をタップすると、その場所に挿し込まれます。完了すると、元の走り書きは「昇格済み」として片付きます。",
+                  },
+                  {
+                    title: "索引はごく少数だけ",
+                    body: "本当によく参照するキーワードだけを、メモを開いて「索引に追加」。索引は入り口で、そこから先はリンクを辿ります。",
+                  },
+                ]}
+              />
+              <Prose>3列の画面なので、スマートフォンでは横向きにして使います。</Prose>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
+          id="literature"
+          path="/literature"
+          name="文献メモ"
+          lead="本や論文に書いてあったことを、自分の言葉で要約して残す場所です。1つの文献につき要約は1つで、走り書きからも永久保存版メモからも参照できます。"
+        >
+          <Points
+            items={[
+              {
+                title: "同じ文献に何度出会っても、要約は1つにまとまる",
+                body: "要約は、その文献を参照しているすべてのメモで共有されます。どのメモから参照されているかも一覧できます。",
+              },
+              {
+                title: "Zoteroから書誌を取り込む",
+                body: "Zoteroを連携しておくと、文献を検索して書誌情報をそのまま使えます。見つからない文献は、書き込み権限があればその場でZoteroに登録できます。",
+              },
+            ]}
+          />
+        </PageSection>
+      </Chapter>
+
+      <Chapter id="plan" kicker="Plan & record" title="組む・記録する" intro="今日をどう過ごすか、今週何を食べるか、今月いくら使えるか。決めて、実際どうだったかを残します。">
+        <PageSection
+          id="calendar"
+          path="/calendar"
+          name="カレンダー"
+          lead="今日のダッシュボードです。1日の流れ、残っているタスク、食事と栄養、支出を1画面にまとめています。前後の日にも移れます。"
+        >
+          <Points
+            items={[
+              {
+                title: "今日の流れ",
+                body: "24時間の縦の軸に、Googleカレンダーの予定、献立から置かれた食事の時間、自分で確保した時間が並びます。今日なら現在時刻に線が出ます。",
+              },
+              {
+                title: "未完了のタスク",
+                body: "プロジェクトのタスクメモに「- 」で書いた行が読み出されます。字下げが親子関係になります。完了したらメモ側で x に書き換えてください。",
+              },
+              {
+                title: "時間を確保する",
+                body: "開始時刻と長さを入れて、その日の流れに枠を置きます。何をするかは未完了のタスクから選べます。",
+              },
+              {
+                title: "今日の食事",
+                body: "献立の食事ごとに「食べた／抜いた／別のもの」を記録すると、目標・献立の合計・実績の栄養が並びます。実績は「食べた」ものだけの合計です。",
+              },
+              {
+                title: "今日の支出",
+                body: "金額とカテゴリを入れるだけ。今月の食費が予算に対してどこまで来たかも出ます。",
+              },
+              {
+                title: "タイムライン表示",
+                body: "右上で切り替えると、月ごとにプロジェクトの帯と、記録のある日が並びます。日をタップするとその日のタスクメモを全プロジェクトぶん開けます。未来の月も見られて、先の日のメモも書けます。",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="projects"
+          path="/projects"
+          name="プロジェクト"
+          lead="やっていることの単位です。目標の梯子と、日毎のタスクメモを持ちます。最初から「自分」という既定のプロジェクトが1つあります。"
+        >
+          <Points
+            items={[
+              {
+                title: "目標の梯子（任意）",
+                body: "最終目標 → 3年 → 2年 → 1年 → 3ヶ月 → 1ヶ月 → 1日。使うなら、最終目標と1日の目標は必須です。遠い目標が今日の行動にどうつながるかを、上から下まで一度に見るためのものです。",
+              },
+              {
+                title: "日毎のタスクメモ",
+                body: "プロジェクトごと・日ごとに1枚。下のバレットジャーナルの記号で書くと、カレンダーの未完了タスクに拾われます。",
+              },
+              {
+                title: "紐づいたメモ",
+                body: "このプロジェクトに紐づけた走り書き・永久保存版メモが一覧できます。",
+              },
+              {
+                title: "閉じるのは手で",
+                body: "目標の期限が来ても自動では閉じません。「プロジェクトを閉じる」を押すと、タイムラインの帯がそこで止まり、紐づいた走り書きはアーカイブされます。",
+              },
+            ]}
+          />
+          <Eyebrow>バレットジャーナルの記号</Eyebrow>
+          <KeyTable
+            mono
+            rows={[
+              ["-", "タスク（未完了。カレンダーに出る）"],
+              ["x", "完了"],
+              [">", "翌日へ移動"],
+              ["<", "予定へ移動"],
+              ["o", "予定・出来事"],
+              ["~", "メモ"],
+              ["*", "優先"],
+              ["!", "ひらめき"],
+            ]}
+          />
+          <Prose>凡例はメモの横に折りたたんで表示できます（設定で表示・非表示を切り替え）。</Prose>
+        </PageSection>
+
+        <PageSection
+          id="meals"
+          path="/meals"
+          name="献立"
+          lead="1週間の献立と、それを賄う1回ぶんの買い物リストを作ります。栄養目標・週の食費・調理時間を制約にしてAIが組み、できたものをアプリ側で計算し直して、目標から外れている点を知らせます。"
+        >
+          <Points
+            items={[
+              {
+                title: "作る・作り置き・冷凍惣菜",
+                body: "台所に立つ日数と、冷凍・惣菜で済ませる食数を決めておくと、その範囲で組みます。作り置きと冷凍・惣菜の食事は温め直すだけの時間で数え、平日の調理時間を超える日があれば知らせます。",
+              },
+              {
+                title: "目標とのズレ",
+                body: "1日ごとのエネルギーやたんぱく質、買い物の概算を計算し直し、目標から外れていれば知らせます。作り直すか、その日だけ手で調整してください。",
+              },
+              {
+                title: "実際の食費",
+                body: "その週に「食費」カテゴリで使った金額（手入力と明細の取り込みの合計）を、週の予算と並べて出します。",
+              },
+              {
+                title: "Googleカレンダーへ書き出す",
+                body: "設定した食事の時刻で、1週間ぶんの食事をカレンダーに書き出せます。",
+              },
+              {
+                title: "コープデリの注文案",
+                body: "その週の買い物リストを、週1回の宅配で届く単位に組み直します。日持ちしないものは「店で買う」に分けます。eフレンズには外部から注文するAPIがないので、ここで注文は確定しません。コピーして、ご自身で注文してください。締切に間に合う週だけが対象です。",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="money"
+          path="/money"
+          name="家計"
+          lead="今月いくら使えて、いくら使ったか、この先1年どうなるか。記録と計画を同じ画面で扱います。"
+        >
+          <Points
+            items={[
+              {
+                title: "今月の計画は自動で埋まる",
+                body: "手取りから、固定費・分割払い・貯金の積立・予備費を引いた残りが生活費です。それを、これまでの使い方に合わせてカテゴリに配分した予算が、月の最初に開いたときに自動で作られます。金額は直接書き換えられます。",
+              },
+              {
+                title: "カテゴリ別の配分",
+                body: "カテゴリごとに使った額と予算、バーの縦線が月の経過位置です。線より右に出ていればこのペースだと月末に超えます。計画に無いカテゴリで使ったお金は「予算なし」として出て、その場で予算を入れられます。",
+              },
+              {
+                title: "固定費・分割払い・貯金の目標",
+                body: "分割払いは終わる月を、貯金は目標額と時期を入れます。貯金は残りの月数で割った額が毎月の積立として計画に入ります。",
+              },
+              {
+                title: "1年の見通し",
+                body: "今月から12ヶ月。分割払いが終わる月、貯金が貯まりきる月が、生活費の増減として見えます。生活できる最低額を下回る月があれば知らせますが、貯金を勝手に削る計画にはしません。どうするかは自分で決めます。",
+              },
+              {
+                title: "今週の会計士から（AI）",
+                body: "直近7日の明細と今月の予算を渡して、具体的にどこをどう減らせるかを出してもらいます。週に1回。",
+              },
+              {
+                title: "明細の取り込み（CSV・PDF）",
+                body: "カードや銀行の明細を取り込みます。CSVは列の対応づけを覚えるので2回目からは貼るだけ。PDFはAIが読み取り、明細に印字された合計と照合します。どちらも書き込む前に一覧で確認でき、取込済みの行は二重に入らず、手入力と同じ日・同じ額の行は置き換えられます。取り込むときに選んだカテゴリは覚えて、次から自動で付きます。",
+              },
+            ]}
+          />
+        </PageSection>
+      </Chapter>
+
+      <Chapter
+        id="body"
+        kicker="Body"
+        title="体と栄養の目標"
+        intro="献立とカレンダーの「目標」の数字は、ここから来ています。設定画面で入れ、iPhoneのヘルスケアから毎朝更新されます。"
+      >
+        <Points
+          items={[
             {
-              title: "① 走り書き（Dash Off）にとにかく書く",
-              body: "思いついたこと、読んだものの断片、AIとの会話の中で気づいたことなどを、体裁を気にせずどんどん記録します。あとで消えても困らない、使い捨て前提の場所です。",
+              title: "1日の栄養目標",
+              body: "エネルギー・たんぱく質・脂質・炭水化物・食物繊維・食塩相当量。体組成計の値（除脂肪量）が届いていれば、基礎代謝とたんぱく質は体重ではなく除脂肪量から計算します。消費エネルギーは、実測が届いていればそれを使います。",
             },
             {
-              title: "② 育てたいものだけ選んで、永久保存版メモに昇格",
-              body: "走り書きの中から「これは残したい」というものを複数選び、タイトルを付けて自分の言葉で書き直します。他の永久保存版メモや索引エントリへのリンクを最低1つ付けるので、単独のメモとして孤立することはありません。",
+              title: "目標の体脂肪率は自動",
+              body: "性別ごとのアスリートの範囲から自動で決まり、今の体脂肪率に応じて「脂肪を落とす／除脂肪量を増やす／維持する」の方向と、落とすなら何週間かかるかが出ます。自分で入れれば上書きできます。",
             },
             {
-              title: "③ 保存位置を選ぶ",
-              body: "永久保存版メモは全体で1本の順序を持ちます。ツェッテルカステン画面の「山」をドリルダウンして、既存の2件の間の帯状スロットをタップすれば、その場所に挿し込まれます — ルーマンの住所方式と同じ考え方です。",
+              title: "無理な減量はしない",
+              body: "目標のペースが速すぎるときは、基礎代謝を下回らない範囲に自動で抑えます。持病がある場合や、医師・管理栄養士の指導がある場合はそちらを優先してください。",
             },
-            {
-              title: "④ 索引はごく少数だけ",
-              body: "本当によく参照するキーワードだけを索引に登録します。索引はあくまで入り口で、そこから先はリンクを辿って探索するのがツェッテルカステンの流儀です。",
-            },
-            {
-              title: "文献メモは両方から参照できる",
-              body: "本や論文を読んで得た「自分の言葉での要約」は、文献メモとして独立して保存され、走り書き・永久保存版メモのどちらからでもリンクできます。同じ文献に何度も出会っても、要約は1つに集約されます。",
-            },
-          ].map((step, i) => (
-            <li key={i} className="flex gap-4 rounded-lg border border-line bg-surface-alt p-4">
-              <span className="shrink-0 font-mono text-xs font-bold text-accent">{String(i + 1).padStart(2, "0")}</span>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-ink">{step.title}</p>
-                <p className="text-xs leading-relaxed text-ink-soft">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+          ]}
+        />
+      </Chapter>
+
+      <Chapter id="find" kicker="Find & adjust" title="探す・整える">
+        <PageSection
+          id="discovery"
+          path="/discovery"
+          name="探索"
+          lead="選んだ走り書きについて、関連しそうな文献やニュースをAIがWebで探してきます。検索はあなたのAIキーを消費するので、対象は1件ずつ選ぶ方式で、既定では自動実行しません。"
+        >
+          <Points
+            items={[
+              {
+                title: "頻度",
+                body: "自動実行しない／1日1回／1日2回。「今すぐ探す」はいつでも押せます。",
+              },
+              {
+                title: "候補の使い方",
+                body: "見つかった候補は走り書きの下に「関連」として並びます。文献メモに追加したり、そこから新しいメモを書き始めたりできます。",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="search"
+          path="/search"
+          name="検索"
+          lead="走り書きと永久保存版メモを横断して、打ちながら絞り込みます。"
+        />
+
+        <PageSection
+          id="settings"
+          path="/settings"
+          name="設定"
+          lead="AIのキー、Googleカレンダー、Zotero、体の基礎情報とヘルスケアの受け口、バレットジャーナルの凡例の表示。言語と明るさの切り替えは右上のメニューにあります。"
+        />
+      </Chapter>
 
       <section className="flex flex-col gap-2 border-t border-line pt-8">
         <p className="font-mono text-[10.5px] text-ink-faint">

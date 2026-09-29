@@ -12,7 +12,7 @@ export const proxy = auth((req) => {
  * benefit: a robots.txt that 307s to a sign-in page is a robots.txt Google
  * treats as absent, and a sitemap naming pages it then gets redirected away
  * from is worse than none. /guide is exempt because it's the one page whose
- * content is about the method rather than about anyone's notes — see
+ * content is about how the app works rather than about anyone's notes — see
  * src/app/robots.ts.
  *
  * `api/health` is exempt for a different reason: the iPhone Shortcut that

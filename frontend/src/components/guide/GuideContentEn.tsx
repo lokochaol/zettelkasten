@@ -1,4 +1,3 @@
-import { HudFrame } from "@/components/HudFrame";
 import {
   LinkedNotesDiagram,
   TwoStageFlowDiagram,
@@ -6,144 +5,521 @@ import {
   NoFoldersDiagram,
   AppMapDiagram,
 } from "@/components/guide/GuideDiagrams";
-
-function Eyebrow({ children }: { children: React.ReactNode }) {
-  return (
-    <p className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
-      <span className="text-accent">{"//"}</span> {children}
-    </p>
-  );
-}
-
-function DiagramFrame({ children }: { children: React.ReactNode }) {
-  return (
-    <HudFrame active={false} innerClassName="flex items-center justify-center rounded-xl px-6 py-8">
-      {children}
-    </HudFrame>
-  );
-}
+import {
+  Chapter,
+  Code,
+  Contents,
+  DiagramFrame,
+  Eyebrow,
+  KeyTable,
+  PageSection,
+  Points,
+  Prose,
+  Rhythm,
+  Steps,
+} from "@/components/guide/GuideParts";
 
 export function GuideContentEn() {
   return (
     <div className="flex flex-col gap-16">
-      <section className="flex flex-col gap-4">
+      <section className="flex flex-col gap-5">
         <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">Guide</p>
-        <h1 className="text-3xl font-extrabold tracking-tight text-ink text-balance">What is a Zettelkasten?</h1>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          A <em className="text-ink not-italic font-semibold">Zettelkasten</em> (German for
-          &ldquo;slip-box&rdquo;) is a specific method for making notes <strong className="text-ink">grow</strong>{" "}
-          into something more — practiced by sociologist Niklas Luhmann and popularized by Sönke Ahrens&rsquo; book
-          {" "}
-          <em className="not-italic text-ink">How to Take Smart Notes</em>. It doesn&rsquo;t need talent or a good
-          memory. Almost every rule in it is really just about one thing: linking notes to each other.
-        </p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">How this app works</h1>
+        <Prose>
+          One place for a person&rsquo;s notes, plans, records and tracking. Writing down what comes to mind, growing the ideas worth
+          keeping, seeing today&rsquo;s schedule and tasks, planning a week of meals and a year of money — things that usually live in
+          separate apps, kept together here so they can refer to each other.
+        </Prose>
+        <Contents
+          heading="Contents"
+          items={[
+            { id: "overview", label: "The shape of it" },
+            { id: "setup", label: "Setting up" },
+            { id: "rhythm", label: "Daily, weekly, monthly" },
+            { id: "write", label: "Write — Dash Off, Zettelkasten, literature" },
+            { id: "plan", label: "Plan and record — calendar, projects, meals, money" },
+            { id: "body", label: "Body and nutrition targets" },
+            { id: "find", label: "Find and adjust — discovery, search, settings" },
+          ]}
+        />
       </section>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>1. A note only matters once it&rsquo;s linked</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          The core idea of a
-          Zettelkasten is that value doesn&rsquo;t live in the note itself — it lives in the{" "}
-          <strong className="text-ink">link between notes</strong>. A note only becomes knowledge once it&rsquo;s
-          connected to something else.
-        </p>
-        <DiagramFrame>
-          <LinkedNotesDiagram leftLabel="Notes alone" rightLabel="Notes, linked" />
-        </DiagramFrame>
-      </section>
+      <Chapter id="overview" kicker="Overview" title="The shape of it">
+        <Points
+          items={[
+            {
+              title: "The way in is the index",
+              body: (
+                <>
+                  <Code>/</Code> lists every page with a line on what it&rsquo;s for. The top-left corner of every page shows where you are,
+                  and pressing it opens the same index.
+                </>
+              ),
+            },
+            {
+              title: "The six everyday screens share an icon bar",
+              body: (
+                <>
+                  <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/money</Code>{" "}
+                  <Code>/discovery</Code> sit in one frame with an icon bar down the left that never goes away. Today&rsquo;s schedule,
+                  what&rsquo;s left to do, what there is to eat and what it costs get looked at in one sitting, so switching between them is a
+                  glance.
+                </>
+              ),
+            },
+            {
+              title: "The rest are pages you visit and come back from",
+              body: "Dash Off, literature notes, search, this guide, settings and a project's detail are plain pages with just the path in the corner.",
+            },
+            {
+              title: "AI runs on your own key",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only five things use it — meal planning, the Coop Deli order proposal, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+            },
+            {
+              title: "Writing works offline",
+              body: "If the connection drops, actions like saving a Dash Off note are held and saved once you're back online. Added to your home screen or Dock, the app also opens with no connection at all.",
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>2. Two stages — fleeting and permanent</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          A Zettelkasten
-          separates capturing a fragment of thought quickly (a fleeting note) from later choosing the ones worth
-          keeping, rewriting them in your own words, linking them to what already exists, and only then adding them
-          to the box as a permanent note. Fleeting notes are disposable — only the ones worth rewriting survive
-          into the Zettelkasten.
-        </p>
-        <DiagramFrame>
-          <TwoStageFlowDiagram fleetingLabel="Fleeting notes" arrowLabel="Select & rewrite" permanentLabel="Permanent note, linked" />
-        </DiagramFrame>
-      </section>
+      <Chapter
+        id="setup"
+        kicker="Setup"
+        title="Setting up"
+        intro="None of it is required up front, but the more of it is in, the more the other screens fill themselves. Roughly in order of how much difference each makes."
+      >
+        <Steps
+          items={[
+            {
+              title: "An AI key (/settings)",
+              body: "One of Claude, ChatGPT or Gemini. Meal planning, money advice, PDF statements and discovery run on it.",
+            },
+            {
+              title: "Google Calendar (/settings)",
+              body: "The day's events appear in the calendar's timeline. To write the week's meals into Google Calendar, allow write access when connecting.",
+            },
+            {
+              title: "Money basics (/money)",
+              body: "Take-home pay, the minimum you can live on and a buffer; rent, subscriptions and instalments; savings goals. With these in, each month's budget fills itself.",
+            },
+            {
+              title: "Body basics and Apple Health (/settings)",
+              body: "Height, birth year, sex and activity level give the daily nutrition targets. An iPhone Shortcut that sends weight, active energy and steps each morning (and body fat, with a body composition scale) replaces the estimates with measurements. The steps are on the settings page.",
+            },
+            {
+              title: "Meal preferences (/meals)",
+              body: "Weekly food budget, weekday cooking time, shopping day, the day the week starts, dislikes and allergies, how many days you cook. For Coop Deli, the delivery day and order deadline too.",
+            },
+            {
+              title: "Zotero (/settings, if you work with sources)",
+              body: "Literature notes can then look up citations in your Zotero library.",
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>3. Choosing where it sits is a deliberate act</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          Deciding where a permanent note lives means thinking about where, among everything you&rsquo;ve already
-          written, this new piece of knowledge belongs — chosen carefully, in relation to the notes already there.
-          Notes sit in one ordered sequence and connect to each other through links, like a web. You only need a
-          handful of &ldquo;index&rdquo; keywords, for the entry points you&rsquo;ll genuinely come back to often.
-        </p>
-        <DiagramFrame>
-          <NoFoldersDiagram folderLabel="Folders (skip this)" indexLabel="A few index entries" />
-        </DiagramFrame>
-      </section>
+      <Chapter id="rhythm" kicker="Rhythm" title="Daily, weekly, monthly" intro="There are a lot of features, but not many by how often you touch them.">
+        <Rhythm
+          columns={[
+            {
+              label: "Daily",
+              items: [
+                "Open /calendar for the day's shape and open tasks",
+                "Write whatever comes to mind in /dash-off",
+                "Keep the day's task note, marking finished tasks x",
+                "Log each meal as eaten, skipped or something else",
+                "Enter spending as it happens",
+              ],
+            },
+            {
+              label: "Weekly",
+              items: [
+                "Plan the week in /meals and shop once",
+                "Send the Coop Deli order before its deadline",
+                "Ask for this week's advice in /money",
+                "Promote the Dash Off notes worth keeping (the rest clear themselves after a week)",
+              ],
+            },
+            {
+              label: "Monthly",
+              items: [
+                "The month's budget is made the first time you open it — check it",
+                "Import card statements (CSV or PDF)",
+                "Look at the year ahead for months that get tight",
+              ],
+            },
+          ]}
+        />
+      </Chapter>
 
-      <section className="flex flex-col gap-5">
-        <Eyebrow>4. Linking is what keeps old notes alive</Eyebrow>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          A permanent note only enters the box once it&rsquo;s linked to at least one note or index entry already
-          there. That one requirement — always connecting to what already exists — is what keeps your older notes
-          from being forgotten: they keep getting found and referenced again from whatever you write next.
-          Luhmann gave his physical cards addresses like <code className="rounded bg-surface-alt px-1.5 py-0.5 text-[11px] text-ink">21/3d7a26</code>{" "}
-          so a new card could always be slotted between two existing ones — no renumbering, ever — which is really
-          just another way of always placing a note in relation to something else.
-        </p>
-        <DiagramFrame>
-          <InsertionDiagram label="A new note can always land between A and B" />
-        </DiagramFrame>
-      </section>
-
-      <section className="flex flex-col gap-4 border-t border-line pt-12">
-        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">How this app works</p>
-        <h2 className="text-2xl font-extrabold tracking-tight text-ink">Using it in this app</h2>
-        <p className="max-w-[62ch] text-sm leading-relaxed text-ink-soft">
-          &ldquo;Dash Off&rdquo; and &ldquo;Zettelkasten&rdquo; in this app map directly onto the two stages above.
-        </p>
-      </section>
-
-      <section className="flex flex-col gap-5">
-        <DiagramFrame>
-          <AppMapDiagram
-            dashOffLabel="① Dash Off"
-            promoteLabel="Select & promote"
-            zettelkastenLabel="② Zettelkasten"
-            literatureLabel="Literature memo (either side)"
+      <Chapter
+        id="write"
+        kicker="Write"
+        title="Write"
+        intro="Write roughly first, then rewrite carefully only what's worth keeping. That two-step is the core of the app."
+      >
+        <PageSection
+          id="dash-off"
+          path="/dash-off"
+          name="Dash Off"
+          lead="Where things go down in the order they arrive, without worrying about form. Notes stack up in time order and can be added to in place."
+        >
+          <Points
+            items={[
+              {
+                title: "Meant to be thrown away",
+                body: "A Dash Off note that isn't attached to a project is archived automatically seven days after it was written. Rewrite the ones worth keeping in the Zettelkasten, or attach them to a project. It keeps the desk from silting up.",
+              },
+              {
+                title: "Attach a project and a source",
+                body: "Open a note to say which project it belongs to and which literature note it came from.",
+              },
+              {
+                title: "Code, diagrams, images",
+                body: (
+                  <>
+                    Wrap text in <Code>```language</Code> for code, <Code>```mermaid</Code> for a diagram, and use <Code>![](URL)</Code> for
+                    an image.
+                  </>
+                ),
+              },
+              {
+                title: "Discovery candidates",
+                body: "Notes you choose in /discovery get related sources and news the AI found hanging underneath them.",
+              },
+            ]}
           />
-        </DiagramFrame>
-        <ol className="flex flex-col gap-4">
-          {[
+        </PageSection>
+
+        <PageSection
+          id="zettelkasten"
+          path="/zettelkasten"
+          name="Zettelkasten"
+          lead={
+            <>
+              Where you pick the scratch notes worth growing, rewrite them in your own words, and file them between the notes they belong
+              with. It&rsquo;s the method practiced by sociologist Niklas Luhmann and popularized by Sönke Ahrens&rsquo; book{" "}
+              <em className="not-italic">How to Take Smart Notes</em> (Zettelkasten is German for &ldquo;slip box&rdquo;). The rules are
+              simple, and almost all of them are about connecting notes.
+            </>
+          }
+        >
+          <div className="flex flex-col gap-10 pt-2">
+            <div className="flex flex-col gap-4">
+              <Eyebrow>A note means something once it&rsquo;s connected</Eyebrow>
+              <Prose>
+                The value isn&rsquo;t in the notes but in the <strong className="text-ink">links between them</strong>. A single note
+                becomes knowledge when it&rsquo;s tied to others.
+              </Prose>
+              <DiagramFrame>
+                <LinkedNotesDiagram leftLabel="Notes alone" rightLabel="Notes, linked" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>Two stages — fleeting and permanent</Eyebrow>
+              <Prose>
+                Capturing fragments of thought quickly is one step; choosing some of them, rewriting them in your own words and linking them
+                to what&rsquo;s already there is another. Fleeting notes can be thrown away. Only what&rsquo;s worth it is rewritten and kept.
+              </Prose>
+              <DiagramFrame>
+                <TwoStageFlowDiagram fleetingLabel="Fleeting notes" arrowLabel="Select & rewrite" permanentLabel="Permanent note, linked" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>Choose where a note goes by what it relates to. No folders</Eyebrow>
+              <Prose>
+                Deciding where a permanent note goes is deciding where a new idea sits among everything you already know. Notes form one
+                sequence and link into a web; a few index entries for the places you return to often are all the structure needed.
+              </Prose>
+              <DiagramFrame>
+                <NoFoldersDiagram folderLabel="Folders (skip this)" indexLabel="A few index entries" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>Linking keeps old notes alive</Eyebrow>
+              <Prose>
+                A permanent note only goes in once it links to at least one existing note or index entry. That small step is what stops old
+                notes being stranded and forgotten. Luhmann gave his paper slips addresses like <Code>21/3d7a26</Code> so a new slip could
+                always go between two existing ones — branching the thought without renumbering anything.
+              </Prose>
+              <DiagramFrame>
+                <InsertionDiagram label="A new note can always land between A and B" />
+              </DiagramFrame>
+            </div>
+
+            <div className="flex flex-col gap-4">
+              <Eyebrow>On this screen</Eyebrow>
+              <DiagramFrame>
+                <AppMapDiagram
+                  dashOffLabel="① Dash Off"
+                  promoteLabel="Select & promote"
+                  zettelkastenLabel="② Zettelkasten"
+                  literatureLabel="Literature memo (either side)"
+                />
+              </DiagramFrame>
+              <Steps
+                items={[
+                  {
+                    title: "Pick scratch notes in the right column (③)",
+                    body: "Select one or several and create a permanent note from them. You can also write one directly, with no scratch note behind it (“+ Permanent note”).",
+                  },
+                  {
+                    title: "Rewrite in the middle (②)",
+                    body: "Give it a title and put it in your own words. Link it to at least one other permanent note or index entry, with a word on how they relate. Literature notes on the source scratch notes carry over.",
+                  },
+                  {
+                    title: "Choose its place in the left column (①)",
+                    body: "Drill into the piles and tap the gap between two existing notes; the new one goes there. Once done, the source scratch notes are cleared as promoted.",
+                  },
+                  {
+                    title: "Keep the index small",
+                    body: "Add a keyword to the index only for the notes you really do return to. The index is a way in; from there, follow the links.",
+                  },
+                ]}
+              />
+              <Prose>It&rsquo;s a three-column screen, so on a phone, turn it sideways.</Prose>
+            </div>
+          </div>
+        </PageSection>
+
+        <PageSection
+          id="literature"
+          path="/literature"
+          name="Literature notes"
+          lead="Where what a book or paper said is kept, in your own words. One summary per source, which both scratch and permanent notes can cite."
+        >
+          <Points
+            items={[
+              {
+                title: "However often a source comes up, there's one summary",
+                body: "The summary is shared by every note that cites it, and you can see which notes those are.",
+              },
+              {
+                title: "Citations from Zotero",
+                body: "With Zotero connected, look a source up and use its citation as is. One that isn't in the library can be added to Zotero on the spot, if the key has write access.",
+              },
+            ]}
+          />
+        </PageSection>
+      </Chapter>
+
+      <Chapter
+        id="plan"
+        kicker="Plan & record"
+        title="Plan and record"
+        intro="How today goes, what to eat this week, what there is to spend this month. Decide, then keep a record of what actually happened."
+      >
+        <PageSection
+          id="calendar"
+          path="/calendar"
+          name="Calendar"
+          lead="Today's dashboard: the shape of the day, open tasks, meals and nutrition, and spending, on one screen. Step to the days either side."
+        >
+          <Points
+            items={[
+              {
+                title: "The day's timeline",
+                body: "A 24-hour axis with your Google Calendar events, the meal slots from the meal plan, and time you've blocked out. On today, a line marks the current time.",
+              },
+              {
+                title: "Open tasks",
+                body: "Lines starting “- ” in your projects' task notes. Indentation becomes nesting. Mark a task done by changing it to x in the note.",
+              },
+              {
+                title: "Block out time",
+                body: "A start time and a length put a block on the day. The title can be picked from your open tasks.",
+              },
+              {
+                title: "Today's meals",
+                body: "Log each planned meal as eaten, skipped or something else, and the target, the plan's total and what you actually had line up. The actual figure counts only meals marked eaten.",
+              },
+              {
+                title: "Today's spending",
+                body: "An amount and a category is all it takes. It also shows how far through this month's food budget you are.",
+              },
+              {
+                title: "Timeline view",
+                body: "Switch at the top right for a month of project bars and the days with notes. Tap a day to open that day's task notes for every project. Future months can be opened too, and written into.",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="projects"
+          path="/projects"
+          name="Projects"
+          lead="The unit of what you're working on: a ladder of goals and a task note for each day. There's always a default project to start with."
+        >
+          <Points
+            items={[
+              {
+                title: "A goal ladder (optional)",
+                body: "Ultimate goal → 3 years → 2 → 1 → 3 months → 1 month → today. If you use it, the ultimate goal and today's goal are required. It's there to see how the far goal reaches today's actions, top to bottom.",
+              },
+              {
+                title: "A task note per day",
+                body: "One per project per day. Written in the bullet journal notation below, its tasks show up on the calendar.",
+              },
+              {
+                title: "Linked notes",
+                body: "Every scratch and permanent note attached to the project.",
+              },
+              {
+                title: "Closing is manual",
+                body: "A project never closes on its own when a goal date passes. Closing it stops its timeline bar there and archives the scratch notes attached to it.",
+              },
+            ]}
+          />
+          <Eyebrow>Bullet journal notation</Eyebrow>
+          <KeyTable
+            mono
+            rows={[
+              ["-", "Task (open — shows on the calendar)"],
+              ["x", "Done"],
+              [">", "Migrated to the next day"],
+              ["<", "Scheduled"],
+              ["o", "Event"],
+              ["~", "Note"],
+              ["*", "Priority"],
+              ["!", "Inspiration"],
+            ]}
+          />
+          <Prose>A collapsed legend can be shown beside the notes (turn it on or off in Settings).</Prose>
+        </PageSection>
+
+        <PageSection
+          id="meals"
+          path="/meals"
+          name="Meals"
+          lead="A week of meals and one shopping trip that covers it. The AI plans within your nutrition targets, weekly budget and cooking time; the app then recalculates the result and tells you where it misses."
+        >
+          <Points
+            items={[
+              {
+                title: "Cook, batch, ready-made",
+                body: "Set how many days you cook and how many meals can be frozen or ready-made, and the plan stays within that. Batch-cooked and ready-made meals count only their reheating time, and any weekday over your cooking time is flagged.",
+              },
+              {
+                title: "Where it misses",
+                body: "Each day's energy and protein, and the shopping estimate, are recalculated and flagged if they're off target. Regenerate, or adjust that one day by hand.",
+              },
+              {
+                title: "Actual food spending",
+                body: "What went on the food category that week (entered by hand and imported together), beside the weekly budget.",
+              },
+              {
+                title: "Write to Google Calendar",
+                body: "Put the week's meals into your calendar at the meal times you've set.",
+              },
+              {
+                title: "Coop Deli order proposal",
+                body: "The week's shopping list regrouped into what a weekly delivery brings, with things that won't keep split out as “buy in store”. Coop Deli has no ordering API, so nothing is ordered from here — copy it and place the order yourself. Only weeks whose deadline hasn't passed are offered.",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="money"
+          path="/money"
+          name="Money"
+          lead="What there is to spend this month, what's been spent, and how the year ahead looks — the record and the plan on one screen."
+        >
+          <Points
+            items={[
+              {
+                title: "The month's plan fills itself",
+                body: "Take-home pay minus fixed costs, instalments, savings and the buffer is what there is to live on. That's split across categories the way this household actually spends, the first time you open a new month. Any figure can be edited.",
+              },
+              {
+                title: "Allocation by category",
+                body: "Each category's spending against its budget, with a tick for how far through the month you are: a bar past the tick is on course to overrun. Spending in a category the plan has no line for appears as “no budget”, with a box to give it one.",
+              },
+              {
+                title: "Fixed costs, instalments, savings goals",
+                body: "Give an instalment its last month and a goal its amount and date. A goal's remaining amount, spread over the months left, goes into the plan as a monthly contribution.",
+              },
+              {
+                title: "The year ahead",
+                body: "Twelve months from now. The month an instalment ends or a goal is reached shows as more to live on. Months that fall below your minimum are flagged — but savings are never cut on your behalf; that's your call.",
+              },
+              {
+                title: "This week's accountant (AI)",
+                body: "Given the last seven days of spending and this month's budget, it says specifically what could come down and by how much. Once a week.",
+              },
+              {
+                title: "Statement import (CSV or PDF)",
+                body: "Bring in card and bank statements. A CSV's column mapping is remembered, so the next one is just a paste. A PDF is read by the AI and checked against the total printed on the statement. Either way you see the rows before anything is written; lines already imported aren't added twice, and a line matching something entered by hand (same day, same amount) can replace it. Categories you choose while importing are remembered for next time.",
+              },
+            ]}
+          />
+        </PageSection>
+      </Chapter>
+
+      <Chapter
+        id="body"
+        kicker="Body"
+        title="Body and nutrition targets"
+        intro="The target figures in meals and on the calendar come from here. They're set in Settings and updated each morning from Apple Health."
+      >
+        <Points
+          items={[
             {
-              title: "① Write anything into Dash Off",
-              body: "Capture whatever crosses your mind — something you just read, a thought from a conversation with an AI, anything — without worrying about form. It's a disposable space by design; nothing here is precious yet.",
+              title: "Daily nutrition targets",
+              body: "Energy, protein, fat, carbohydrate, fibre and salt. With lean mass from a body composition scale, basal metabolism and protein are worked out from lean mass rather than body weight. Measured energy expenditure is used when it's available.",
             },
             {
-              title: "② Promote only what's worth keeping",
-              body: "Select a few Dash Off notes you actually want to develop, give the result a title, and rewrite it in your own words. Every promoted note needs at least one link to another permanent note or index entry, so nothing ends up isolated.",
+              title: "Body fat target, set automatically",
+              body: "Taken from the athletic range for your sex. Your current reading then decides the direction — lose fat, build lean mass, or hold — and, if losing, roughly how many weeks it takes. Enter your own to override it.",
             },
             {
-              title: "③ Choose where it sits",
-              body: "Permanent notes share one global order. Drill into the Zettelkasten screen's piles and tap the gap-slot between two existing notes to insert yours there — the same idea as Luhmann's addressing scheme.",
+              title: "No crash diets",
+              body: "A target pace that's too fast is held back so intake never drops below basal metabolism. If you have a condition, or advice from a doctor or dietitian, follow that instead.",
             },
-            {
-              title: "④ Keep the index small",
-              body: "Only register keywords you'll genuinely reference often. The index is meant to be an entry point, not a filing system — from there you follow links.",
-            },
-            {
-              title: "Literature memos work from either side",
-              body: "A summary of something you read, in your own words, is stored once as a literature memo and can be linked from Dash Off notes or permanent notes alike — the same source never needs to be summarized twice.",
-            },
-          ].map((step, i) => (
-            <li key={i} className="flex gap-4 rounded-lg border border-line bg-surface-alt p-4">
-              <span className="shrink-0 font-mono text-xs font-bold text-accent">{String(i + 1).padStart(2, "0")}</span>
-              <div className="flex flex-col gap-1">
-                <p className="text-sm font-semibold text-ink">{step.title}</p>
-                <p className="text-xs leading-relaxed text-ink-soft">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
-      </section>
+          ]}
+        />
+      </Chapter>
+
+      <Chapter id="find" kicker="Find & adjust" title="Find and adjust">
+        <PageSection
+          id="discovery"
+          path="/discovery"
+          name="Discovery"
+          lead="For the scratch notes you choose, the AI searches the web for related sources and news. It spends your AI credit, so notes are opted in one at a time, and nothing runs automatically by default."
+        >
+          <Points
+            items={[
+              {
+                title: "How often",
+                body: "Off, once a day, or twice a day. “Search now” works any time.",
+              },
+              {
+                title: "Using what it finds",
+                body: "Candidates appear under the note as “Related”. Add one as a literature note, or start a new note from it.",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
+          id="search"
+          path="/search"
+          name="Search"
+          lead="Across scratch and permanent notes, narrowing as you type."
+        />
+
+        <PageSection
+          id="settings"
+          path="/settings"
+          name="Settings"
+          lead="AI key, Google Calendar, Zotero, body basics and the Apple Health intake, and whether the bullet journal legend shows. Language and light/dark are in the menu at the top right."
+        />
+      </Chapter>
 
       <section className="flex flex-col gap-2 border-t border-line pt-8">
         <p className="font-mono text-[10.5px] text-ink-faint">

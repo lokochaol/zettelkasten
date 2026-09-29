@@ -11,7 +11,8 @@ import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
 /** The only page in the app that renders without a session — it explains
- * the method rather than showing anyone's notes, so it's the one thing
+ * how the app works (every page, and the Zettelkasten method behind the
+ * writing side) rather than showing anyone's notes, so it's the one thing
  * worth letting a crawler (or a curious stranger following a link) read.
  * See the exemption in proxy.ts. The header menu is account plumbing, so
  * it only appears for someone signed in. */

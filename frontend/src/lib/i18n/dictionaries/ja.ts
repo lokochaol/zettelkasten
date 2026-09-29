@@ -19,7 +19,7 @@ export const ja: Dictionary = {
       money: { name: "家計", note: "今月の計画と実績、1年の見通し、週1回の助言、明細（CSV・PDF）の取り込み。" },
       discovery: { name: "探索", note: "選んだ走り書きについて、決めた頻度でWebを調べて候補を持ってくる。" },
       search: { name: "検索", note: "走り書きと永久保存版メモを横断して、打ちながら絞り込む。" },
-      guide: { name: "ガイド", note: "ツェッテルカステンという手法と、このアプリでの対応関係。" },
+      guide: { name: "ガイド", note: "全ページの使い方、最初の設定、ツェッテルカステンという手法。" },
       settings: { name: "設定", note: "AIのキー、Googleカレンダー、体組成の受け口と目標、表示の設定。" },
     },
   },

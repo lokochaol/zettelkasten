@@ -19,7 +19,7 @@ export const en: Dictionary = {
       money: { name: "Money", note: "This month's plan against actuals, the year ahead, weekly advice, statement import (CSV or PDF)." },
       discovery: { name: "Discovery", note: "Searches the web, at a frequency you set, for the scratch notes you opt in." },
       search: { name: "Search", note: "Across scratch and permanent notes, narrowing as you type." },
-      guide: { name: "Guide", note: "The Zettelkasten method, and how this app maps onto it." },
+      guide: { name: "Guide", note: "How every page works, what to set up first, and the Zettelkasten method." },
       settings: { name: "Settings", note: "AI key, Google Calendar, the health intake and goal, display preferences." },
     },
   },
