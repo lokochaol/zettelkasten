@@ -14,6 +14,8 @@ import { getLocale } from "@/lib/i18n/locale";
 import { translateDomainError } from "@/lib/i18n/errors";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { parseCsv, guessMapping, type ColumnMapping } from "@/lib/csvImport";
+import { MAX_PDF_BYTES, PDF_MAPPING, looksLikePdf, readPdfStatement } from "@/lib/pdfStatement";
+import type { Dictionary } from "@/lib/i18n/types";
 import { prisma } from "@/lib/db";
 
 export interface MoneyDayView {
@@ -78,6 +80,53 @@ export interface CsvPreview {
   candidates: expenses.ImportCandidate[];
   rows: Record<string, string>[];
   profiles: { id: string; name: string; mapping: ColumnMapping }[];
+  /** Present when the rows were read out of a PDF by the AI — the columns
+   * are then fixed, and the totals are there to check the reading. */
+  pdf?: { statedTotalYen: number | null; extractedTotalYen: number; truncated: boolean };
+}
+
+/** The preview for rows already split into columns, whichever file they
+ * came from. */
+async function buildPreview(
+  ownerSub: string,
+  headers: string[],
+  rows: Record<string, string>[],
+  mapping: ColumnMapping,
+  profileName: string,
+  saved: { id: string; name: string; dateColumn: string; amountColumn: string; memoColumn: string; amountIsNegativeForSpending: boolean }[],
+): Promise<CsvPreview> {
+  return {
+    headers,
+    mapping,
+    rows,
+    candidates: await expenses.prepareImport(ownerSub, rows, mapping, profileName),
+    profiles: saved.map((p) => ({
+      id: p.id,
+      name: p.name,
+      mapping: {
+        dateColumn: p.dateColumn,
+        amountColumn: p.amountColumn,
+        memoColumn: p.memoColumn,
+        amountIsNegativeForSpending: p.amountIsNegativeForSpending,
+      },
+    })),
+  };
+}
+
+/** What to tell the owner when their AI couldn't do it. Every one of these
+ * is something they can act on, so it's a message, not an exception. */
+function aiErrorMessage(dict: Dictionary, e: AiJsonError, truncatedMessage = dict.meals.errorTruncated): string {
+  const byCode: Record<string, string> = {
+    notConfigured: dict.meals.errorNoAiKey,
+    authError: dict.meals.errorAuth,
+    rateLimitError: dict.meals.errorRateLimit,
+    invalidResponse: dict.meals.errorBadResponse,
+    truncated: truncatedMessage,
+    apiError: dict.meals.errorApi,
+  };
+  // No key is a setting, not a failure — the detail would only be noise.
+  if (e.code === "notConfigured") return byCode.notConfigured;
+  return `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}`;
 }
 
 /**
@@ -105,39 +154,73 @@ export async function previewCsvAction(
     amountIsNegativeForSpending:
       overrides?.amountIsNegativeForSpending ?? savedForName?.amountIsNegativeForSpending ?? false,
   };
+  return buildPreview(ownerSub, headers, rows, mapping, profileName, saved);
+}
+
+/**
+ * Reads a statement PDF with the owner's AI and shows what importing it
+ * would do — the same preview a CSV gets, so nothing is written until the
+ * owner has looked at the rows.
+ *
+ * The file arrives as FormData rather than as base64 in an argument: it's
+ * binary, and base64 would spend a third of the upload limit on encoding.
+ */
+export async function previewPdfAction(form: FormData): Promise<CsvPreview | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const dict = getDictionary(await getLocale());
+  const file = form.get("file");
+  const profileName = String(form.get("profileName") ?? "").trim() || "明細";
+  if (!(file instanceof File)) return { error: dict.money.pdfNotPdf };
+  if (file.size > MAX_PDF_BYTES) return { error: dict.money.pdfTooLarge(Math.round(MAX_PDF_BYTES / 1024 / 1024)) };
+  const bytes = new Uint8Array(await file.arrayBuffer());
+  if (!looksLikePdf(bytes)) return { error: dict.money.pdfNotPdf };
+
+  let statement;
+  try {
+    statement = await readPdfStatement(ownerSub, file.name || "statement.pdf", bytes);
+  } catch (e) {
+    if (e instanceof AiJsonError) {
+      console.error("pdf statement failed", e.code, e.message);
+      return { error: aiErrorMessage(dict, e, dict.money.pdfTruncated) };
+    }
+    throw e;
+  }
+  if (statement.rows.length === 0) return { error: dict.money.pdfNoRows };
+
+  const saved = await prisma.csvImportProfile.findMany({ where: { ownerSub } });
+  const preview = await buildPreview(ownerSub, statement.headers, statement.rows, PDF_MAPPING, profileName, saved);
   return {
-    headers,
-    mapping,
-    rows,
-    candidates: await expenses.prepareImport(ownerSub, rows, mapping, profileName),
-    profiles: saved.map((p) => ({
-      id: p.id,
-      name: p.name,
-      mapping: {
-        dateColumn: p.dateColumn,
-        amountColumn: p.amountColumn,
-        memoColumn: p.memoColumn,
-        amountIsNegativeForSpending: p.amountIsNegativeForSpending,
-      },
-    })),
+    ...preview,
+    pdf: {
+      statedTotalYen: statement.statedTotalYen,
+      extractedTotalYen: statement.extractedTotalYen,
+      truncated: statement.truncated,
+    },
   };
 }
 
 /** Commits the chosen rows and remembers the mapping under this profile
- * name, so the next statement from the same issuer needs no mapping. */
+ * name, so the next statement from the same issuer needs no mapping.
+ *
+ * `rememberMapping` is off for a PDF: its columns are fixed names the app
+ * made up, and saving them would overwrite the real mapping of a card
+ * whose statements are sometimes imported as CSV. */
 export async function importCsvAction(
   profileName: string,
   mapping: ColumnMapping,
   selections: expenses.ImportSelection[],
   learnedRules: { keyword: string; category: string }[],
+  rememberMapping = true,
 ): Promise<expenses.ImportResult> {
   const ownerSub = await requireOwnerSub();
   const name = profileName.trim() || "明細";
-  await prisma.csvImportProfile.upsert({
-    where: { ownerSub_name: { ownerSub, name } },
-    create: { ownerSub, name, ...mapping },
-    update: mapping,
-  });
+  if (rememberMapping) {
+    await prisma.csvImportProfile.upsert({
+      where: { ownerSub_name: { ownerSub, name } },
+      create: { ownerSub, name, ...mapping },
+      update: mapping,
+    });
+  }
   for (const rule of learnedRules) await expenses.learnCategoryRule(ownerSub, rule.keyword, rule.category);
   const result = await expenses.commitImport(ownerSub, selections);
   revalidatePath("/money");
@@ -302,16 +385,8 @@ export async function generateAdviceAction(todayKey: string): Promise<MoneyPlanV
   } catch (e) {
     if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
     if (e instanceof AiJsonError) {
-      const byCode: Record<string, string> = {
-        notConfigured: dict.meals.errorNoAiKey,
-        authError: dict.meals.errorAuth,
-        rateLimitError: dict.meals.errorRateLimit,
-        invalidResponse: dict.meals.errorBadResponse,
-        truncated: dict.meals.errorTruncated,
-        apiError: dict.meals.errorApi,
-      };
       console.error("spending advice failed", e.code, e.message);
-      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
+      return { error: aiErrorMessage(dict, e) };
     }
     throw e;
   }

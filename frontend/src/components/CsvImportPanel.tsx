@@ -1,18 +1,27 @@
 "use client";
 
 import { useRef, useState, useTransition } from "react";
-import { previewCsvAction, importCsvAction, type CsvPreview } from "@/app/money/actions";
+import { previewCsvAction, previewPdfAction, importCsvAction, type CsvPreview } from "@/app/money/actions";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { ColumnMapping } from "@/lib/csvImport";
+
+/** Mirrors MAX_PDF_BYTES on the server, so an oversized file is turned
+ * away before it's uploaded rather than after. */
+const MAX_PDF_MB = 4;
 
 /**
  * Importing a statement, with the preview in front of the write.
  *
- * The file is decoded in the browser rather than shipped as bytes: half
- * of Japanese issuers still export Shift-JIS, and the browser already has
- * the decoders. UTF-8 is tried first in fatal mode — Shift-JIS text is
- * not valid UTF-8, so the failure is a definite answer rather than a
- * guess at the encoding.
+ * A CSV is decoded in the browser rather than shipped as bytes: half of
+ * Japanese issuers still export Shift-JIS, and the browser already has the
+ * decoders. UTF-8 is tried first in fatal mode — Shift-JIS text is not
+ * valid UTF-8, so the failure is a definite answer rather than a guess at
+ * the encoding.
+ *
+ * A PDF goes to the server as it is and is read there by the owner's AI.
+ * Its rows land in the same preview, so the check before writing is the
+ * same one — plus the statement's own printed total against the rows,
+ * which is the one thing that can catch a line the reading skipped.
  */
 export function CsvImportPanel({ categories, onImported }: { categories: string[]; onImported: () => void }) {
   const { t } = useI18n();
@@ -24,9 +33,14 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
   const [rowCategory, setRowCategory] = useState<Record<string, string>>({});
   const [replaceManual, setReplaceManual] = useState<Record<string, boolean>>({});
   const [pending, startTransition] = useTransition();
+  const [readingPdf, setReadingPdf] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function readFile(file: File) {
+    if (file.type === "application/pdf" || /\.pdf$/i.test(file.name)) {
+      readPdf(file);
+      return;
+    }
     const buffer = await file.arrayBuffer();
     let decoded: string;
     try {
@@ -37,6 +51,39 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
     setText(decoded);
     if (!profileName) setProfileName(file.name.replace(/\.[^.]+$/, ""));
     runPreview(decoded);
+  }
+
+  function readPdf(file: File) {
+    setError(null);
+    setResult(null);
+    setPreview(null);
+    setText("");
+    if (file.size > MAX_PDF_MB * 1024 * 1024) {
+      setError(t.money.pdfTooLarge(MAX_PDF_MB));
+      return;
+    }
+    const name = profileName || file.name.replace(/\.[^.]+$/, "");
+    if (!profileName) setProfileName(name);
+    const form = new FormData();
+    form.set("file", file);
+    form.set("profileName", name);
+    setReadingPdf(true);
+    startTransition(async () => {
+      try {
+        const res = await previewPdfAction(form);
+        if ("error" in res) {
+          setError(res.error);
+          return;
+        }
+        setPreview(res);
+        setRowCategory(
+          Object.fromEntries(res.candidates.filter((c) => !c.problem).map((c) => [c.externalKey, c.category])),
+        );
+        setReplaceManual({});
+      } finally {
+        setReadingPdf(false);
+      }
+    });
   }
 
   function runPreview(source = text, overrides?: Partial<ColumnMapping>) {
@@ -76,7 +123,7 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
       .map((c) => ({ keyword: c.memo, category: rowCategory[c.externalKey] }));
 
     startTransition(async () => {
-      const r = await importCsvAction(profileName || "明細", preview.mapping, selections, learnedRules);
+      const r = await importCsvAction(profileName || "明細", preview.mapping, selections, learnedRules, !preview.pdf);
       setResult(t.money.importResult(r.imported, r.replaced, r.skipped));
       setPreview(null);
       setText("");
@@ -102,8 +149,14 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
         <input
           ref={fileRef}
           type="file"
-          accept=".csv,text/csv,text/plain"
-          onChange={(e) => e.target.files?.[0] && void readFile(e.target.files[0])}
+          accept=".csv,text/csv,text/plain,.pdf,application/pdf"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Cleared so choosing the same file again still fires — a
+            // retry after fixing the AI key is exactly that.
+            e.target.value = "";
+            if (file) void readFile(file);
+          }}
           className="hidden"
         />
         <button
@@ -123,46 +176,53 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
         className="w-full rounded-md border border-line bg-surface px-2.5 py-2 font-mono text-[10.5px] text-ink focus:border-accent focus:outline-none"
       />
 
+      {readingPdf && <p className="font-mono text-[10.5px] text-ink-soft">{t.money.pdfReading}</p>}
       {error && <p className="text-[10.5px] text-accent">{error}</p>}
       {result && <p className="font-mono text-[10.5px] text-accent">{result}</p>}
 
+      {preview?.pdf && <PdfCheck pdf={preview.pdf} />}
+
       {preview && (
         <>
-          <div className="flex flex-wrap items-center gap-2">
-            {(
-              [
-                ["dateColumn", t.money.columnDate],
-                ["amountColumn", t.money.columnAmount],
-                ["memoColumn", t.money.columnMemo],
-              ] as const
-            ).map(([key, label]) => (
-              <label key={key} className="flex items-center gap-1.5">
-                <span className="font-mono text-[9px] text-ink-faint">{label}</span>
-                <select
-                  value={preview.mapping[key]}
-                  onChange={(e) => runPreview(text, { ...preview.mapping, [key]: e.target.value })}
-                  className="rounded border border-line bg-surface px-1.5 py-1 text-[11px] text-ink focus:outline-none"
-                >
-                  {preview.headers.map((h) => (
-                    <option key={h} value={h}>
-                      {h}
-                    </option>
-                  ))}
-                </select>
+          {/* A PDF's columns are named by the app, so there is nothing to
+              map; the controls are CSV-only. */}
+          {!preview.pdf && (
+            <div className="flex flex-wrap items-center gap-2">
+              {(
+                [
+                  ["dateColumn", t.money.columnDate],
+                  ["amountColumn", t.money.columnAmount],
+                  ["memoColumn", t.money.columnMemo],
+                ] as const
+              ).map(([key, label]) => (
+                <label key={key} className="flex items-center gap-1.5">
+                  <span className="font-mono text-[9px] text-ink-faint">{label}</span>
+                  <select
+                    value={preview.mapping[key]}
+                    onChange={(e) => runPreview(text, { ...preview.mapping, [key]: e.target.value })}
+                    className="rounded border border-line bg-surface px-1.5 py-1 text-[11px] text-ink focus:outline-none"
+                  >
+                    {preview.headers.map((h) => (
+                      <option key={h} value={h}>
+                        {h}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              ))}
+              <label className="flex items-center gap-1.5">
+                <input
+                  type="checkbox"
+                  checked={preview.mapping.amountIsNegativeForSpending}
+                  onChange={(e) =>
+                    runPreview(text, { ...preview.mapping, amountIsNegativeForSpending: e.target.checked })
+                  }
+                  className="h-3.5 w-3.5 accent-[var(--color-accent)]"
+                />
+                <span className="font-mono text-[9.5px] text-ink-soft">{t.money.negativeIsSpending}</span>
               </label>
-            ))}
-            <label className="flex items-center gap-1.5">
-              <input
-                type="checkbox"
-                checked={preview.mapping.amountIsNegativeForSpending}
-                onChange={(e) =>
-                  runPreview(text, { ...preview.mapping, amountIsNegativeForSpending: e.target.checked })
-                }
-                className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-              />
-              <span className="font-mono text-[9.5px] text-ink-soft">{t.money.negativeIsSpending}</span>
-            </label>
-          </div>
+            </div>
+          )}
 
           <p className="font-mono text-[10px] text-ink-soft">
             {t.money.previewHeading(usable.length, preview.candidates.length)}
@@ -230,5 +290,31 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
         </>
       )}
     </section>
+  );
+}
+
+/**
+ * The reading, checked against the statement's own arithmetic.
+ *
+ * A model reading forty lines off three pages can drop one, and nothing in
+ * the preview would show it — every row it did read looks fine. The total
+ * printed on the statement is the independent figure, so it's compared
+ * here and a mismatch is said plainly, above the rows, before the import
+ * button.
+ */
+function PdfCheck({ pdf }: { pdf: NonNullable<CsvPreview["pdf"]> }) {
+  const { t } = useI18n();
+  const matches = pdf.statedTotalYen !== null && pdf.statedTotalYen === pdf.extractedTotalYen;
+  return (
+    <div className="flex flex-col gap-1">
+      {pdf.truncated && <p className="text-[10.5px] text-accent">{t.money.pdfPartial}</p>}
+      {pdf.statedTotalYen === null ? (
+        <p className="text-[10.5px] text-ink-soft">{t.money.pdfTotalUnknown(pdf.extractedTotalYen)}</p>
+      ) : matches ? (
+        <p className="text-[10.5px] text-ink-soft">{t.money.pdfTotalMatch(pdf.statedTotalYen)}</p>
+      ) : (
+        <p className="text-[10.5px] text-accent">{t.money.pdfTotalMismatch(pdf.statedTotalYen, pdf.extractedTotalYen)}</p>
+      )}
+    </div>
   );
 }
