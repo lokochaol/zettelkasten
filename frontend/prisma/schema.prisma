@@ -583,6 +583,12 @@ model MealPreference {
   weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
   /// 0 = Sunday. The one shopping trip the whole week is planned around.
   shoppingWeekday   Int      @default(1) @map("shopping_weekday")
+  /// 0 = Sunday. Which day the seven-day plan starts on. Separate from the
+  /// shopping day because the two are genuinely different decisions: a
+  /// Saturday shop feeding a week that runs Monday to Sunday is an
+  /// ordinary way to live, and tying them together forced a plan to start
+  /// on the day the shopping was done.
+  weekStartWeekday  Int      @default(1) @map("week_start_weekday")
   /// Free text, passed to the planner as-is: "パクチーが苦手", "夜は炭水化物少なめ".
   dislikes          String   @default("")
   /// Kept separate from dislikes so it can be stated to the model as a hard

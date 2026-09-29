@@ -175,6 +175,7 @@ export const en: Dictionary = {
     prefBudget: "Weekly food budget (yen)",
     prefCookMinutes: "Weekday cooking (min/day)",
     prefShoppingDay: "Shopping day",
+    prefWeekStart: "Week starts on",
     prefDislikes: "Dislikes / avoid",
     prefAllergies: "Allergies (never use)",
     weekdayNames: ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"],

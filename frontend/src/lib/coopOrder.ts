@@ -34,11 +34,11 @@ export type { CoopOrder, CoopOrderItem };
  */
 export function targetWeekStart(
   todayKey: string,
-  shoppingWeekday: number,
+  weekStartWeekday: number,
   deliveryWeekday: number,
   orderLeadDays: number,
 ): string {
-  const thisWeek = weekStartFor(todayKey, shoppingWeekday);
+  const thisWeek = weekStartFor(todayKey, weekStartWeekday);
   for (let week = 1; week <= 8; week++) {
     const candidate = shiftDateKey(thisWeek, week * 7);
     if (deliveryDatesFor(candidate, deliveryWeekday, orderLeadDays).orderByDateKey >= todayKey) return candidate;

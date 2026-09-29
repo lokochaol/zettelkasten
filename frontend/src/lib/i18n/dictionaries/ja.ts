@@ -175,6 +175,7 @@ export const ja: Dictionary = {
     prefBudget: "週の食費 (円)",
     prefCookMinutes: "平日の調理時間 (分/日)",
     prefShoppingDay: "買い物の曜日",
+    prefWeekStart: "週の開始曜日",
     prefDislikes: "苦手・避けたいもの",
     prefAllergies: "アレルギー（絶対に使わない）",
     weekdayNames: ["日", "月", "火", "水", "木", "金", "土"],
