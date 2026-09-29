@@ -1,7 +1,7 @@
 "use client";
 
 import { LiteratureMemoField } from "@/components/LiteratureMemoField";
-import { setLiteratureMemoAction } from "@/app/scratch/actions";
+import { setLiteratureMemoAction } from "@/app/dash-off/actions";
 import { updateLiteratureMemoSummaryAction } from "@/app/literature/actions";
 import type { LiteratureMemoRef, LiteratureSelection } from "@/lib/literatureMemos";
 

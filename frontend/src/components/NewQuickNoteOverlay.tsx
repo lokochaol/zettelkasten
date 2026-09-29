@@ -4,7 +4,7 @@ import { useRef, useState } from "react";
 import { useOffline } from "next/offline";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { PendingLiteratureMemoField } from "@/components/PendingLiteratureMemoField";
-import { createQuickNoteWithContentAction, updateQuickNoteContentAction, setLiteratureMemoAction } from "@/app/scratch/actions";
+import { createQuickNoteWithContentAction, updateQuickNoteContentAction, setLiteratureMemoAction } from "@/app/dash-off/actions";
 import type { LiteratureSelection } from "@/lib/literatureMemos";
 import type { QuickNoteSummary } from "@/lib/quickNotes";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -17,7 +17,7 @@ function previewFrom(content: string): string {
 
 /**
  * A new 走り書き's compose surface — a full-screen overlay laid out just
- * like the real /scratch/[id] detail page, rather than a small inline card
+ * like the real /dash-off/[id] detail page, rather than a small inline card
  * sitting in the timeline among other notes. All editing lives on "the
  * detail screen" this way, even for a note that doesn't have a real route
  * yet: this mirrors that page's structure/width instead of an actual

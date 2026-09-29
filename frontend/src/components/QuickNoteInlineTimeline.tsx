@@ -5,7 +5,7 @@ import { NoteTimeline } from "@/components/NoteTimeline";
 import { QuickNoteActionMenu } from "@/components/QuickNoteActionMenu";
 import { QuickNoteDetailOverlay } from "@/components/QuickNoteDetailOverlay";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { createQuickNoteAction, deleteQuickNoteAction } from "@/app/scratch/actions";
+import { createQuickNoteAction, deleteQuickNoteAction } from "@/app/dash-off/actions";
 import type { QuickNoteDetail, QuickNoteSummary } from "@/lib/quickNotes";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
@@ -24,9 +24,9 @@ function formatDate(date: Date, locale: Locale) {
 const HEADER_FADE_MASK = "linear-gradient(to bottom, black 0%, black 70%, transparent 100%)";
 
 /**
- * The ③ column's quick-note list — unlike /scratch's ScratchTimeline, add/
+ * The ③ column's quick-note list — unlike /dash-off's ScratchTimeline, add/
  * edit/delete all complete without leaving the Zettelkasten screen.
- * Editing opens the same detail layout /scratch/[id] uses (content,
+ * Editing opens the same detail layout /dash-off/[id] uses (content,
  * literature, project sections) but as an overlay (QuickNoteDetailOverlay)
  * rather than a real navigation — mirroring how a PermanentNote opens via
  * NoteDetailOverlay instead of routing to it. Selection (for promotion)

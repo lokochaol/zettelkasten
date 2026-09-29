@@ -46,6 +46,6 @@ export async function removeLiteratureMemoAction(id: string): Promise<void> {
   const ownerSub = await requireOwnerSub();
   await literatureMemos.remove(ownerSub, id);
   revalidatePath("/literature");
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   revalidatePath("/zettelkasten");
 }

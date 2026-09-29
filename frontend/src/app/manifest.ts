@@ -13,7 +13,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "/",
     short_name: "/",
     description: "個人のメモ・計画・記録・追跡を1箇所にまとめる道具。",
-    // The index, since that is now the way in — /scratch is one click
+    // The index, since that is now the way in — /dash-off is one click
     // from it, and a bookmark there still works for anyone who always
     // wants to land on the timeline.
     start_url: "/",

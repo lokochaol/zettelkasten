@@ -2,7 +2,7 @@
 
 import { useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
-import { confirmDiscoveryLiteratureAction, writeNoteFromDiscoveryAction } from "@/app/scratch/actions";
+import { confirmDiscoveryLiteratureAction, writeNoteFromDiscoveryAction } from "@/app/dash-off/actions";
 import type { DiscoveryCandidateSummary } from "@/lib/discovery";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
@@ -162,7 +162,7 @@ export function DiscoveryRail({
     try {
       const note = await writeNoteFromDiscoveryAction(c.id, { citation, url: url.trim() || null });
       onCandidatesChange(candidates.map((x) => (x.id === c.id ? { ...x, status: "CONFIRMED" as const } : x)));
-      router.push(`/scratch/${note.id}`);
+      router.push(`/dash-off/${note.id}`);
     } finally {
       setPending(false);
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
-import { runDiscoveryAction } from "@/app/scratch/actions";
+import { runDiscoveryAction } from "@/app/dash-off/actions";
 import { dispatchDiscoveryRunEvent } from "@/lib/discoveryRunEvent";
 import { onDiscoveryConfirmRequest } from "@/lib/discoveryConfirmEvent";
 import { useI18n } from "@/lib/i18n/LocaleProvider";

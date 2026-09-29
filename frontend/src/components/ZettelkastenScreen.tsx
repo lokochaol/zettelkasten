@@ -27,7 +27,7 @@ import {
   completePromotionAction,
   getGlobalOrderAction,
 } from "@/app/zettelkasten/actions";
-import { getQuickNoteDetailAction, listActiveQuickNotesAction } from "@/app/scratch/actions";
+import { getQuickNoteDetailAction, listActiveQuickNotesAction } from "@/app/dash-off/actions";
 import type { CompletePromotionInput } from "@/lib/promotion";
 import { midpointRank } from "@/lib/rank";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -204,7 +204,7 @@ export function ZettelkastenScreen({
   }
 
   function handleNavigateToScratch() {
-    navigateWithViewTransition(router, "/scratch");
+    navigateWithViewTransition(router, "/dash-off");
   }
 
   return (
@@ -392,7 +392,7 @@ export function ZettelkastenScreen({
             )}
           </div>
 
-          {/* ③ — shares view-transition-name with /scratch's timeline container (§5).
+          {/* ③ — shares view-transition-name with /dash-off's timeline container (§5).
               The column itself doesn't scroll; only the note list inside
               QuickNoteInlineTimeline does, anchored to the bottom by default. */}
           <div

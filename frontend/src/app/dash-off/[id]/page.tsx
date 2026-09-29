@@ -20,7 +20,7 @@ function formatDate(date: Date, locale: Locale) {
   });
 }
 
-export default async function QuickNoteDetailPage(props: PageProps<"/scratch/[id]">) {
+export default async function QuickNoteDetailPage(props: PageProps<"/dash-off/[id]">) {
   const { id } = await props.params;
   const ownerSub = await requireOwnerSub();
   const locale = await getLocale();
@@ -38,7 +38,7 @@ export default async function QuickNoteDetailPage(props: PageProps<"/scratch/[id
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
       <div className="flex w-full max-w-[860px] flex-col gap-8">
         <Link
-          href="/scratch"
+          href="/dash-off"
           className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
         >
           <span className="text-accent">&lt;</span> {dict.nav.backToScratch}

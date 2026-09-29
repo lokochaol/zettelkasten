@@ -57,7 +57,7 @@ enum QuickNoteArchiveReason {
 /// A temporary, quickly-captured note ("走り書き"). Either typed on the spot
 /// (SCRATCH) or, in a future phase, transcribed from a voice memo (VOICE — the
 /// voice* columns are a schema hook only, not wired up in Phase 1). Active
-/// notes live on the /scratch timeline; once promoted into one or more
+/// notes live on the /dash-off timeline; once promoted into one or more
 /// PermanentNotes they flip to ARCHIVED and disappear from that timeline.
 model QuickNote {
   id       String          @id @default(uuid())
@@ -353,7 +353,7 @@ model DiscoveryCandidate {
 /// One row per owner — the outcome of their most recent discovery batch run
 /// (manual trigger or cron). `lastErrorCode`/`lastErrorStatus` are set only
 /// when that run failed outright (bad/expired API key, rate limit, etc. —
-/// see DiscoveryProviderError in src/lib/discovery.ts) so /scratch can show
+/// see DiscoveryProviderError in src/lib/discovery.ts) so /dash-off can show
 /// a banner; a clean run clears them. Never records "found nothing" as an
 /// error — that's a normal outcome, not a failure.
 model DiscoveryRunStatus {

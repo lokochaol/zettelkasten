@@ -10,12 +10,12 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 /**
  * The index of the app.
  *
- * This used to redirect to /scratch on the grounds that the way in should
+ * This used to redirect to /dash-off on the grounds that the way in should
  * always be the scratch timeline. That held while the app was only notes.
  * It now holds a week of meals, a year of money and a body — and which of
  * those you came for is not something the app can guess. So the root is
  * the list of everything, and going straight to writing is one click from
- * here (or a bookmark on /scratch, for the days it is always that).
+ * here (or a bookmark on /dash-off, for the days it is always that).
  */
 export default async function RootPage() {
   const session = await requireSession();

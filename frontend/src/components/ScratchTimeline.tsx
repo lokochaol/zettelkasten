@@ -9,7 +9,7 @@ import { NewQuickNoteOverlay } from "@/components/NewQuickNoteOverlay";
 import { AddQuickNoteTrigger } from "@/components/AddQuickNoteTrigger";
 import { DiscoveryShelf } from "@/components/DiscoveryShelf";
 import { DiscoveryRail } from "@/components/DiscoveryRail";
-import { deleteQuickNoteAction } from "@/app/scratch/actions";
+import { deleteQuickNoteAction } from "@/app/dash-off/actions";
 import type { QuickNoteSummary } from "@/lib/quickNotes";
 import type { DiscoveryCandidateSummary } from "@/lib/discovery";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -29,10 +29,10 @@ function formatDate(date: Date, locale: Locale) {
 
 const HEADER_FADE_MASK = "linear-gradient(to bottom, black 0%, black 70%, transparent 100%)";
 
-/** /scratch's timeline — extracted to a client component so each card can
+/** /dash-off's timeline — extracted to a client component so each card can
  * carry a corner 編集/削除 menu (both navigate to the full detail page)
  * alongside the "+" add flow. Editing always happens on "the detail screen" —
- * for an already-synced note that's a real navigation to /scratch/[id]; for
+ * for an already-synced note that's a real navigation to /dash-off/[id]; for
  * a brand-new one, NewQuickNoteOverlay is a full-screen overlay laid out
  * like that same detail page rather than an inline card sitting in this
  * list, so composing never happens in-place among the other notes. It's
@@ -98,7 +98,7 @@ export function ScratchTimeline({
               const noteCard = (
                 <div className="relative w-full max-w-[420px]">
                   <button
-                    onClick={() => router.push(`/scratch/${note.id}`)}
+                    onClick={() => router.push(`/dash-off/${note.id}`)}
                     className="flex w-full flex-col gap-2 rounded-lg border border-line bg-surface-alt p-4 text-left text-sm text-ink transition-colors hover:border-line-strong"
                   >
                     {note.preview || t.common.noContent}
@@ -110,7 +110,7 @@ export function ScratchTimeline({
                     )}
                   </button>
                   <QuickNoteActionMenu
-                    onEdit={() => router.push(`/scratch/${note.id}`)}
+                    onEdit={() => router.push(`/dash-off/${note.id}`)}
                     onDelete={() => setDeleteTargetId(note.id)}
                   />
                   <ConfirmDialog

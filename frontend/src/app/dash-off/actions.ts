@@ -20,7 +20,7 @@ import { translateZoteroError } from "@/lib/i18n/errors";
 export async function createQuickNoteAction(source: QuickNoteSource = "SCRATCH"): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await quickNotes.create(ownerSub, source);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   return note;
 }
 
@@ -32,7 +32,7 @@ export async function createQuickNoteAction(source: QuickNoteSource = "SCRATCH")
  * create-then-save pair across a network drop.
  *
  * `literatureSelection` lets the same compose step link a 文献メモ, the
- * way the /scratch/[id] detail page's LiteratureMemoField does — but that
+ * way the /dash-off/[id] detail page's LiteratureMemoField does — but that
  * one always operates on an already-created note (setLiteratureMemoAction),
  * so here the selection is resolved to a memo id up front and passed
  * straight into quickNotes.create instead of a separate follow-up call. */
@@ -44,15 +44,15 @@ export async function createQuickNoteWithContentAction(
   const literatureMemoId = await literatureMemos.resolveSelection(prisma, ownerSub, literatureSelection);
   const note = await quickNotes.create(ownerSub, "SCRATCH", literatureMemoId ?? undefined);
   const detail = await quickNotes.updateContent(ownerSub, note.id, content);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   return detail;
 }
 
 export async function updateQuickNoteContentAction(id: string, content: string): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await quickNotes.updateContent(ownerSub, id, content);
-  revalidatePath(`/scratch/${id}`);
-  revalidatePath("/scratch");
+  revalidatePath(`/dash-off/${id}`);
+  revalidatePath("/dash-off");
   revalidatePath("/zettelkasten");
   return note;
 }
@@ -60,15 +60,15 @@ export async function updateQuickNoteContentAction(id: string, content: string):
 export async function deleteQuickNoteAction(id: string): Promise<void> {
   const ownerSub = await requireOwnerSub();
   await quickNotes.remove(ownerSub, id);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   revalidatePath("/zettelkasten");
 }
 
 export async function setLiteratureMemoAction(id: string, selection: LiteratureSelection): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await quickNotes.setLiteratureMemo(ownerSub, id, selection);
-  revalidatePath(`/scratch/${id}`);
-  revalidatePath("/scratch");
+  revalidatePath(`/dash-off/${id}`);
+  revalidatePath("/dash-off");
   return note;
 }
 
@@ -77,7 +77,7 @@ export async function setLiteratureMemoAction(id: string, selection: LiteratureS
 export async function setQuickNoteProjectAction(id: string, projectId: string | null): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await quickNotes.setProject(ownerSub, id, projectId);
-  revalidatePath(`/scratch/${id}`);
+  revalidatePath(`/dash-off/${id}`);
   revalidatePath("/projects");
   if (projectId) revalidatePath(`/projects/${projectId}`);
   return note;
@@ -171,7 +171,7 @@ export async function getQuickNoteDetailAction(id: string): Promise<QuickNoteDet
 export async function runDiscoveryAction(force = false): Promise<{ notesChecked: number; candidatesFound: number }> {
   const ownerSub = await requireOwnerSub();
   const result = await discovery.runForEnabledNotes(ownerSub, { force });
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   return result;
 }
 
@@ -190,20 +190,20 @@ export async function confirmDiscoveryLiteratureAction(
 ): Promise<{ literatureMemoId: string }> {
   const ownerSub = await requireOwnerSub();
   const literatureMemoId = await discovery.resolveLiteratureForCandidate(ownerSub, candidateId, overrides);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   return { literatureMemoId };
 }
 
 /** "＋ このメモを書く" — resolves the candidate's literature memo (adding it
  * first if this is the first action taken on it) and creates a new QuickNote
- * already linked to it, ready for the caller to navigate to /scratch/[id]. */
+ * already linked to it, ready for the caller to navigate to /dash-off/[id]. */
 export async function writeNoteFromDiscoveryAction(
   candidateId: string,
   overrides: { citation: string; url: string | null },
 ): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await discovery.writeNoteFromCandidate(ownerSub, candidateId, overrides);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   return note;
 }
 
@@ -219,7 +219,7 @@ export async function listDiscoveryNotesAction(): Promise<discovery.DiscoveryNot
 export async function setNoteDiscoveryEnabledAction(quickNoteId: string, enabled: boolean): Promise<void> {
   const ownerSub = await requireOwnerSub();
   await discovery.setNoteDiscoveryEnabled(ownerSub, quickNoteId, enabled);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   revalidatePath("/zettelkasten");
 }
 

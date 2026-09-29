@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import { HudFrame } from "@/components/HudFrame";
 import { Spinner } from "@/components/LoadingSpinner";
-import { zoteroCreateItemAction, zoteroSearchAction } from "@/app/scratch/actions";
+import { zoteroCreateItemAction, zoteroSearchAction } from "@/app/dash-off/actions";
 import { CREATABLE_ITEM_TYPES, type CreatableItemType, type ZoteroSearchResult } from "@/lib/zotero";
 import type { LiteratureSelection } from "@/lib/literatureMemos";
 import { useI18n } from "@/lib/i18n/LocaleProvider";

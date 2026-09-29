@@ -4,7 +4,7 @@ import { useRouter } from "next/navigation";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
-/** The always-visible nav action on 走り書き that fires the /scratch → /zettelkasten transition (§5) — never automatic/implicit. */
+/** The always-visible nav action on 走り書き that fires the /dash-off → /zettelkasten transition (§5) — never automatic/implicit. */
 export function ZettelkastenNavButton() {
   const router = useRouter();
   const { t } = useI18n();

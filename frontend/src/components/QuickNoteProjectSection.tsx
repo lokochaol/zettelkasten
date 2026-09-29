@@ -4,7 +4,7 @@ import { useEffect, useState, type ChangeEvent } from "react";
 import { Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { listActiveProjectsAction } from "@/app/projects/actions";
-import { setQuickNoteProjectAction } from "@/app/scratch/actions";
+import { setQuickNoteProjectAction } from "@/app/dash-off/actions";
 import type { ProjectSummary } from "@/lib/projects";
 import type { QuickNoteProjectRef } from "@/lib/quickNotes";
 

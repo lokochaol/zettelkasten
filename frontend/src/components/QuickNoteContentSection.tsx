@@ -1,7 +1,7 @@
 "use client";
 
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
-import { updateQuickNoteContentAction } from "@/app/scratch/actions";
+import { updateQuickNoteContentAction } from "@/app/dash-off/actions";
 import type { QuickNoteDetail } from "@/lib/quickNotes";
 
 export function QuickNoteContentSection({
