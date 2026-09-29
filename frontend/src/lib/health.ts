@@ -162,7 +162,14 @@ export interface CompositionView {
   current: body.Window;
   trend: body.Trend;
   band: body.Band | null;
-  targetBodyFatPercent: number | null;
+  /** The target actually being worked to — the owner's, or the one
+   * derived from the athletic range when they haven't set one. Never
+   * null once a composition exists: "aim at nothing" is not a useful
+   * state for something that plans meals. */
+  targetBodyFatPercent: number;
+  /** True when the app chose it, so the screen can say so rather than
+   * presenting a number the owner never typed as if they had. */
+  targetIsAuto: boolean;
   suggested: { from: number; to: number };
   plan: body.CompositionPlan | null;
 }
@@ -263,25 +270,24 @@ async function compositionFor(
   const current = trend.recent;
   if (current.bodyFatPercent === null || current.weightKg === null || current.leanMassKg === null) return null;
 
-  const target = profile.targetBodyFatPercent;
+  const targetIsAuto = profile.targetBodyFatPercent === null;
+  const target = profile.targetBodyFatPercent ?? body.autoTargetFor(current.bodyFatPercent, profile.sex);
   return {
     current,
     trend,
     band: body.bandOf(current.bodyFatPercent, profile.sex),
     targetBodyFatPercent: target,
+    targetIsAuto,
     suggested: body.suggestedTarget(profile.sex),
-    plan:
-      target === null
-        ? null
-        : body.planFor(
-            {
-              weightKg: current.weightKg,
-              bodyFatPercent: current.bodyFatPercent,
-              fatMassKg: current.fatMassKg ?? 0,
-              leanMassKg: current.leanMassKg,
-            },
-            target,
-          ),
+    plan: body.planFor(
+      {
+        weightKg: current.weightKg,
+        bodyFatPercent: current.bodyFatPercent,
+        fatMassKg: current.fatMassKg ?? 0,
+        leanMassKg: current.leanMassKg,
+      },
+      target,
+    ),
   };
 }
 

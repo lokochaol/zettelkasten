@@ -206,6 +206,11 @@ export function HealthSettings() {
                 {t.health.averagedOver(data.current.composition.current.days)} ·{" "}
                 {t.health.suggestedRange(data.current.composition.suggested.from, data.current.composition.suggested.to)}
               </p>
+              {data.current.composition.targetIsAuto && (
+                <p className="font-mono text-[10px] text-accent">
+                  {t.health.targetAuto(data.current.composition.targetBodyFatPercent)}
+                </p>
+              )}
               {data.current.composition.plan && (
                 <p className="text-[11px] leading-relaxed text-ink">
                   {data.current.composition.plan.direction === "lose_fat"

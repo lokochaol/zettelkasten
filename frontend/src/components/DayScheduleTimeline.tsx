@@ -207,7 +207,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                       href={e.htmlLink ?? undefined}
                       target="_blank"
                       rel="noreferrer"
-                      className={`absolute overflow-hidden rounded-lg border-l-[3px] border-accent bg-accent-soft pr-2 pl-2 transition-colors hover:bg-accent/15 ${pad}`}
+                      className={`absolute overflow-hidden rounded-r-lg border-l-[3px] border-accent bg-accent-soft pr-2 pl-2 transition-colors hover:bg-accent/15 ${pad}`}
                       style={style}
                     >
                       <p className="truncate text-[11.5px] leading-tight font-semibold text-ink">{e.title}</p>
@@ -227,7 +227,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                     // Placed by hand, so it reads as the owner's own: the
                     // page's surface with an outline, against the filled
                     // blocks that came from the calendar.
-                    className={`group absolute overflow-hidden rounded-lg border border-accent/45 border-l-[3px] border-l-accent bg-surface pr-2 pl-2 ${pad}`}
+                    className={`group absolute overflow-hidden rounded-r-lg border border-accent/45 border-l-[3px] border-l-accent bg-surface pr-2 pl-2 ${pad}`}
                     style={style}
                   >
                     <div className="flex items-baseline gap-1.5">
@@ -260,7 +260,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                   <div
                     key={m.id}
                     title={m.recipe}
-                    className={`absolute right-0 left-0 overflow-hidden rounded-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] pr-2 pl-2 ${
+                    className={`absolute right-0 left-0 overflow-hidden rounded-r-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] pr-2 pl-2 ${
                       height < 40 ? "py-0.5" : "py-1"
                     }`}
                     style={{ top, height }}

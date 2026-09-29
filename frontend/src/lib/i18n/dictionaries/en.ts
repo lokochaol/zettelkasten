@@ -239,6 +239,7 @@ export const en: Dictionary = {
     weightLabel: "Weight",
     basisEquation: (name) => name,
     targetBodyFatLabel: "Target body fat (%)",
+    targetAuto: (percent) => `Target ${percent}% — chosen from the athletic range. Set your own above to override.`,
     compositionHeading: "Body composition",
     compositionNone: "No body fat reading yet. If your scale writes to Apple Health, the Shortcut can send it along with the weight.",
     bodyFat: "Body fat",

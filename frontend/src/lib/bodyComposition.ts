@@ -156,6 +156,24 @@ export function suggestedTarget(sex: BiologicalSex): { from: number; to: number 
   return sex === "MALE" ? { from: 10, to: 14 } : { from: 18, to: 22 };
 }
 
+/**
+ * The target to work to when the owner hasn't named one.
+ *
+ * Not a fixed number: the sustainable athletic range is a range, and
+ * which end of it applies depends on where the body currently is.
+ * Carrying more fat than the range, the first target is its upper edge —
+ * a milestone that can actually be reached, rather than the far end of
+ * the range with a year of dieting in between. Already inside it, the
+ * target is where you are: the job is holding it and training, not
+ * chasing a smaller number. Leaner than the range, the target is its
+ * lower edge, which reads as "stop cutting" — and that is the honest
+ * answer, because below the range is not more athletic, it's less.
+ */
+export function autoTargetFor(currentBodyFatPercent: number, sex: BiologicalSex): number {
+  const { from, to } = suggestedTarget(sex);
+  return Math.min(Math.max(currentBodyFatPercent, from), to);
+}
+
 export type Direction = "lose_fat" | "gain_lean" | "hold";
 
 export interface CompositionPlan {

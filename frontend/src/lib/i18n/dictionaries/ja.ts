@@ -239,6 +239,7 @@ export const ja: Dictionary = {
     weightLabel: "体重",
     basisEquation: (name) => name,
     targetBodyFatLabel: "目標の体脂肪率（%）",
+    targetAuto: (percent) => `目標 ${percent}%（アスリート範囲から自動設定。上の欄に入れると上書きできます）`,
     compositionHeading: "体組成",
     compositionNone: "体脂肪率がまだ届いていません。体組成計の値がヘルスケアに入っていれば、ショートカットで一緒に送れます。",
     bodyFat: "体脂肪率",

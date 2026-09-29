@@ -251,6 +251,7 @@ export interface Dictionary {
     weightLabel: string;
     basisEquation: (name: string) => string;
     targetBodyFatLabel: string;
+    targetAuto: (percent: number) => string;
     compositionHeading: string;
     compositionNone: string;
     bodyFat: string;
