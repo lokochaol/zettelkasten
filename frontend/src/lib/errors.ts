@@ -21,6 +21,8 @@ export type DomainErrorCode =
   | "coopOrderNotFound"
   | "timeBlockInvalid"
   | "timeBlockNotFound"
+  | "moneyPlanInvalid"
+  | "moneyPlanNotFound"
   | "expenseInvalid"
   | "expenseNotFound"
   | "healthGoalTooAggressive"
