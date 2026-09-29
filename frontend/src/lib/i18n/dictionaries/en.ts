@@ -9,6 +9,7 @@ export const en: Dictionary = {
     heading: "Index of pages",
     groups: { write: "Write", plan: "Plan and record", find: "Find and adjust" },
     pages: {
+      home: { name: "Index", note: "Every page in one list. The way in." },
       scratch: { name: "Dash Off", note: "Whatever comes to mind, in the order it arrives. The way in." },
       zettelkasten: { name: "Zettelkasten", note: "Rewrite scratch notes as permanent ones, filed between the notes they belong with." },
       literature: { name: "Literature notes", note: "Books and papers in your own words. Zotero can fill in the citation." },

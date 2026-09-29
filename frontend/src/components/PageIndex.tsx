@@ -21,6 +21,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
  */
 
 export type PageKey =
+  | "home"
   | "scratch"
   | "zettelkasten"
   | "literature"
@@ -38,7 +39,7 @@ interface Entry {
 }
 
 /** Grouped by what you came to do, not by when each was built. */
-const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[] = [
+export const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[] = [
   {
     titleKey: "write",
     entries: [
@@ -65,6 +66,12 @@ const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[] = [
     ],
   },
 ];
+
+/** The address of each page, for the header's label. */
+export const PATHS: Record<PageKey, string> = {
+  home: "/",
+  ...Object.fromEntries(GROUPS.flatMap((g) => g.entries.map((e) => [e.key, e.href]))),
+} as Record<PageKey, string>;
 
 export function PageIndex({ current }: { current: PageKey }) {
   const { t } = useI18n();
@@ -106,10 +113,9 @@ export function PageIndex({ current }: { current: PageKey }) {
           onClick={toggle}
           aria-expanded={open}
           aria-label={t.pageIndex.heading}
-          className="group flex items-baseline gap-2 text-lg font-extrabold tracking-tight text-ink transition-colors hover:text-accent"
+          className="group flex items-baseline gap-1.5 font-mono text-lg font-extrabold tracking-tight text-ink transition-colors hover:text-accent"
         >
-          <span className="font-mono text-[11px] text-accent">{"//"}</span>
-          {t.pageIndex.pages[current].name}
+          {PATHS[current]}
           <span
             aria-hidden="true"
             className={`font-mono text-[10px] text-ink-faint transition-transform group-hover:text-accent ${open ? "rotate-180" : ""}`}

@@ -11,7 +11,10 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "Zettelkasten",
     short_name: "Zettelkasten",
     description: "書き留めた考えをリンクでつなぎ、育てていく個人的な知識システム。",
-    start_url: "/scratch",
+    // The index, since that is now the way in — /scratch is one click
+    // from it, and a bookmark there still works for anyone who always
+    // wants to land on the timeline.
+    start_url: "/",
     display: "standalone",
     // The light palette, matching DEFAULT_THEME and the app icon — this
     // is the splash screen behind a cold launch, so a dark one would flash

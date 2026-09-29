@@ -9,6 +9,7 @@ export const ja: Dictionary = {
     heading: "ページの索引",
     groups: { write: "書く", plan: "組む・記録する", find: "探す・整える" },
     pages: {
+      home: { name: "索引", note: "全ページの一覧。ここが入り口。" },
       scratch: { name: "走り書き", note: "思いついた順に書き留める場所。ここが入り口。" },
       zettelkasten: { name: "ツェッテルカステン", note: "走り書きを永久保存版メモに書き直し、既存のメモのあいだに置く。" },
       literature: { name: "文献メモ", note: "本や論文を自分の言葉で要約して残す。Zoteroから取り込める。" },
