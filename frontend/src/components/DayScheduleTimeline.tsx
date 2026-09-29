@@ -21,8 +21,14 @@ import { todayKey as todayKeyIn } from "@/lib/dateKey";
  * has to be the same height on a day with two events and a day with ten,
  * or the timeline stops being readable at a glance. */
 const HOUR_PX = 44;
-const DEFAULT_FROM = 8;
-const DEFAULT_TO = 21;
+
+/** The whole day, every day. A window that grew to fit whatever the day
+ * happened to hold meant the same hour sat at a different height each
+ * time, and a block at six in the morning changed where lunch was drawn.
+ * A fixed midnight-to-midnight axis is the one thing that makes two days
+ * comparable at a glance. */
+const DAY_FROM = 0;
+const DAY_TO = 24;
 
 function clockLabel(minutes: number): string {
   const wrapped = ((minutes % 1440) + 1440) % 1440;
@@ -107,23 +113,10 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   const timed = events.filter((e) => !e.allDay && e.start);
   const allDay = events.filter((e) => e.allDay);
 
-  // The axis covers the working day, widened to whatever the day actually
-  // holds — meals included, since breakfast is usually before the events.
-  const starts = [
-    ...timed.map((e) => hourOf(e.start as Date, timeZone)),
-    ...view.meals.map((m) => hourOf(new Date(m.start), timeZone)),
-    ...view.blocks.map((b) => b.startMinutes / 60),
-  ];
-  const ends = [
-    ...timed.map((e) => hourOf((e.end ?? e.start) as Date, timeZone)),
-    ...view.meals.map((m) => hourOf(new Date(m.end), timeZone)),
-    ...view.blocks.map((b) => (b.startMinutes + b.durationMinutes) / 60),
-  ];
   const isToday = dateKey === todayKeyIn(timeZone);
   const nowHour = now && isToday ? hourOf(now, timeZone) : null;
-  const from = Math.floor(Math.min(DEFAULT_FROM, ...starts, ...(nowHour === null ? [] : [nowHour])));
-  const to = Math.ceil(Math.max(DEFAULT_TO, ...ends, ...(nowHour === null ? [] : [nowHour + 0.5])));
-  const hours = Array.from({ length: to - from }, (_, i) => from + i);
+  const from = DAY_FROM;
+  const hours = Array.from({ length: DAY_TO - DAY_FROM }, (_, i) => DAY_FROM + i);
   const timeLabel = (d: Date) =>
     new Intl.DateTimeFormat(localeTag(locale), { timeZone, hour: "2-digit", minute: "2-digit", hour12: false }).format(d);
 
@@ -193,9 +186,13 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                   left: `${(lane.column / lane.columns) * 100}%`,
                   width: `calc(${100 / lane.columns}% - 4px)`,
                 };
-                // Below two lines' worth of height, the second line would
-                // be sliced in half — worse than not showing it.
-                const roomForMeta = height >= 34;
+                // Below two lines' worth of height the second line would be
+                // sliced in half, which is worse than not showing it. A
+                // short block tightens its padding first, so a 45-minute
+                // one still gets to say when it is.
+                const tight = height < 40;
+                const roomForMeta = height >= (tight ? 30 : 34);
+                const pad = tight ? "py-0.5" : "py-1";
                 if (item.kind === "event") {
                   const e = item.event;
                   const s = e.start as Date;
@@ -206,7 +203,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                       href={e.htmlLink ?? undefined}
                       target="_blank"
                       rel="noreferrer"
-                      className="absolute overflow-hidden rounded-lg border-l-[3px] border-accent bg-accent-soft py-1 pr-2 pl-2 transition-colors hover:bg-accent/15"
+                      className={`absolute overflow-hidden rounded-lg border-l-[3px] border-accent bg-accent-soft pr-2 pl-2 transition-colors hover:bg-accent/15 ${pad}`}
                       style={style}
                     >
                       <p className="truncate text-[11.5px] leading-tight font-semibold text-ink">{e.title}</p>
@@ -226,7 +223,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                     // Placed by hand, so it reads as the owner's own: the
                     // page's surface with an outline, against the filled
                     // blocks that came from the calendar.
-                    className="group absolute overflow-hidden rounded-lg border border-accent/45 border-l-[3px] border-l-accent bg-surface py-1 pr-2 pl-2"
+                    className={`group absolute overflow-hidden rounded-lg border border-accent/45 border-l-[3px] border-l-accent bg-surface pr-2 pl-2 ${pad}`}
                     style={style}
                   >
                     <div className="flex items-baseline gap-1.5">
@@ -259,7 +256,9 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                   <div
                     key={m.id}
                     title={m.recipe}
-                    className="absolute right-0 left-0 overflow-hidden rounded-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] py-1 pr-2 pl-2"
+                    className={`absolute right-0 left-0 overflow-hidden rounded-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] pr-2 pl-2 ${
+                      height < 40 ? "py-0.5" : "py-1"
+                    }`}
                     style={{ top, height }}
                   >
                     <p
@@ -269,7 +268,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                     >
                       {m.title}
                     </p>
-                    {height >= 34 && (
+                    {height >= (height < 40 ? 30 : 34) && (
                       <p className="truncate font-mono text-[9px] leading-tight text-ink-soft">
                         {m.status === "REPLACED" ? t.daySchedule.logOther : `${m.kcal} kcal`} · {timeLabel(start)}
                         {m.prepMinutes > 0 ? ` · ${t.daySchedule.prep(m.prepMinutes)}` : ""}
