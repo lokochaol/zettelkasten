@@ -1,12 +1,14 @@
-# Zettelkasten
+# /
 
-思いついたことを気軽に書き留め、そのうち残す価値のあるものだけを自分の言葉で書き直し、既存のメモとリンクさせて積み上げていく — ニクラス・ルーマンの**ツェッテルカステン**(Zettelkasten、ドイツ語で「メモ箱」)を1人用のWebアプリとして実装した、個人用の知識システム。
+個人のメモ・計画・記録・追跡を1箇所にまとめる、1人用のWebアプリ。名前は付けていない — 毎日開く自分の道具に自己紹介は要らないので、画面の左上は常に現在のパスで、押すと全ページの索引が開く。
 
-**https://word-log-two.vercel.app/scratch**
+**https://word-log-two.vercel.app/**
 
-まずは走り書き(Dash Off)から。思いついたことをそのまま放り込むだけの画面なので、ここが一番とっつきやすい。書いたメモを育てる側は [/zettelkasten](https://word-log-two.vercel.app/zettelkasten)、手法そのものの解説は [/guide](https://word-log-two.vercel.app/guide)。いずれもGoogleログインが必要で、メモはログインしたアカウントごとに分かれる。
+入り口は索引。書き始めるなら [/scratch](https://word-log-two.vercel.app/scratch)(走り書き)、考えを育てるなら [/zettelkasten](https://word-log-two.vercel.app/zettelkasten)、手法そのものの解説は [/guide](https://word-log-two.vercel.app/guide)。Googleログインが必要で、中身はログインしたアカウントごとに分かれる。
 
-### 考え方
+書く側の中心にあるのはニクラス・ルーマンの**ツェッテルカステン**(Zettelkasten、ドイツ語で「メモ箱」)で、そこに計画(プロジェクト・献立・家計)と記録(タスク・食事の実績・体組成・支出)が同じ日付の背骨に乗っている。
+
+### 考え方 — 書く側
 
 ツェッテルカステンが価値を置くのは、メモそのものではなく**メモとメモの間のリンク**。1枚のメモは、他のメモと結びついて初めて「知識」になる。そのために、このアプリは書く行為を2段階に分ける。
 
