@@ -286,6 +286,11 @@ export const en: Dictionary = {
   },
   daySchedule: {
     heading: "Schedule & tasks",
+    flowHeading: "The day",
+    flowNote: "Meals are placed automatically from the week's plan. Add your own blocks under the tasks.",
+    statNet: "Net",
+    statFoodToday: "Food today",
+    spendingHeading: "Today's spending",
     eventCount: (n) => `${n} event(s)`,
     allDay: "All day",
     noEvents: "Nothing scheduled for this day",

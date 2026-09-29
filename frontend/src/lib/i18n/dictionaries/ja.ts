@@ -286,6 +286,11 @@ export const ja: Dictionary = {
   },
   daySchedule: {
     heading: "その日の予定とタスク",
+    flowHeading: "今日の流れ",
+    flowNote: "食事は献立から自動で置かれた時間枠です。予定・タスクの時間枠は右の「時間を確保する」から追加できます。",
+    statNet: "差引",
+    statFoodToday: "今日の食費",
+    spendingHeading: "今日の支出（手入力）",
     eventCount: (n) => `予定 ${n}件`,
     allDay: "終日",
     noEvents: "この日の予定はありません",

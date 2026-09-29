@@ -287,6 +287,11 @@ export interface Dictionary {
   };
   daySchedule: {
     heading: string;
+    flowHeading: string;
+    flowNote: string;
+    statNet: string;
+    statFoodToday: string;
+    spendingHeading: string;
     eventCount: (n: number) => string;
     allDay: string;
     noEvents: string;
