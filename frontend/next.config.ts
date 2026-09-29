@@ -7,6 +7,14 @@ const nextConfig: NextConfig = {
   // connectivity returns. See src/app/dash-off for how this is used.
   experimental: {
     useOffline: true,
+    // A statement PDF is uploaded to a Server Action (see previewPdfAction),
+    // and the default 1 MB turns away an ordinary two-page statement. 4 MB
+    // sits just under what Vercel accepts for a request body (4.5 MB), with
+    // room for the multipart framing; past that the platform refuses the
+    // upload before the app can say why, so the client checks first.
+    serverActions: {
+      bodySizeLimit: "4mb",
+    },
   },
   /** /scratch was this route's address for the app's whole life so far:
    * it is in bookmarks, in the installed app's saved start URL, in the

@@ -149,6 +149,21 @@ interface AnthropicBlock {
   text?: string;
 }
 
+/**
+ * A file sent alongside the prompt — only PDFs so far.
+ *
+ * All three providers read PDFs natively, text layer and scanned pages
+ * alike, so nothing on this side has to pull text out of the file first.
+ * That matters for statements in particular: text extraction from a
+ * multi-column PDF comes out interleaved, and a scanned one has no text at
+ * all, whereas the model reads the page the way a person would.
+ */
+export interface AiAttachment {
+  mimeType: "application/pdf";
+  filename: string;
+  base64: string;
+}
+
 /** The reply text, plus whether the model ran out of room while writing
  * it. Every provider says so in its own field; knowing which failure this
  * is decides whether retrying can possibly help. */
@@ -157,7 +172,14 @@ interface ProviderReply {
   truncated: boolean;
 }
 
-async function callAnthropic(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
+async function callAnthropic(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  attachment?: AiAttachment,
+): Promise<ProviderReply> {
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method: "POST",
     headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
@@ -165,7 +187,19 @@ async function callAnthropic(apiKey: string, system: string, user: string, maxTo
       model: ANTHROPIC_MODEL,
       max_tokens: maxTokens,
       system,
-      messages: [{ role: "user", content: user }],
+      messages: [
+        {
+          role: "user",
+          // The document goes before the question — the order the API
+          // documents for PDF input.
+          content: attachment
+            ? [
+                { type: "document", source: { type: "base64", media_type: attachment.mimeType, data: attachment.base64 } },
+                { type: "text", text: user },
+              ]
+            : user,
+        },
+      ],
       // Thinking is on by default on this model and is paid for out of the
       // same token budget as the answer — which is how a week of meals
       // came back empty. The brief here is long and prescriptive, and the
@@ -184,7 +218,14 @@ async function callAnthropic(apiKey: string, system: string, user: string, maxTo
   return { text, truncated: data.stop_reason === "max_tokens" };
 }
 
-async function callOpenAi(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
+async function callOpenAi(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  attachment?: AiAttachment,
+): Promise<ProviderReply> {
   const res = await fetch("https://api.openai.com/v1/responses", {
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
@@ -192,7 +233,21 @@ async function callOpenAi(apiKey: string, system: string, user: string, maxToken
       model: OPENAI_MODEL,
       max_output_tokens: maxTokens,
       instructions: system,
-      input: user,
+      input: attachment
+        ? [
+            {
+              role: "user",
+              content: [
+                {
+                  type: "input_file",
+                  filename: attachment.filename,
+                  file_data: `data:${attachment.mimeType};base64,${attachment.base64}`,
+                },
+                { type: "input_text", text: user },
+              ],
+            },
+          ]
+        : user,
       // Same reason as Anthropic: reasoning tokens come out of the output
       // budget on this model.
       ...(tuned ? { reasoning: { effort: "low" } } : {}),
@@ -217,13 +272,27 @@ async function callOpenAi(apiKey: string, system: string, user: string, maxToken
   return { text, truncated: cutOff };
 }
 
-async function callGoogle(apiKey: string, system: string, user: string, maxTokens: number, tuned: boolean): Promise<ProviderReply> {
+async function callGoogle(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  attachment?: AiAttachment,
+): Promise<ProviderReply> {
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:generateContent?key=${apiKey}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: "user", parts: [{ text: user }] }],
+      contents: [
+        {
+          role: "user",
+          parts: attachment
+            ? [{ inlineData: { mimeType: attachment.mimeType, data: attachment.base64 } }, { text: user }]
+            : [{ text: user }],
+        },
+      ],
       generationConfig: {
         maxOutputTokens: maxTokens,
         responseMimeType: "application/json",
@@ -256,12 +325,15 @@ async function callGoogle(apiKey: string, system: string, user: string, maxToken
  * request without risking an HTTP timeout. Asking for much more than this
  * needs streaming, which is a bigger change than this app has needed so
  * far — so callers that want more output should ask for less text instead.
+ *
+ * `attachment` sends a file with the prompt (see AiAttachment).
  */
 export async function askForJson(
   ownerSub: string,
   system: string,
   user: string,
   maxTokens = 16000,
+  attachment?: AiAttachment,
 ): Promise<LooseParse> {
   const credential = await aiCredentials.get(ownerSub);
   if (!credential) throw new AiJsonError("notConfigured", "No AI provider configured");
@@ -269,11 +341,11 @@ export async function askForJson(
   const call = (tuned: boolean): Promise<ProviderReply> => {
     switch (credential.provider) {
       case AiProvider.ANTHROPIC:
-        return callAnthropic(credential.apiKey, system, user, maxTokens, tuned);
+        return callAnthropic(credential.apiKey, system, user, maxTokens, tuned, attachment);
       case AiProvider.OPENAI:
-        return callOpenAi(credential.apiKey, system, user, maxTokens, tuned);
+        return callOpenAi(credential.apiKey, system, user, maxTokens, tuned, attachment);
       case AiProvider.GOOGLE:
-        return callGoogle(credential.apiKey, system, user, maxTokens, tuned);
+        return callGoogle(credential.apiKey, system, user, maxTokens, tuned, attachment);
       default:
         throw new AiJsonError("notConfigured", "Unknown provider");
     }

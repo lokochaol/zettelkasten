@@ -111,8 +111,6 @@ export interface Dictionary {
     memoPlaceholder: string;
     todayTotal: string;
     foodProgress: (spent: number, budget: number, daysLeft: number) => string;
-    byCategoryHeading: string;
-    noSpend: string;
     noBudget: string;
     overBudget: string;
     aheadOfPace: string;
@@ -136,6 +134,15 @@ export interface Dictionary {
     doImport: (n: number) => string;
     importing: string;
     importResult: (imported: number, replaced: number, skipped: number) => string;
+    pdfReading: string;
+    pdfNotPdf: string;
+    pdfTooLarge: (mb: number) => string;
+    pdfTruncated: string;
+    pdfNoRows: string;
+    pdfPartial: string;
+    pdfTotalMatch: (yen: number) => string;
+    pdfTotalMismatch: (stated: number, extracted: number) => string;
+    pdfTotalUnknown: (extracted: number) => string;
     trendHeading: string;
     trendNote: string;
     planHeading: string;

@@ -111,9 +111,13 @@ export async function monthSummary(ownerSub: string, dateKey: string): Promise<M
       where: { ownerSub, dateKey: { startsWith: month } },
       _sum: { amountYen: true },
     }),
-    prisma.categoryBudget.findMany({ where: { ownerSub } }),
+    // The month's own plan (see src/lib/moneyPlan.ts), not the standing
+    // per-category budget this used to read: that one was a second set of
+    // numbers for the same categories, edited in a different section, and
+    // the two drifted apart as soon as the plan existed.
+    prisma.monthBudget.findMany({ where: { ownerSub, month } }),
   ]);
-  const budgetByCategory = new Map(budgets.map((b) => [b.category, b.monthlyYen]));
+  const budgetByCategory = new Map(budgets.map((b) => [b.category, b.amountYen]));
   const spentByCategory = new Map(rows.map((r) => [r.category, r._sum.amountYen ?? 0]));
 
   // Every budgeted category appears even at zero spend — a budget you
@@ -134,24 +138,6 @@ export async function monthSummary(ownerSub: string, dateKey: string): Promise<M
     dayOfMonth: Number(dateKey.slice(8, 10)),
     daysInMonth: new Date(Date.UTC(year, monthNum, 0)).getUTCDate(),
   };
-}
-
-export async function setCategoryBudget(ownerSub: string, category: string, monthlyYen: number | null): Promise<void> {
-  const trimmed = category.trim();
-  if (!trimmed) throw new ValidationError("expenseInvalid", "category is required");
-  if (monthlyYen === null) {
-    await prisma.categoryBudget.deleteMany({ where: { ownerSub, category: trimmed } });
-    return;
-  }
-  if (!Number.isFinite(monthlyYen) || monthlyYen < 0) {
-    throw new ValidationError("expenseInvalid", "budget must be zero or more");
-  }
-  const value = Math.round(monthlyYen);
-  await prisma.categoryBudget.upsert({
-    where: { ownerSub_category: { ownerSub, category: trimmed } },
-    create: { ownerSub, category: trimmed, monthlyYen: value },
-    update: { monthlyYen: value },
-  });
 }
 
 /** Categories the owner has actually used or budgeted, for the picker —
