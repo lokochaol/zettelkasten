@@ -111,8 +111,6 @@ export interface Dictionary {
     memoPlaceholder: string;
     todayTotal: string;
     foodProgress: (spent: number, budget: number, daysLeft: number) => string;
-    byCategoryHeading: string;
-    noSpend: string;
     noBudget: string;
     overBudget: string;
     aheadOfPace: string;

@@ -31,7 +31,15 @@ import type { CommitmentKind } from "@/generated/prisma/client";
  * how much, is subtraction; only "which three lines could come down" is
  * judgement.
  */
-export function MoneyPlanPanel({ todayKey }: { todayKey: string }) {
+export function MoneyPlanPanel({
+  todayKey,
+  /** Bumped by the screen when something outside this panel changed the
+   * month's spending (a statement import), so the used amounts re-read. */
+  version = 0,
+}: {
+  todayKey: string;
+  version?: number;
+}) {
   const { t } = useI18n();
   const [data, setData] = useState<MoneyPlanView | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -40,7 +48,7 @@ export function MoneyPlanPanel({ todayKey }: { todayKey: string }) {
 
   useEffect(() => {
     getMoneyPlanAction(todayKey).then(setData);
-  }, [todayKey]);
+  }, [todayKey, version]);
 
   if (!data) return <LoadingBlock label={t.common.loading} />;
 
@@ -62,6 +70,18 @@ export function MoneyPlanPanel({ todayKey }: { todayKey: string }) {
   const allocated = plan.budgets.reduce((sum, b) => sum + b.amountYen, 0);
   const unallocated = plan.projection.discretionaryYen - allocated;
   const shortMonths = year.filter((m) => m.belowMinimum);
+  // How far through the month today is, so each bar can be read against
+  // the calendar and not only against its ceiling: two thirds of a budget
+  // used is fine on the 20th and a problem on the 8th.
+  const [yearNum, monthNum, dayNum] = todayKey.split("-").map(Number);
+  const monthProgress = dayNum / new Date(Date.UTC(yearNum, monthNum, 0)).getUTCDate();
+  // Spending in a category the plan has no line for — a category added
+  // after the plan was made, or one the allocation left out. Listed so
+  // the money shows up somewhere, with a box to give it a budget.
+  const planned = new Set(plan.budgets.map((b) => b.category));
+  const unplanned = Object.entries(spentByCategory)
+    .filter(([category, spent]) => !planned.has(category) && spent > 0)
+    .sort((a, b) => b[1] - a[1]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -123,42 +143,32 @@ export function MoneyPlanPanel({ todayKey }: { todayKey: string }) {
           </button>
         }
       >
-        <ul className="flex flex-col gap-2">
-          {plan.budgets.map((b) => {
-            const spent = spentByCategory[b.category] ?? 0;
-            const ratio = b.amountYen > 0 ? spent / b.amountYen : null;
-            return (
-              <li key={b.category} className="flex flex-col gap-1">
-                <div className="flex items-baseline gap-2">
-                  <span className="text-xs text-ink">{b.category}</span>
-                  <span className="ml-auto font-mono text-[11px] text-ink">¥{spent.toLocaleString()}</span>
-                  <span className="font-mono text-[9.5px] text-ink-faint">/</span>
-                  <input
-                    defaultValue={b.amountYen}
-                    onBlur={(e) =>
-                      run(() =>
-                        setMonthBudgetAction(plan.month, b.category, Number(e.target.value.replace(/[,¥\s]/g, "")), todayKey),
-                      )
-                    }
-                    inputMode="numeric"
-                    className="w-20 rounded border border-line bg-surface px-1.5 py-0.5 text-right font-mono text-[10px] text-ink-soft focus:border-accent focus:outline-none"
-                  />
-                </div>
-                <div className="h-1.5 overflow-hidden rounded-full bg-surface-alt">
-                  {ratio !== null && (
-                    <div
-                      className={`h-full rounded-full ${ratio > 1 ? "bg-accent" : "bg-[var(--color-meal)]"}`}
-                      style={{ width: `${Math.min(ratio, 1) * 100}%` }}
-                    />
-                  )}
-                </div>
-              </li>
-            );
-          })}
+        <ul className="flex flex-col gap-2.5">
+          {plan.budgets.map((b) => (
+            <BudgetRow
+              key={b.category}
+              category={b.category}
+              spentYen={spentByCategory[b.category] ?? 0}
+              budgetYen={b.amountYen}
+              monthProgress={monthProgress}
+              onSave={(value) => run(() => setMonthBudgetAction(plan.month, b.category, value ?? 0, todayKey))}
+            />
+          ))}
+          {unplanned.map(([category, spent]) => (
+            <BudgetRow
+              key={category}
+              category={category}
+              spentYen={spent}
+              budgetYen={null}
+              monthProgress={monthProgress}
+              onSave={(value) => value !== null && run(() => setMonthBudgetAction(plan.month, category, value, todayKey))}
+            />
+          ))}
         </ul>
         <p className={`font-mono text-[10px] ${unallocated < 0 ? "text-accent" : "text-ink-faint"}`}>
           {t.money.monthPlanLeft(unallocated)}
         </p>
+        <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.money.paceNote}</p>
       </Section>
 
       {/* ③ 固定費・分割払い */}
@@ -488,5 +498,70 @@ function Figure({ label, yen, strong, tone }: { label: string; yen: number; stro
         ¥{value.toLocaleString()}
       </span>
     </span>
+  );
+}
+
+/**
+ * One category of the month: used so far against its budget, and where
+ * the month is.
+ *
+ * Over the budget and on pace to go over are different situations and get
+ * different words — one has already happened, the other is still a choice.
+ * `budgetYen` null is a category with spending but no line in the plan.
+ */
+function BudgetRow({
+  category,
+  spentYen,
+  budgetYen,
+  monthProgress,
+  onSave,
+}: {
+  category: string;
+  spentYen: number;
+  budgetYen: number | null;
+  monthProgress: number;
+  /** null when the box was left empty. */
+  onSave: (value: number | null) => void;
+}) {
+  const { t } = useI18n();
+  // A ¥0 budget with spending against it is simply over — drawn as a full
+  // bar, not as an empty one next to the word 予算超過.
+  const ratio =
+    budgetYen === null ? null : budgetYen > 0 ? spentYen / budgetYen : spentYen > 0 ? Number.POSITIVE_INFINITY : null;
+  const over = budgetYen !== null && spentYen > budgetYen;
+  const aheadOfPace = ratio !== null && !over && ratio > monthProgress + 0.1;
+  return (
+    <li className="flex flex-col gap-1">
+      <div className="flex items-baseline gap-2">
+        <span className="text-xs text-ink">{category}</span>
+        {over && <span className="font-mono text-[9px] text-accent">{t.money.overBudget}</span>}
+        {aheadOfPace && <span className="font-mono text-[9px] text-ink-soft">{t.money.aheadOfPace}</span>}
+        <span className="ml-auto font-mono text-[11px] text-ink">¥{spentYen.toLocaleString()}</span>
+        <span className="font-mono text-[9.5px] text-ink-faint">/</span>
+        <input
+          defaultValue={budgetYen ?? ""}
+          placeholder={t.money.noBudget}
+          onBlur={(e) => {
+            const text = e.target.value.replace(/[,¥\s]/g, "");
+            if (text === "") return onSave(null);
+            const value = Number(text);
+            if (Number.isFinite(value)) onSave(value);
+          }}
+          inputMode="numeric"
+          className="w-20 rounded border border-line bg-surface px-1.5 py-0.5 text-right font-mono text-[10px] text-ink-soft focus:border-accent focus:outline-none"
+        />
+      </div>
+      <div className="relative h-1.5 overflow-hidden rounded-full bg-surface-alt">
+        {ratio !== null && (
+          <div
+            className={`h-full rounded-full ${over ? "bg-accent" : "bg-[var(--color-meal)]"}`}
+            style={{ width: `${Math.min(ratio, 1) * 100}%` }}
+          />
+        )}
+        {budgetYen !== null && (
+          <div className="absolute top-0 h-full w-px bg-ink-faint" style={{ left: `${monthProgress * 100}%` }} />
+        )}
+      </div>
+    </li>
   );
 }

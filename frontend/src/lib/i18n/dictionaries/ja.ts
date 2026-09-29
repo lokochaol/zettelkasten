@@ -94,8 +94,6 @@ export const ja: Dictionary = {
     todayTotal: "今日の合計",
     foodProgress: (spent, budget, daysLeft) =>
       `食費 ¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}（残り${daysLeft}日）`,
-    byCategoryHeading: "今月のカテゴリ別",
-    noSpend: "今月の記録はまだありません。",
     noBudget: "予算なし",
     overBudget: "予算超過",
     aheadOfPace: "ペースが速い",

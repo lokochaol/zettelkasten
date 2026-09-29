@@ -17,6 +17,7 @@ import { parseCsv, guessMapping, type ColumnMapping } from "@/lib/csvImport";
 import { MAX_PDF_BYTES, PDF_MAPPING, looksLikePdf, readPdfStatement } from "@/lib/pdfStatement";
 import type { Dictionary } from "@/lib/i18n/types";
 import { prisma } from "@/lib/db";
+import { getTodayKey } from "@/lib/preferences/preferences";
 
 export interface MoneyDayView {
   today: Expense[];
@@ -27,6 +28,14 @@ export interface MoneyDayView {
 
 export async function getMoneyDayAction(dateKey: string): Promise<MoneyDayView> {
   const ownerSub = await requireOwnerSub();
+  // The month's budgets live in its plan, and the plan is made on first
+  // read. This view is often the first thing opened in a new month (the
+  // calendar's spending card), so it makes sure the current month has one.
+  // Only the current month: browsing to another day must not quietly
+  // create plans for months nobody asked about.
+  if (expenses.monthOf(dateKey) === expenses.monthOf(await getTodayKey())) {
+    await moneyPlan.getOrCreateMonthPlan(ownerSub, expenses.monthOf(dateKey));
+  }
   const [today, month, categories] = await Promise.all([
     expenses.listForDay(ownerSub, dateKey),
     expenses.monthSummary(ownerSub, dateKey),
@@ -59,17 +68,6 @@ export async function removeExpenseAction(id: string, dateKey: string): Promise<
   revalidatePath("/money");
   revalidatePath("/calendar");
   return getMoneyDayAction(dateKey);
-}
-
-export async function setCategoryBudgetAction(
-  category: string,
-  monthlyYen: number | null,
-  dateKey: string,
-): Promise<MonthSummary> {
-  const ownerSub = await requireOwnerSub();
-  await expenses.setCategoryBudget(ownerSub, category, monthlyYen);
-  revalidatePath("/money");
-  return expenses.monthSummary(ownerSub, dateKey);
 }
 
 /* ---------- statement import ---------- */

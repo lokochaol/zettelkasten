@@ -94,8 +94,6 @@ export const en: Dictionary = {
     todayTotal: "Today",
     foodProgress: (spent, budget, daysLeft) =>
       `Food ¥${spent.toLocaleString()} / ¥${budget.toLocaleString()} (${daysLeft} days left)`,
-    byCategoryHeading: "This month by category",
-    noSpend: "Nothing recorded this month yet.",
     noBudget: "no budget",
     overBudget: "over",
     aheadOfPace: "ahead of pace",
