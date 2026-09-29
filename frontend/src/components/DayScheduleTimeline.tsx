@@ -143,10 +143,14 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   const lanes = layoutSpans(laneItems.map((i) => ({ start: i.start, end: i.end })));
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="@container flex flex-col gap-4">
       {view.nutrition && <StatCards nutrition={view.nutrition} />}
 
-      <div className="flex flex-col gap-4 2xl:flex-row">
+      {/* Side by side once the container is wide enough to read two
+          columns; stacked when it isn't. Measured against this element
+          rather than the window, because the pane can be half the width
+          of the screen it sits in. */}
+      <div className="flex flex-col gap-4 @[1100px]:flex-row">
         {/* 今日の流れ */}
         <section className="flex min-w-0 flex-1 flex-col gap-2.5 rounded-xl border border-line bg-surface p-4">
           <Heading
@@ -300,7 +304,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
         </section>
 
         {/* 右の列 — それぞれ独立したブロック */}
-        <div className="flex w-full min-w-0 flex-col gap-4 2xl:w-[330px] 2xl:shrink-0">
+        <div className="flex w-full min-w-0 flex-col gap-4 @[1100px]:w-[330px] @[1100px]:shrink-0">
           {view.meals.length > 0 && (
             <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface p-4">
               <Heading label={t.daySchedule.mealsHeading} />
@@ -543,7 +547,7 @@ function StatCards({ nutrition: n }: { nutrition: NonNullable<DayScheduleView["n
 
   return (
     <div className="flex flex-col gap-3">
-      <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3 @[420px]:grid-cols-2 @[860px]:grid-cols-4">
         <Card
           label={burn === null ? t.daySchedule.statTarget : t.daySchedule.statBurn}
           value={`${Math.round(burn ?? n.targetKcal)} kcal`}
@@ -557,9 +561,16 @@ function StatCards({ nutrition: n }: { nutrition: NonNullable<DayScheduleView["n
         />
         {/* Against the target when the phone hasn't reported, against the
             body when it has — the second is the real one. */}
+        {/* With nothing eaten and nothing planned, the difference is the
+            whole target with a minus in front — a number that looks like
+            a deficit and means "no data". A dash says that instead. */}
         <Card
           label={t.daySchedule.statNet}
-          value={`${Math.round(intakeKcal - (burn ?? n.targetKcal)) > 0 ? "+" : ""}${Math.round(intakeKcal - (burn ?? n.targetKcal))} kcal`}
+          value={
+            intakeKcal === 0
+              ? "—"
+              : `${Math.round(intakeKcal - (burn ?? n.targetKcal)) > 0 ? "+" : ""}${Math.round(intakeKcal - (burn ?? n.targetKcal))} kcal`
+          }
           tone={intakeKcal === 0 ? "faint" : "plain"}
         />
         <Card label={t.daySchedule.statFoodToday} value={`¥${n.foodSpentYen.toLocaleString()}`} />
