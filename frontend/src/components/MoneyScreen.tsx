@@ -8,6 +8,7 @@ import {
   type MoneyDayView,
 } from "@/app/money/actions";
 import { CsvImportPanel } from "@/components/CsvImportPanel";
+import { MoneyPlanPanel } from "@/components/MoneyPlanPanel";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import type { MonthTotal } from "@/lib/expenses";
@@ -63,6 +64,8 @@ export function MoneyScreen() {
       </div>
 
       <ExpenseQuickEntry dateKey={todayKey} />
+
+      <MoneyPlanPanel todayKey={todayKey} />
 
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
         <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.money.byCategoryHeading}</p>

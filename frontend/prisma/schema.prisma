@@ -850,3 +850,109 @@ model TimeBlock {
   @@index([ownerSub, dateKey])
   @@map("time_block")
 }
+
+/// What comes in, and the floor under what must go out.
+///
+/// Budgeting without income is arithmetic with one side missing — the
+/// current category budgets are numbers typed from memory, and nothing
+/// checks them against what there is to spend.
+model MoneyProfile {
+  ownerSub           String   @id @map("owner_sub")
+  monthlyIncomeYen   Int      @default(0) @map("monthly_income_yen")
+  /// The least this household can run on in a month, food and daily
+  /// necessities included. A plan that goes under it isn't thrift, it's a
+  /// plan that will be broken in week two — so it's flagged rather than
+  /// quietly proposed.
+  minimumLivingYen   Int      @default(40000) @map("minimum_living_yen")
+  /// Kept back for the unexpected before anything is called savings.
+  bufferYen          Int      @default(20000) @map("buffer_yen")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  @@map("money_profile")
+}
+
+enum CommitmentKind {
+  /// Instalments already signed for — the past arriving monthly.
+  INSTALMENT
+  /// Subscriptions and dues.
+  SUBSCRIPTION
+  /// Rent, utilities, insurance.
+  FIXED
+
+  @@map("commitment_kind")
+}
+
+/// Money already promised to someone else. Planning a year without these
+/// is planning someone else's year.
+model Commitment {
+  id         String         @id @default(uuid())
+  ownerSub   String         @map("owner_sub")
+  name       String
+  kind       CommitmentKind
+  monthlyYen Int            @map("monthly_yen")
+  /// Inclusive "YYYY-MM" bounds. An open end (null) is an ongoing cost;
+  /// an instalment has a last month, and that month is when the plan
+  /// gets easier — which is worth being able to see coming.
+  fromMonth  String         @map("from_month")
+  toMonth    String?        @map("to_month")
+  createdAt  DateTime       @default(now()) @map("created_at")
+
+  @@index([ownerSub])
+  @@map("commitment")
+}
+
+/// Something being saved for, by when.
+model SavingsGoal {
+  id          String   @id @default(uuid())
+  ownerSub    String   @map("owner_sub")
+  name        String
+  targetYen   Int      @map("target_yen")
+  targetMonth String   @map("target_month")
+  /// Put aside so far. Typed in rather than inferred: what's in the
+  /// account is something only the owner can see.
+  savedYen    Int      @default(0) @map("saved_yen")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([ownerSub])
+  @@map("savings_goal")
+}
+
+/// The plan for one month: what each category may have.
+///
+/// Separate from CategoryBudget, which is a standing figure. This is the
+/// month's own allocation, derived at the start of the month from income
+/// minus what is already promised, and adjustable afterwards.
+model MonthBudget {
+  id        String   @id @default(uuid())
+  ownerSub  String   @map("owner_sub")
+  month     String
+  category  String
+  amountYen Int      @map("amount_yen")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ownerSub, month, category])
+  @@index([ownerSub, month])
+  @@map("month_budget")
+}
+
+/// One week's advice from the AI acting as the household's accountant.
+///
+/// Stored, not regenerated on sight: it costs the owner an API call, it
+/// is about a week that has now happened, and advice that changes every
+/// time you open the page is advice nobody follows.
+model SpendingAdvice {
+  id               String   @id @default(uuid())
+  ownerSub         String   @map("owner_sub")
+  weekStartDateKey String   @map("week_start_date_key")
+  /// What the week actually looked like when the advice was written, so
+  /// it can be read against its own evidence later.
+  summary          String
+  /// The concrete cuts, as JSON: [{ category, action, monthlySavingYen }].
+  actionsJson      String   @map("actions_json")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  @@unique([ownerSub, weekStartDateKey])
+  @@index([ownerSub])
+  @@map("spending_advice")
+}

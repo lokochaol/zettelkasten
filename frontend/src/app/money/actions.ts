@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import * as expenses from "@/lib/expenses";
+import * as moneyPlan from "@/lib/moneyPlan";
+import * as spendingAdvice from "@/lib/spendingAdvice";
+import type { AdviceView } from "@/lib/spendingAdvice";
+import type { MonthProjection } from "@/lib/moneyPlanning";
+import { AiJsonError } from "@/lib/aiJson";
 import type { Expense, ExpenseInput, MonthSummary } from "@/lib/expenses";
 import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
@@ -143,4 +148,173 @@ export async function importCsvAction(
 export async function getMonthlyTotalsAction(throughDateKey: string): Promise<expenses.MonthTotal[]> {
   const ownerSub = await requireOwnerSub();
   return expenses.monthlyTotals(ownerSub, throughDateKey);
+}
+
+/* ---------- planning ---------- */
+
+export interface MoneyPlanView {
+  profile: moneyPlan.MoneyProfile;
+  plan: moneyPlan.MonthPlan;
+  /** Spent so far this month, by the plan's own categories. */
+  spentByCategory: Record<string, number>;
+  year: MonthProjection[];
+  commitments: moneyPlan.Commitment[];
+  goals: moneyPlan.SavingsGoal[];
+  advice: AdviceView | null;
+  recentAdvice: AdviceView[];
+  weekStartDateKey: string;
+}
+
+/**
+ * The whole planning picture for a day: this month's plan (created now if
+ * the month is new), the twelve months around it, and the latest weekly
+ * advice. One round trip, because every part of it is read together.
+ */
+export async function getMoneyPlanAction(todayKey: string): Promise<MoneyPlanView> {
+  const ownerSub = await requireOwnerSub();
+  const month = expenses.monthOf(todayKey);
+  const [profile, plan, summary, year, commitments, goals, recentAdvice] = await Promise.all([
+    moneyPlan.getProfile(ownerSub),
+    moneyPlan.getOrCreateMonthPlan(ownerSub, month),
+    expenses.monthSummary(ownerSub, todayKey),
+    moneyPlan.projectYear(ownerSub, month, 12),
+    prisma.commitment.findMany({ where: { ownerSub }, orderBy: [{ kind: "asc" }, { monthlyYen: "desc" }] }),
+    prisma.savingsGoal.findMany({ where: { ownerSub }, orderBy: { targetMonth: "asc" } }),
+    spendingAdvice.listRecentAdvice(ownerSub, 4),
+  ]);
+  const weekStartDateKey = spendingAdvice.weekStartFor(todayKey);
+  return {
+    profile,
+    plan,
+    spentByCategory: Object.fromEntries(summary.byCategory.map((c) => [c.category, c.spentYen])),
+    year,
+    commitments,
+    goals,
+    advice: recentAdvice.find((a) => a.weekStartDateKey === weekStartDateKey) ?? null,
+    recentAdvice,
+    weekStartDateKey,
+  };
+}
+
+export async function saveMoneyProfileAction(
+  input: moneyPlan.ProfileInput,
+  todayKey: string,
+): Promise<MoneyPlanView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await moneyPlan.saveProfile(ownerSub, input);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function addCommitmentAction(
+  input: moneyPlan.CommitmentInput,
+  todayKey: string,
+): Promise<MoneyPlanView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await moneyPlan.addCommitment(ownerSub, input);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function removeCommitmentAction(id: string, todayKey: string): Promise<MoneyPlanView> {
+  const ownerSub = await requireOwnerSub();
+  await moneyPlan.removeCommitment(ownerSub, id);
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function addGoalAction(
+  input: moneyPlan.GoalInput,
+  todayKey: string,
+): Promise<MoneyPlanView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await moneyPlan.addGoal(ownerSub, input);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function updateGoalSavedAction(id: string, savedYen: number, todayKey: string): Promise<MoneyPlanView> {
+  const ownerSub = await requireOwnerSub();
+  await moneyPlan.updateGoalSaved(ownerSub, id, savedYen);
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function removeGoalAction(id: string, todayKey: string): Promise<MoneyPlanView> {
+  const ownerSub = await requireOwnerSub();
+  await moneyPlan.removeGoal(ownerSub, id);
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+export async function setMonthBudgetAction(
+  month: string,
+  category: string,
+  amountYen: number,
+  todayKey: string,
+): Promise<MoneyPlanView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await moneyPlan.setMonthBudget(ownerSub, month, category, amountYen);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+/** Throws this month's allocation away and derives it again — for when
+ * income or commitments have changed under it. */
+export async function resetMonthPlanAction(month: string, todayKey: string): Promise<MoneyPlanView> {
+  const ownerSub = await requireOwnerSub();
+  await moneyPlan.resetMonthPlan(ownerSub, month);
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
+}
+
+/**
+ * Asks the owner's own model for this week's advice. Every failure is
+ * something they can act on — no key, a rejected key, an unusable reply —
+ * so they come back as messages rather than exceptions.
+ */
+export async function generateAdviceAction(todayKey: string): Promise<MoneyPlanView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  try {
+    await spendingAdvice.generateAdvice(ownerSub, todayKey);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    if (e instanceof AiJsonError) {
+      const byCode: Record<string, string> = {
+        notConfigured: dict.meals.errorNoAiKey,
+        authError: dict.meals.errorAuth,
+        rateLimitError: dict.meals.errorRateLimit,
+        invalidResponse: dict.meals.errorBadResponse,
+        truncated: dict.meals.errorTruncated,
+        apiError: dict.meals.errorApi,
+      };
+      console.error("spending advice failed", e.code, e.message);
+      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
+    }
+    throw e;
+  }
+  revalidatePath("/money");
+  return getMoneyPlanAction(todayKey);
 }

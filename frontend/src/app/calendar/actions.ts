@@ -16,6 +16,7 @@ import { getTimeZone } from "@/lib/preferences/preferences";
 import * as mealPlanning from "@/lib/mealPlanning";
 import * as health from "@/lib/health";
 import * as timeBlocks from "@/lib/timeBlocks";
+import * as expenses from "@/lib/expenses";
 import type { TimeBlock } from "@/lib/timeBlocks";
 
 export async function listTodayProjectNotesAction(dateKey: string): Promise<TodayProjectNote[]> {
@@ -69,6 +70,9 @@ export interface DayNutrition {
    * between the two is the interesting part, and collapsing them would
    * show a day as short on protein when it simply hasn't been logged. */
   intake: mealPlanning.DayIntake;
+  /** What the day's food actually cost, so the plate and the price sit
+   * on the same screen. */
+  foodSpentYen: number;
   /** Measured for the day, from the phone. */
   activeEnergyKcal: number | null;
   weightKg: number | null;
@@ -113,6 +117,7 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
     health.getDailyMetric(ownerSub, dateKey),
     timeBlocks.listForDay(ownerSub, dateKey),
   ]);
+  const foodSpentYen = await expenses.sumForRange(ownerSub, dateKey, dateKey, expenses.FOOD_CATEGORY);
   const meals: DayMeal[] = scheduled.map(({ meal, start, end }) => ({
     id: meal.id,
     slot: meal.slot,
@@ -140,6 +145,7 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
         plannedFiberG: meals.reduce((sum, m) => sum + m.fiberG, 0),
         plannedSaltG: meals.reduce((sum, m) => sum + m.saltG, 0),
         intake: mealPlanning.intakeOf(scheduled.map(({ meal }) => meal)),
+        foodSpentYen,
         activeEnergyKcal: metric?.activeEnergyKcal ?? null,
         weightKg: metric?.weightKg ?? null,
       }

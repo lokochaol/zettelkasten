@@ -56,6 +56,10 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.timeBlockInvalid;
     case "timeBlockNotFound":
       return dict.timeBlockNotFound;
+    case "moneyPlanInvalid":
+      return dict.moneyPlanInvalid;
+    case "moneyPlanNotFound":
+      return dict.moneyPlanNotFound;
     case "projectNotFound":
       return dict.projectNotFound;
     case "projectNameRequired":
