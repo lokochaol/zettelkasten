@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { addExpenseAction, getMoneyDayAction, removeExpenseAction, type MoneyDayView } from "@/app/money/actions";
+import { useEnterKey } from "@/lib/ime";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 /**
@@ -21,6 +22,8 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
   const amountRef = useRef<HTMLInputElement>(null);
+  // Enter submits — except the Enter that confirms a Japanese conversion.
+  const enterKey = useEnterKey(() => submit());
 
   useEffect(() => {
     getMoneyDayAction(dateKey).then((v) => {
@@ -58,7 +61,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
           ref={amountRef}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
+          {...enterKey}
           inputMode="numeric"
           placeholder={t.money.amountPlaceholder}
           className="w-24 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
@@ -77,7 +80,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
         <input
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && submit()}
+          {...enterKey}
           placeholder={t.money.memoPlaceholder}
           className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
         />

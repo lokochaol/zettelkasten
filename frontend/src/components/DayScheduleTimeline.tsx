@@ -11,6 +11,7 @@ import {
 } from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
+import { useEnterKey } from "@/lib/ime";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 
@@ -303,6 +304,7 @@ function TimeBlockForm({
   const [error, setError] = useState<string | null>(null);
   const [pending, startAdding] = useTransition();
   const listId = `tasks-${dateKey}`;
+  const enterKey = useEnterKey(() => submit());
 
   function submit() {
     if (!title.trim()) return;
@@ -347,7 +349,7 @@ function TimeBlockForm({
         <input
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !e.nativeEvent.isComposing && submit()}
+          {...enterKey}
           list={listId}
           placeholder={t.daySchedule.blockTitlePlaceholder}
           className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-[11px] text-ink focus:border-accent focus:outline-none"
