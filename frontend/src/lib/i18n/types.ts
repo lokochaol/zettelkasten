@@ -26,7 +26,18 @@ export interface Dictionary {
     heading: string;
     groups: { write: string; plan: string; find: string };
     pages: Record<
-      "home" | "scratch" | "zettelkasten" | "literature" | "projects" | "calendar" | "meals" | "money" | "search" | "guide" | "settings",
+      | "home"
+      | "scratch"
+      | "zettelkasten"
+      | "literature"
+      | "projects"
+      | "calendar"
+      | "meals"
+      | "money"
+      | "discovery"
+      | "search"
+      | "guide"
+      | "settings",
       { name: string; note: string }
     >;
   };

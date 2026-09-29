@@ -15,9 +15,9 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
  * holds. An index rather than a menu: the descriptions are the point,
  * because after a month away "献立" and "家計" are not self-explanatory.
  *
- * Routes only. The panes inside the zettelkasten screen (探索, and the
- * project detail) have no address of their own, and an index that links
- * to somewhere you can't be sent is worse than one that admits the gap.
+ * Routes only — which is now all of them. 探索 used to be a pane inside the
+ * zettelkasten screen with no address of its own; it is a page like the
+ * rest, so it is listed like the rest.
  */
 
 export type PageKey =
@@ -29,6 +29,7 @@ export type PageKey =
   | "calendar"
   | "meals"
   | "money"
+  | "discovery"
   | "search"
   | "guide"
   | "settings";
@@ -55,6 +56,7 @@ export const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[]
       { key: "projects", href: "/projects" },
       { key: "meals", href: "/meals" },
       { key: "money", href: "/money" },
+      { key: "discovery", href: "/discovery" },
     ],
   },
   {

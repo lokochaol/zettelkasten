@@ -1,10 +1,21 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
-export type ZettelkastenMainView = "notes" | "projects" | "calendar" | "meals" | "money" | "discovery";
+/** The screens the bar switches between, in the order they sit in it. */
+export type ShellView = "notes" | "projects" | "calendar" | "meals" | "money" | "discovery";
+
+export const SHELL_VIEW_HREF: Record<ShellView, string> = {
+  notes: "/zettelkasten",
+  projects: "/projects",
+  calendar: "/calendar",
+  meals: "/meals",
+  money: "/money",
+  discovery: "/discovery",
+};
 
 /** Simple line-icon glyphs — no emoji, so they read consistently with the
  * rest of the HUD's monochrome/mono-label visual language across themes
@@ -95,7 +106,7 @@ function ActionBarButton({
       onClick={onClick}
       title={label}
       aria-label={label}
-      aria-pressed={active}
+      aria-current={active ? "page" : undefined}
       className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
         active
           ? "border-accent bg-accent-soft text-accent"
@@ -108,47 +119,40 @@ function ActionBarButton({
 }
 
 /**
- * A fixed, always-visible icon-button strip along the very left edge of the
- * zettelkasten screen's pane area — not a HeaderMenu entry (which is a
- * collapsed, tap-to-open overflow list) and not a real navigation either:
- * picking an icon swaps which content the pane area shows (③本来のノート／
- * プロジェクト／カレンダー) in place, without leaving this screen, and the
- * active icon stays highlighted so the current view is always visible at a
- * glance. "notes" (①②③のツェッテルカステン本体) is included here too so
- * there's always a way back to it once you've switched away.
+ * A fixed, always-visible icon strip along the very left edge of the pane
+ * area — not a HeaderMenu entry (which is a collapsed, tap-to-open overflow
+ * list), and the one place where the six everyday screens are all reachable
+ * without opening anything.
+ *
+ * It used to swap panes in place on the zettelkasten screen, which meant
+ * those screens only existed while you were standing on that one — カレンダー
+ * and 家計 had no address of their own. They are pages, so the bar navigates
+ * between them and the active icon is whichever page you are on: a bookmark,
+ * a reload and the back button all land where the bar says you are, which
+ * in-place swapping could never offer.
  */
-export function ZettelkastenSideActionBar({
-  active,
-  onSelect,
-}: {
-  active: ZettelkastenMainView;
-  onSelect: (view: ZettelkastenMainView) => void;
-}) {
+export function AppSideBar({ active }: { active: ShellView }) {
+  const router = useRouter();
   const { t } = useI18n();
   const { guard } = useUnsavedChanges();
-  // Swapping the pane content unmounts whatever editor is open in it, so an
-  // unsaved buffer gets a 保存 / 破棄 prompt before the switch happens.
-  const select = (view: ZettelkastenMainView) => guard(() => onSelect(view));
+  // Leaving a screen unmounts whatever editor is open on it, so an unsaved
+  // buffer gets a 保存 / 破棄 prompt before the navigation happens.
+  const go = (view: ShellView) => guard(() => router.push(SHELL_VIEW_HREF[view]));
+  const entries: { view: ShellView; label: string; icon: ReactNode }[] = [
+    { view: "notes", label: t.brand.zettelkasten, icon: <NotesIcon /> },
+    { view: "projects", label: t.nav.projectsLabel, icon: <ProjectsIcon /> },
+    { view: "calendar", label: t.nav.calendarLabel, icon: <CalendarIcon /> },
+    { view: "meals", label: t.nav.mealsLabel, icon: <MealsIcon /> },
+    { view: "money", label: t.nav.moneyLabel, icon: <MoneyIcon /> },
+    { view: "discovery", label: t.nav.discoveryLabel, icon: <DiscoveryIcon /> },
+  ];
   return (
     <div className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-line py-3">
-      <ActionBarButton active={active === "notes"} label={t.brand.zettelkasten} onClick={() => select("notes")}>
-        <NotesIcon />
-      </ActionBarButton>
-      <ActionBarButton active={active === "projects"} label={t.nav.projectsLabel} onClick={() => select("projects")}>
-        <ProjectsIcon />
-      </ActionBarButton>
-      <ActionBarButton active={active === "calendar"} label={t.nav.calendarLabel} onClick={() => select("calendar")}>
-        <CalendarIcon />
-      </ActionBarButton>
-      <ActionBarButton active={active === "meals"} label={t.nav.mealsLabel} onClick={() => select("meals")}>
-        <MealsIcon />
-      </ActionBarButton>
-      <ActionBarButton active={active === "money"} label={t.nav.moneyLabel} onClick={() => select("money")}>
-        <MoneyIcon />
-      </ActionBarButton>
-      <ActionBarButton active={active === "discovery"} label={t.nav.discoveryLabel} onClick={() => select("discovery")}>
-        <DiscoveryIcon />
-      </ActionBarButton>
+      {entries.map((entry) => (
+        <ActionBarButton key={entry.view} active={active === entry.view} label={entry.label} onClick={() => go(entry.view)}>
+          {entry.icon}
+        </ActionBarButton>
+      ))}
     </div>
   );
 }

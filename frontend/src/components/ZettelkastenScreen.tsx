@@ -1,8 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { PileDrill, type GapSelection } from "@/components/PileDrill";
 import { PromotionEditor, type EditableDraft } from "@/components/PromotionEditor";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
@@ -11,7 +9,6 @@ import { PermanentNoteLiteratureSection } from "@/components/PermanentNoteLitera
 import { LiteratureMemoPane } from "@/components/LiteratureMemoPane";
 import { QuickNoteInlineTimeline } from "@/components/QuickNoteInlineTimeline";
 import { LoadingBlock } from "@/components/LoadingSpinner";
-import { navigateWithViewTransition } from "@/lib/viewTransition";
 import type { DeletionImpact, GlobalOrderEntry, PermanentNoteDetail } from "@/lib/permanentNotes";
 import type { IndexEntrySummary } from "@/lib/indexEntries";
 import type { QuickNoteSummary } from "@/lib/quickNotes";
@@ -34,35 +31,27 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useBackdropDismiss } from "@/lib/useBackdropDismiss";
 import { useUnsavedChanges, useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
-import { PageIndex } from "@/components/PageIndex";
-import { LocaleToggle } from "@/components/LocaleToggle";
-import { ThemeToggle } from "@/components/ThemeToggle";
-import { HeaderMenu } from "@/components/HeaderMenu";
-import { ZettelkastenSideActionBar, type ZettelkastenMainView } from "@/components/ZettelkastenSideActionBar";
-import { ZettelkastenProjectsPane } from "@/components/ZettelkastenProjectsPane";
-import { ZettelkastenCalendarPane } from "@/components/ZettelkastenCalendarPane";
-import { MealWeekScreen } from "@/components/MealWeekScreen";
-import { MoneyScreen } from "@/components/MoneyScreen";
-import { ZettelkastenDiscoveryPane } from "@/components/ZettelkastenDiscoveryPane";
-import { ZettelkastenProjectDetailPane } from "@/components/ZettelkastenProjectDetailPane";
-import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
-import { SignOutButton } from "@/components/SignOutButton";
 import { RotateDeviceGate } from "@/components/RotateDeviceGate";
 
+/**
+ * ①②③のツェッテルカステン本体だけ。
+ *
+ * The header and the icon bar around it belong to AppShell now. This used to
+ * own both, plus every other screen as a pane it swapped in place — which is
+ * why カレンダー and 家計 had no address of their own for as long as they lived
+ * here. They are pages; this is a page; the frame is shared.
+ */
 export function ZettelkastenScreen({
   initialGlobalOrder,
   initialActiveQuickNotes,
   initialIndexEntries,
   deepLinkOpenId,
-  userEmail,
 }: {
   initialGlobalOrder: GlobalOrderEntry[];
   initialActiveQuickNotes: QuickNoteSummary[];
   initialIndexEntries: IndexEntrySummary[];
   deepLinkOpenId?: string;
-  userEmail: string;
 }) {
-  const router = useRouter();
   const { t } = useI18n();
   const [globalOrder, setGlobalOrder] = useState(initialGlobalOrder);
   const [activeQuickNotes, setActiveQuickNotes] = useState(initialActiveQuickNotes);
@@ -78,14 +67,6 @@ export function ZettelkastenScreen({
   const [indexPanelOpen, setIndexPanelOpen] = useState(false);
   const [openNoteId, setOpenNoteId] = useState<string | null>(deepLinkOpenId ?? null);
   const [col1Mode, setCol1Mode] = useState<"notes" | "literature">("notes");
-  const [mainView, setMainView] = useState<ZettelkastenMainView>("notes");
-  const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
-  const [activeProjectDate, setActiveProjectDate] = useState<string | null>(null);
-
-  function openProject(id: string, date: string | null = null) {
-    setActiveProjectId(id);
-    setActiveProjectDate(date);
-  }
   const [focusQuickNoteRequest, setFocusQuickNoteRequest] = useState<{ id: string; token: number } | null>(null);
 
   function focusQuickNote(id: string) {
@@ -203,240 +184,156 @@ export function ZettelkastenScreen({
     setActiveQuickNotes(active);
   }
 
-  function handleNavigateToScratch() {
-    navigateWithViewTransition(router, "/dash-off");
-  }
-
   return (
-    <div className="relative flex h-dvh flex-col overflow-hidden bg-bg">
+    <>
       <RotateDeviceGate />
-      <div className="flex items-center gap-3 border-b border-line px-6 py-3.5">
-        <span className="text-sm font-extrabold tracking-tight text-ink">
-          <PageIndex current="zettelkasten" />
-        </span>
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={handleNavigateToScratch}
-            className="rounded-full border border-line-strong px-3 py-1.5 font-mono text-[10.5px] text-ink-soft transition-colors hover:text-ink"
-          >
-            <span className="text-accent">←</span> {t.zettelkasten.backToScratch}
-          </button>
-          <HeaderMenu>
-            <div className="flex w-full flex-col items-end gap-1.5 border-b border-line pb-2.5">
-              <HeaderAccountBadge email={userEmail} />
-              <Link href="/settings" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-                {t.nav.settingsLabel}
-              </Link>
+      <div
+        className="grid h-full min-h-0 min-w-0 transition-[grid-template-columns] duration-400 ease-out"
+        style={{ gridTemplateColumns: editorOpen ? "1.05fr 1fr 0.7fr" : "1.3fr 0px 0.85fr" }}
+      >
+        {/* ① */}
+        <div ref={col1Ref} className="relative min-w-0 overflow-hidden border-r border-line">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+            <span className="text-accent">①</span>
+            <div className="flex gap-1 normal-case">
+              <button
+                onClick={() => setCol1Mode("notes")}
+                className={`rounded-full border px-2.5 py-1 text-[10px] transition-colors ${
+                  col1Mode === "notes"
+                    ? "border-accent bg-accent-soft text-ink"
+                    : "border-line-strong text-ink-soft hover:text-ink"
+                }`}
+              >
+                {t.zettelkasten.columnTitle}
+              </button>
+              <button
+                onClick={() => setCol1Mode("literature")}
+                className={`rounded-full border px-2.5 py-1 text-[10px] transition-colors ${
+                  col1Mode === "literature"
+                    ? "border-accent bg-accent-soft text-ink"
+                    : "border-line-strong text-ink-soft hover:text-ink"
+                }`}
+              >
+                {t.zettelkasten.literatureTabLabel}
+              </button>
             </div>
-            <button
-              onClick={() => setCol1Mode("literature")}
-              className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent"
-            >
-              {t.zettelkasten.literatureNav}
-            </button>
-            <Link href="/guide" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-              {t.nav.guideLabel}
-            </Link>
-            <LocaleToggle />
-            <ThemeToggle />
-            <SignOutButton />
-          </HeaderMenu>
-        </div>
-      </div>
+            {col1Mode === "notes" && (
+              <>
+                <span className="normal-case">{t.zettelkasten.countAll(globalOrder.length)}</span>
+                {/* Writing one straight into the Zettelkasten, with no
+                    走り書き behind it — lives here because picking its
+                    position happens in this very column. */}
+                <button
+                  onClick={() => addDraft([])}
+                  className="ml-auto rounded-full border border-line-strong px-2.5 py-1 text-[10px] text-ink-soft normal-case hover:border-accent hover:text-accent"
+                >
+                  {t.zettelkasten.addPermanentNote}
+                </button>
+                <button
+                  onClick={() => setIndexPanelOpen((v) => !v)}
+                  className="rounded-full border border-line-strong px-2.5 py-1 text-[10px] text-ink-soft normal-case hover:text-ink"
+                >
+                  {t.zettelkasten.indexToggle}
+                </button>
+              </>
+            )}
+          </div>
 
-      <div className="flex min-h-0 flex-1">
-        <ZettelkastenSideActionBar
-          active={mainView}
-          onSelect={(view) => {
-            setActiveProjectId(null);
-            setMainView(view);
-          }}
-        />
-        {activeProjectId && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
-            <ZettelkastenProjectDetailPane
-              key={activeProjectId}
-              projectId={activeProjectId}
-              initialDate={activeProjectDate}
-              onBack={() => setActiveProjectId(null)}
+          {col1Mode === "notes" && indexPanelOpen && (
+            <IndexPanel
+              entries={indexEntries}
+              onSelect={(noteId) => {
+                setOpenNoteId(noteId);
+                setIndexPanelOpen(false);
+              }}
+              onRemove={async (id) => {
+                await removeIndexEntryAction(id);
+                setIndexEntries((prev) => prev.filter((e) => e.id !== id));
+              }}
             />
-          </div>
-        )}
-        {!activeProjectId && mainView === "projects" && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
-            <ZettelkastenProjectsPane onOpenProject={(id) => openProject(id)} />
-          </div>
-        )}
-        {!activeProjectId && mainView === "calendar" && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
-            <ZettelkastenCalendarPane onOpenProject={(id) => openProject(id)} />
-          </div>
-        )}
-        {!activeProjectId && mainView === "meals" && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
-            <MealWeekScreen />
-          </div>
-        )}
-        {!activeProjectId && mainView === "money" && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto px-6 py-6">
-            <MoneyScreen />
-          </div>
-        )}
-        {!activeProjectId && mainView === "discovery" && (
-          <div className="min-h-0 min-w-0 flex-1 overflow-auto">
-            <ZettelkastenDiscoveryPane />
-          </div>
-        )}
-        {!activeProjectId && mainView === "notes" && (
-        <div
-          className="grid min-h-0 min-w-0 flex-1 transition-[grid-template-columns] duration-400 ease-out"
-          style={{ gridTemplateColumns: editorOpen ? "1.05fr 1fr 0.7fr" : "1.3fr 0px 0.85fr" }}
-        >
-          {/* ① */}
-          <div ref={col1Ref} className="relative min-w-0 overflow-hidden border-r border-line">
-            <div className="flex items-center gap-2 border-b border-line px-4 py-3 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-              <span className="text-accent">①</span>
-              <div className="flex gap-1 normal-case">
-                <button
-                  onClick={() => setCol1Mode("notes")}
-                  className={`rounded-full border px-2.5 py-1 text-[10px] transition-colors ${
-                    col1Mode === "notes"
-                      ? "border-accent bg-accent-soft text-ink"
-                      : "border-line-strong text-ink-soft hover:text-ink"
-                  }`}
-                >
-                  {t.zettelkasten.columnTitle}
-                </button>
-                <button
-                  onClick={() => setCol1Mode("literature")}
-                  className={`rounded-full border px-2.5 py-1 text-[10px] transition-colors ${
-                    col1Mode === "literature"
-                      ? "border-accent bg-accent-soft text-ink"
-                      : "border-line-strong text-ink-soft hover:text-ink"
-                  }`}
-                >
-                  {t.zettelkasten.literatureTabLabel}
-                </button>
+          )}
+
+          <div className="flex min-h-0 flex-col" style={{ height: "calc(100dvh - 130px)" }}>
+            {col1Mode === "notes" ? (
+              <div className="overflow-auto p-4">
+                <PileDrill
+                  items={globalOrder}
+                  drillPath={drillPath}
+                  onDrillPathChange={setDrillPath}
+                  columns={columns}
+                  mode={mode}
+                  onOpenNote={(id) => setOpenNoteId(id)}
+                  onSelectGap={handleSelectGap}
+                  selectedGap={activeDraft?.gap ?? null}
+                  loadContent={loadContent}
+                />
               </div>
-              {col1Mode === "notes" && (
-                <>
-                  <span className="normal-case">{t.zettelkasten.countAll(globalOrder.length)}</span>
-                  {/* Writing one straight into the Zettelkasten, with no
-                      走り書き behind it — lives here because picking its
-                      position happens in this very column. */}
-                  <button
-                    onClick={() => addDraft([])}
-                    className="ml-auto rounded-full border border-line-strong px-2.5 py-1 text-[10px] text-ink-soft normal-case hover:border-accent hover:text-accent"
-                  >
-                    {t.zettelkasten.addPermanentNote}
-                  </button>
-                  <button
-                    onClick={() => setIndexPanelOpen((v) => !v)}
-                    className="rounded-full border border-line-strong px-2.5 py-1 text-[10px] text-ink-soft normal-case hover:text-ink"
-                  >
-                    {t.zettelkasten.indexToggle}
-                  </button>
-                </>
-              )}
-            </div>
-
-            {col1Mode === "notes" && indexPanelOpen && (
-              <IndexPanel
-                entries={indexEntries}
-                onSelect={(noteId) => {
-                  setOpenNoteId(noteId);
-                  setIndexPanelOpen(false);
-                }}
-                onRemove={async (id) => {
-                  await removeIndexEntryAction(id);
-                  setIndexEntries((prev) => prev.filter((e) => e.id !== id));
-                }}
-              />
+            ) : (
+              <LiteratureMemoPane onOpenPermanentNote={(id) => setOpenNoteId(id)} onOpenQuickNote={focusQuickNote} />
             )}
-
-            <div className="flex min-h-0 flex-col" style={{ height: "calc(100dvh - 130px)" }}>
-              {col1Mode === "notes" ? (
-                <div className="overflow-auto p-4">
-                  <PileDrill
-                    items={globalOrder}
-                    drillPath={drillPath}
-                    onDrillPathChange={setDrillPath}
-                    columns={columns}
-                    mode={mode}
-                    onOpenNote={(id) => setOpenNoteId(id)}
-                    onSelectGap={handleSelectGap}
-                    selectedGap={activeDraft?.gap ?? null}
-                    loadContent={loadContent}
-                  />
-                </div>
-              ) : (
-                <LiteratureMemoPane onOpenPermanentNote={(id) => setOpenNoteId(id)} onOpenQuickNote={focusQuickNote} />
-              )}
-            </div>
-          </div>
-
-          {/* ② */}
-          <div className="min-w-0 overflow-hidden border-r border-line">
-            {editorOpen && (
-              <PromotionEditor
-                drafts={drafts}
-                onChangeDrafts={setDrafts}
-                activeDraftId={activeDraftId}
-                onSetActiveDraftId={setActiveDraftId}
-                indexEntries={indexEntries}
-                globalOrder={globalOrder}
-                onComplete={handleComplete}
-                completing={completing}
-                completeError={completeError}
-              />
-            )}
-          </div>
-
-          {/* ③ — shares view-transition-name with /dash-off's timeline container (§5).
-              The column itself doesn't scroll; only the note list inside
-              QuickNoteInlineTimeline does, anchored to the bottom by default. */}
-          <div
-            className="flex min-h-0 min-w-0 flex-col"
-            style={{ viewTransitionName: "note-timeline" } as CSSProperties}
-          >
-            <QuickNoteInlineTimeline
-              notes={activeQuickNotes}
-              onNotesChange={setActiveQuickNotes}
-              selectedIds={selectedQuickNoteIds}
-              onToggleSelect={toggleQuickNoteSelection}
-              focusRequest={focusQuickNoteRequest}
-              onDeleted={(id) =>
-                setSelectedQuickNoteIds((prev) => {
-                  if (!prev.has(id)) return prev;
-                  const next = new Set(prev);
-                  next.delete(id);
-                  return next;
-                })
-              }
-              header={
-                <>
-                  <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
-                    <span className="text-accent">③</span> {t.zettelkasten.scratchColumnHeading}
-                    {selectedQuickNoteIds.size > 0 && (
-                      <span className="ml-auto font-mono text-[10px] text-accent normal-case">
-                        {t.zettelkasten.selectedCount(selectedQuickNoteIds.size)}
-                      </span>
-                    )}
-                  </div>
-                  {selectedQuickNoteIds.size > 0 && drafts.length === 0 && (
-                    <button
-                      onClick={buildDraftFromSelection}
-                      className="btn-sheen w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-bold text-on-accent"
-                    >
-                      {t.zettelkasten.createFromSelection(selectedQuickNoteIds.size)}
-                    </button>
-                  )}
-                </>
-              }
-            />
           </div>
         </div>
-        )}
+
+        {/* ② */}
+        <div className="min-w-0 overflow-hidden border-r border-line">
+          {editorOpen && (
+            <PromotionEditor
+              drafts={drafts}
+              onChangeDrafts={setDrafts}
+              activeDraftId={activeDraftId}
+              onSetActiveDraftId={setActiveDraftId}
+              indexEntries={indexEntries}
+              globalOrder={globalOrder}
+              onComplete={handleComplete}
+              completing={completing}
+              completeError={completeError}
+            />
+          )}
+        </div>
+
+        {/* ③ — shares view-transition-name with /dash-off's timeline container (§5).
+            The column itself doesn't scroll; only the note list inside
+            QuickNoteInlineTimeline does, anchored to the bottom by default. */}
+        <div
+          className="flex min-h-0 min-w-0 flex-col"
+          style={{ viewTransitionName: "note-timeline" } as CSSProperties}
+        >
+          <QuickNoteInlineTimeline
+            notes={activeQuickNotes}
+            onNotesChange={setActiveQuickNotes}
+            selectedIds={selectedQuickNoteIds}
+            onToggleSelect={toggleQuickNoteSelection}
+            focusRequest={focusQuickNoteRequest}
+            onDeleted={(id) =>
+              setSelectedQuickNoteIds((prev) => {
+                if (!prev.has(id)) return prev;
+                const next = new Set(prev);
+                next.delete(id);
+                return next;
+              })
+            }
+            header={
+              <>
+                <div className="flex items-center gap-2 font-mono text-[10px] tracking-wider text-ink-faint uppercase">
+                  <span className="text-accent">③</span> {t.zettelkasten.scratchColumnHeading}
+                  {selectedQuickNoteIds.size > 0 && (
+                    <span className="ml-auto font-mono text-[10px] text-accent normal-case">
+                      {t.zettelkasten.selectedCount(selectedQuickNoteIds.size)}
+                    </span>
+                  )}
+                </div>
+                {selectedQuickNoteIds.size > 0 && drafts.length === 0 && (
+                  <button
+                    onClick={buildDraftFromSelection}
+                    className="btn-sheen w-full rounded-lg bg-accent px-3 py-2.5 text-xs font-bold text-on-accent"
+                  >
+                    {t.zettelkasten.createFromSelection(selectedQuickNoteIds.size)}
+                  </button>
+                )}
+              </>
+            }
+          />
+        </div>
       </div>
 
       {openNoteId && (
@@ -456,7 +353,7 @@ export function ZettelkastenScreen({
           }}
         />
       )}
-    </div>
+    </>
   );
 }
 
