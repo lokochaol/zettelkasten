@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageIndex } from "@/components/PageIndex";
 import * as literatureMemos from "@/lib/literatureMemos";
 import { requireSession } from "@/lib/session";
 import { LiteratureMemoList } from "@/components/LiteratureMemoList";
@@ -19,12 +20,7 @@ export default async function LiteraturePage() {
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
       <div className="flex w-full max-w-[720px] flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/scratch"
-            className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
-          >
-            <span className="text-accent">&lt;</span> {dict.nav.backToScratch}
-          </Link>
+          <PageIndex current="literature" />
           <HeaderMenu>
             <Link href="/guide" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
               {dict.nav.guideLabel}

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageIndex } from "@/components/PageIndex";
 import { auth } from "@/auth";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
@@ -23,12 +24,7 @@ export default async function GuidePage() {
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
       <div className="flex w-full max-w-[760px] flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/scratch"
-            className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
-          >
-            <span className="text-accent">&lt;</span> {dict.nav.backToScratch}
-          </Link>
+          <PageIndex current="guide" />
           <HeaderMenu>
             {session && (
               <>

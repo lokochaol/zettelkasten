@@ -17,16 +17,17 @@ const inter = Inter({
   subsets: ["latin"],
 });
 
-/** The home-screen/browser-tab title is fixed to the Zettelkasten name
- * (not the per-screen "Dash Off"/"走り書き" brand used inside the app) since
- * it's captured once, independent of whichever screen is open at the time. */
+/** The app has no name, so the title is the character every page of it
+ * begins with. It is captured once, independent of whichever screen is
+ * open, which is why it can't be the current path — that changes as you
+ * move, and a home-screen icon keeps whatever it was saved with. */
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getLocale();
-  const title = locale === "ja" ? "ツェッテルカステン" : "Zettelkasten";
+  const title = "/";
   const description =
     locale === "ja"
-      ? "書き留めた考えをリンクでつなぎ、育てていく個人的な知識システム。"
-      : "A personal knowledge system where your notes grow by linking to one another.";
+      ? "個人のメモ・計画・記録・追跡を1箇所にまとめる道具。"
+      : "One place for a person's notes, plans, records and tracking.";
   // Google Search Console's HTML-meta-tag verification. The DNS/domain
   // property method can't be used here: the site lives on a *.vercel.app
   // hostname, so there's no zone to add a TXT record to — it has to be a

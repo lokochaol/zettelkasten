@@ -11,7 +11,7 @@ import { DiscoveryRunToast } from "@/components/DiscoveryRunToast";
 import { DiscoveryConfirmDialog } from "@/components/DiscoveryConfirmDialog";
 import { DiscoveryStatusBanner } from "@/components/DiscoveryStatusBanner";
 import { OfflineBanner } from "@/components/OfflineBanner";
-import { AppBrand } from "@/components/AppBrand";
+import { PageIndex } from "@/components/PageIndex";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderMenu } from "@/components/HeaderMenu";
@@ -40,9 +40,7 @@ export default async function ScratchPage() {
         <DiscoveryStatusBanner message={runError.message} occurredAt={runError.occurredAt} locale={locale} t={dict} />
       )}
       <div className="flex items-center justify-between gap-3">
-        <span className="text-lg font-extrabold tracking-tight text-ink">
-          <AppBrand locale={locale} screen="scratch" />
-        </span>
+        <PageIndex current="scratch" />
         <div className="flex items-center gap-2">
           <ZettelkastenNavButton />
           <HeaderMenu>

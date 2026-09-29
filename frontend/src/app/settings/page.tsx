@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageIndex } from "@/components/PageIndex";
 import { requireSession } from "@/lib/session";
 import {
   getZoteroSettingsAction,
@@ -31,12 +32,7 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
       <div className="flex w-full max-w-[560px] flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/scratch"
-            className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
-          >
-            <span className="text-accent">&lt;</span> {dict.nav.backToScratch}
-          </Link>
+          <PageIndex current="settings" />
           <HeaderMenu>
             <Link
               href="/literature"

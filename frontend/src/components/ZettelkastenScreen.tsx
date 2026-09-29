@@ -34,7 +34,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useBackdropDismiss } from "@/lib/useBackdropDismiss";
 import { useUnsavedChanges, useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
-import { AppBrand } from "@/components/AppBrand";
+import { PageIndex } from "@/components/PageIndex";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
 import { HeaderMenu } from "@/components/HeaderMenu";
@@ -63,7 +63,7 @@ export function ZettelkastenScreen({
   userEmail: string;
 }) {
   const router = useRouter();
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const [globalOrder, setGlobalOrder] = useState(initialGlobalOrder);
   const [activeQuickNotes, setActiveQuickNotes] = useState(initialActiveQuickNotes);
   const [indexEntries, setIndexEntries] = useState(initialIndexEntries);
@@ -212,7 +212,7 @@ export function ZettelkastenScreen({
       <RotateDeviceGate />
       <div className="flex items-center gap-3 border-b border-line px-6 py-3.5">
         <span className="text-sm font-extrabold tracking-tight text-ink">
-          <AppBrand locale={locale} screen="zettelkasten" />
+          <PageIndex current="zettelkasten" />
         </span>
         <div className="ml-auto flex items-center gap-2">
           <button

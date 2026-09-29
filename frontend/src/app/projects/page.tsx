@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { PageIndex } from "@/components/PageIndex";
 import { requireSession } from "@/lib/session";
 import * as projects from "@/lib/projects";
 import { ProjectsGrid } from "@/components/ProjectsGrid";
@@ -19,12 +20,7 @@ export default async function ProjectsPage() {
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
       <div className="flex w-full flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
-          <Link
-            href="/scratch"
-            className="inline-flex w-fit items-center gap-1.5 font-mono text-xs font-medium tracking-wide text-ink-soft transition-colors hover:text-accent"
-          >
-            <span className="text-accent">&lt;</span> {dict.projects.backToScratch}
-          </Link>
+          <PageIndex current="projects" />
           <HeaderMenu>
             <div className="flex w-full flex-col items-end gap-1.5 border-b border-line pb-2.5">
               <HeaderAccountBadge email={session.user?.email ?? dict.common.unknownEmail} />

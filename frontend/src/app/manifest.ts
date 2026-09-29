@@ -8,10 +8,15 @@ import type { MetadataRoute } from "next";
  * while offline the whole time. */
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Zettelkasten",
-    short_name: "Zettelkasten",
-    description: "書き留めた考えをリンクでつなぎ、育てていく個人的な知識システム。",
-    start_url: "/scratch",
+    // No name, so the label is the root path — the one string that is
+    // true of every page and never has to be invented.
+    name: "/",
+    short_name: "/",
+    description: "個人のメモ・計画・記録・追跡を1箇所にまとめる道具。",
+    // The index, since that is now the way in — /scratch is one click
+    // from it, and a bookmark there still works for anyone who always
+    // wants to land on the timeline.
+    start_url: "/",
     display: "standalone",
     // The light palette, matching DEFAULT_THEME and the app icon — this
     // is the splash screen behind a cold launch, so a dark one would flash
