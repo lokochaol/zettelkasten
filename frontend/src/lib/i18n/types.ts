@@ -26,7 +26,18 @@ export interface Dictionary {
     heading: string;
     groups: { write: string; plan: string; find: string };
     pages: Record<
-      "home" | "scratch" | "zettelkasten" | "literature" | "projects" | "calendar" | "meals" | "money" | "search" | "guide" | "settings",
+      | "home"
+      | "scratch"
+      | "zettelkasten"
+      | "literature"
+      | "projects"
+      | "calendar"
+      | "meals"
+      | "money"
+      | "discovery"
+      | "search"
+      | "guide"
+      | "settings",
       { name: string; note: string }
     >;
   };
@@ -661,6 +672,7 @@ export interface Dictionary {
     timelineOpenDay: (date: string) => string;
     timelinePrevMonth: string;
     timelineNextMonth: string;
+    timelineThisMonth: string;
     todayBadge: string;
     backToToday: string;
     prevDay: string;

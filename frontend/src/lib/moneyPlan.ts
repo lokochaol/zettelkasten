@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { ValidationError } from "@/lib/errors";
 import * as expenses from "@/lib/expenses";
@@ -25,9 +26,27 @@ const HISTORY_MONTHS = 3;
  * so a lean plan cuts the discretionary categories first. */
 const FOOD_FLOOR_RATIO = 0.35;
 
+/**
+ * The owner's money profile, created empty the first time it's asked for.
+ *
+ * Read-then-create would be a race, and not a theoretical one: 家計 fires
+ * several reads at once when it opens, so on the very first visit they all
+ * find nothing and all try to insert. One wins and the rest get a unique
+ * violation on owner_sub — a 500 on the first look at the screen, and then
+ * never again, which is the hardest kind of bug to catch. Losing the race
+ * is fine and means the row exists, so read it back.
+ */
 export async function getProfile(ownerSub: string): Promise<MoneyProfile> {
   const row = await prisma.moneyProfile.findUnique({ where: { ownerSub } });
-  return row ?? prisma.moneyProfile.create({ data: { ownerSub } });
+  if (row) return row;
+  try {
+    return await prisma.moneyProfile.create({ data: { ownerSub } });
+  } catch (e) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
+    const created = await prisma.moneyProfile.findUnique({ where: { ownerSub } });
+    if (!created) throw e;
+    return created;
+  }
 }
 
 export interface ProfileInput {

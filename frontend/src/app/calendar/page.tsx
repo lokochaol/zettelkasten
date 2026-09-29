@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { PageIndex } from "@/components/PageIndex";
 import { requireSession } from "@/lib/session";
 import * as projectTaskNotes from "@/lib/projectTaskNotes";
 import { CalendarViewSwitch } from "@/components/CalendarViewSwitch";
@@ -7,8 +6,7 @@ import { CalendarMonthNav } from "@/components/CalendarMonthNav";
 import { CalendarTodayView } from "@/components/CalendarTodayView";
 import { CalendarTodaySection } from "@/components/CalendarTodaySection";
 import { CalendarTimelineSection } from "@/components/CalendarTimelineSection";
-import { HeaderMenu } from "@/components/HeaderMenu";
-import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
+import { AppShell } from "@/components/AppShell";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary, localeTag } from "@/lib/i18n/dictionary";
 import { formatDateKey } from "@/lib/dateKey";
@@ -30,16 +28,19 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const currentMonth = today.getUTCMonth() + 1;
   const requestedYear = Number(searchParams.year);
   const requestedMonth = Number(searchParams.month);
+  // Future months are allowed — the timeline is for planning as much as for
+  // looking back, and a day's notes are editable whether or not the day has
+  // arrived. The bounds here are only about `Date.UTC` staying meaningful,
+  // not about which months are worth looking at.
   const isValidRequestedMonth =
-    Number.isInteger(requestedYear) && Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12;
-  let viewedYear = isValidRequestedMonth ? requestedYear : currentYear;
-  let viewedMonth = isValidRequestedMonth ? requestedMonth : currentMonth;
-  // Clamp to the current month rather than trust an arbitrary future ?year=/?month= —
-  // a project can't have notes ahead of today.
-  if (viewedYear > currentYear || (viewedYear === currentYear && viewedMonth > currentMonth)) {
-    viewedYear = currentYear;
-    viewedMonth = currentMonth;
-  }
+    Number.isInteger(requestedYear) &&
+    Number.isInteger(requestedMonth) &&
+    requestedMonth >= 1 &&
+    requestedMonth <= 12 &&
+    requestedYear >= 1970 &&
+    requestedYear <= 9999;
+  const viewedYear = isValidRequestedMonth ? requestedYear : currentYear;
+  const viewedMonth = isValidRequestedMonth ? requestedMonth : currentMonth;
   const isCurrentViewedMonth = viewedYear === currentYear && viewedMonth === currentMonth;
   const monthLabel = new Date(Date.UTC(viewedYear, viewedMonth - 1, 1)).toLocaleDateString(localeTag(locale), {
     year: "numeric",
@@ -57,29 +58,8 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const selectedDayLabel = selectedDate ? formatDateKey(selectedDate, localeTag(locale)) : "";
 
   return (
-    <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
+    <AppShell view="calendar" userEmail={session.user?.email ?? dict.common.unknownEmail}>
       <div className="flex w-full flex-col gap-8">
-        <div className="flex items-center justify-between gap-3">
-          <PageIndex current="calendar" />
-          <HeaderMenu>
-            <div className="flex w-full flex-col items-end gap-1.5 border-b border-line pb-2.5">
-              <HeaderAccountBadge email={session.user?.email ?? dict.common.unknownEmail} />
-              <Link href="/settings" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-                {dict.nav.settingsLabel}
-              </Link>
-            </div>
-            <Link href="/projects" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-              {dict.nav.projectsLabel}
-            </Link>
-            <Link href="/literature" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-              {dict.nav.literatureLabel}
-            </Link>
-            <Link href="/guide" className="font-mono text-[10px] text-ink-soft transition-colors hover:text-accent">
-              {dict.nav.guideLabel}
-            </Link>
-          </HeaderMenu>
-        </div>
-
         {selectedDate ? (
           <>
             <div className="flex items-center gap-3">
@@ -112,6 +92,6 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
           </>
         )}
       </div>
-    </main>
+    </AppShell>
   );
 }

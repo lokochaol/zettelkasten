@@ -103,18 +103,26 @@ export function CalendarTimelineView({
         </div>
 
         {marks.map((mark) => {
-          const startDay = dayOfMonth(mark.rangeStart);
-          const endDay = dayOfMonth(mark.rangeEnd);
-          const barLeftPct = leftPct(startDay);
-          const barWidthPct = ((endDay - startDay + 1) / totalDays) * 100;
+          // Null in a month that hasn't happened yet — the track and its
+          // note marks still render, so a future month can be read and
+          // written into; only the "was running" bar is absent.
+          const span =
+            mark.rangeStart && mark.rangeEnd
+              ? {
+                  left: leftPct(dayOfMonth(mark.rangeStart)),
+                  width: ((dayOfMonth(mark.rangeEnd) - dayOfMonth(mark.rangeStart) + 1) / totalDays) * 100,
+                }
+              : null;
           return (
             <div key={mark.projectId} className="flex flex-col gap-1.5">
               <span className="font-mono text-[10px] text-ink-soft">{mark.projectName}</span>
               <div className="relative h-6 w-full rounded-full bg-surface-alt">
-                <div
-                  className="absolute inset-y-0 rounded-full bg-accent/25"
-                  style={{ left: `${barLeftPct}%`, width: `${barWidthPct}%` }}
-                />
+                {span && (
+                  <div
+                    className="absolute inset-y-0 rounded-full bg-accent/25"
+                    style={{ left: `${span.left}%`, width: `${span.width}%` }}
+                  />
+                )}
                 {mark.noteDates.map((dateKey) => (
                   <div
                     key={dateKey}

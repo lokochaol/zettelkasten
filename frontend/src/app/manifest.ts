@@ -10,8 +10,16 @@ export default function manifest(): MetadataRoute.Manifest {
   return {
     // No name, so the label is the root path — the one string that is
     // true of every page and never has to be invented.
-    name: "/",
-    short_name: "/",
+    //
+    // A fullwidth solidus (U+FF0F), not an ASCII "/". This name becomes a
+    // filename when the app is installed — Safari's "Add to Dock" builds a
+    // .app bundle out of it — and "/" is the path separator, so it gets
+    // replaced: the Dock offered "-". U+FF0F is an ordinary character as
+    // far as the filesystem is concerned, so it survives, and it still
+    // reads as a slash. The <title> and the header stay ASCII "/", where
+    // nothing is sanitising anything.
+    name: "／",
+    short_name: "／",
     description: "個人のメモ・計画・記録・追跡を1箇所にまとめる道具。",
     // The index, since that is now the way in — /dash-off is one click
     // from it, and a bookmark there still works for anyone who always

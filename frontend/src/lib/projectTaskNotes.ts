@@ -115,11 +115,16 @@ export async function listAllProjectsTodayNotes(ownerSub: string, dateKey: strin
 export interface ProjectTimelineMark {
   projectId: string;
   projectName: string;
-  /** This project's active span within the requested month, already clipped
-   * to [monthStart, monthEnd] and to [startedAt, today-or-closedAt] — the
-   * bar drawn for this row runs exactly from rangeStart to rangeEnd. */
-  rangeStart: string;
-  rangeEnd: string;
+  /** This project's *elapsed* span within the requested month, already
+   * clipped to [monthStart, monthEnd] and to [startedAt, today-or-closedAt]
+   * — the bar drawn for this row runs exactly from rangeStart to rangeEnd.
+   *
+   * Both are null when none of this month has happened yet: a month in the
+   * future can be looked at and written into, but nothing in it has been
+   * lived, so there is no span to draw. The row is still returned, because
+   * the point of a future month is to plan in it. */
+  rangeStart: string | null;
+  rangeEnd: string | null;
   /** Every date (YYYY-MM-DD) this project has a task note on THIS MONTH, for
    * the tappable marks — not the project's whole history, so this payload
    * stays bounded no matter how long a project has been running. */
@@ -184,18 +189,20 @@ export async function listTimelineMarks(
 
     const rangeStartDate = p.startedAt > monthStart ? p.startedAt : monthStart;
     let rangeEndDate = p.closedAt && p.closedAt < monthEnd ? p.closedAt : monthEnd;
-    // An open project's bar never extends past "today" — but clamp
-    // defensively (never below rangeStartDate) rather than dropping the
-    // row if "today" ends up earlier than the project's own start.
-    if (!p.closedAt && today < rangeEndDate) {
-      rangeEndDate = today < rangeStartDate ? rangeStartDate : today;
-    }
+    // An open project's bar never extends past "today": the bar says "this
+    // project was running on these days", which cannot be said of a day
+    // that hasn't come. In a month that is entirely ahead of today that
+    // leaves nothing to draw, and the row goes out with no span rather
+    // than with a one-day stub on the 1st, which would read as a fact
+    // about a day nobody has lived yet.
+    const hasSpan = !(!p.closedAt && today < rangeStartDate);
+    if (!p.closedAt && today < rangeEndDate) rangeEndDate = today;
 
     marks.push({
       projectId: p.id,
       projectName: p.name,
-      rangeStart: toDateKey(rangeStartDate),
-      rangeEnd: toDateKey(rangeEndDate),
+      rangeStart: hasSpan ? toDateKey(rangeStartDate) : null,
+      rangeEnd: hasSpan ? toDateKey(rangeEndDate) : null,
       noteDates: (datesByProject.get(p.id) ?? []).sort(),
     });
   }
