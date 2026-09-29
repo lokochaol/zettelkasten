@@ -8,15 +8,22 @@
  * and the generator is held to all of them at once.
  *
  * Sources for the numbers, so they can be checked rather than trusted:
- *   - Resting energy: Mifflin-St Jeor (1990), the equation with the best
- *     published accuracy for non-obese and obese adults alike.
+ *   - Resting energy: Katch-McArdle (370 + 21.6 × lean mass) when a body
+ *     composition scale has reported a body fat percentage, because with
+ *     lean mass known it is the more accurate of the two — muscle is what
+ *     burns, and two people of the same weight and height differ by
+ *     hundreds of kcal at different compositions. Mifflin-St Jeor (1990)
+ *     otherwise, which is the best of the weight-only equations.
  *   - Fibre and salt: 日本人の食事摂取基準（2020年版）, ages 18–64 —
  *     fibre 21g/day or more (men), 18g/day or more (women); salt under
  *     7.5g/day (men), under 6.5g/day (women). These are absolute daily
  *     figures in the standard, not proportions of intake.
- *   - Protein: 1.6 g per kg of body weight, the middle of the range the
- *     evidence supports for preserving muscle in a deficit; clamped to
- *     1.2–2.2 g/kg.
+ *   - Protein: 2.2 g per kg of LEAN mass when the composition is known,
+ *     clamped 1.8–2.6 — the ISSN position stand's range for an athlete in
+ *     an energy deficit, which is stated per kg of lean mass precisely
+ *     because fat tissue has no protein requirement. Without a body fat
+ *     figure it falls back to 1.6 g per kg of body weight (clamped
+ *     1.2–2.2), the best available guess when lean mass is unknown.
  *   - Fat: 25% of energy, with a floor of 0.6 g/kg so a low-calorie day
  *     can't drop fat far enough to interfere with fat-soluble vitamins.
  *
@@ -39,6 +46,9 @@ export interface BodyInput {
   activityLevel: ActivityLevel;
   /** Target kg change per week; negative loses. */
   weeklyKgDelta: number;
+  /** Lean mass from the scale, when there is one. Everything that can be
+   * computed from lean mass rather than body weight then is. */
+  leanMassKg?: number | null;
   /** Apple's active energy for the day, when the phone has sent one. Used
    * in place of the activity multiplier, since a measurement beats a
    * lookup table. */
@@ -65,6 +75,10 @@ export interface NutritionTargets {
   deficitLimited: boolean;
   /** Whether maintenance came from a measurement or an estimate. */
   energyBasis: "measured" | "estimated";
+  /** Which body the numbers were figured from. "lean" means a scale
+   * reported a composition and the targets follow lean mass; "weight"
+   * means they are the best that can be done from a weight alone. */
+  bodyBasis: "lean" | "weight";
 }
 
 const ACTIVITY_FACTOR: Record<ActivityLevel, number> = {
@@ -82,7 +96,13 @@ const ABSOLUTE_FLOOR_KCAL: Record<BiologicalSex, number> = { MALE: 1500, FEMALE:
 
 const round = (n: number) => Math.round(n);
 
-export function basalMetabolicRate(input: Pick<BodyInput, "heightCm" | "weightKg" | "age" | "sex">): number {
+export function basalMetabolicRate(
+  input: Pick<BodyInput, "heightCm" | "weightKg" | "age" | "sex"> & { leanMassKg?: number | null },
+): number {
+  // Katch-McArdle, which needs no height, age or sex term: those three
+  // exist in the other equations to guess at lean mass, and there is
+  // nothing to guess at once it has been measured.
+  if (typeof input.leanMassKg === "number" && input.leanMassKg > 0) return 370 + 21.6 * input.leanMassKg;
   const base = 10 * input.weightKg + 6.25 * input.heightCm - 5 * input.age;
   return input.sex === "MALE" ? base + 5 : base - 161;
 }
@@ -106,9 +126,16 @@ export function computeTargets(input: BodyInput): NutritionTargets {
   const targetKcal = Math.max(unclamped, Math.min(floor, maintenanceKcal));
   const deficitLimited = targetKcal > unclamped + 1;
 
-  // Protein first — it's the one that protects muscle while losing weight,
-  // so the other two are fitted around it rather than the reverse.
-  const proteinG = clamp(1.6 * input.weightKg, 1.2 * input.weightKg, 2.2 * input.weightKg);
+  // Protein first — it's the one that protects muscle while losing
+  // weight, so the other two are fitted around it rather than the
+  // reverse. Per kg of lean mass where that is known: fat tissue doesn't
+  // need feeding, and scaling protein by total weight quietly
+  // under-feeds a lean body and over-feeds a heavier one.
+  const lean = typeof input.leanMassKg === "number" && input.leanMassKg > 0 ? input.leanMassKg : null;
+  const proteinG =
+    lean === null
+      ? clamp(1.6 * input.weightKg, 1.2 * input.weightKg, 2.2 * input.weightKg)
+      : clamp(2.2 * lean, 1.8 * lean, 2.6 * lean);
   const fatG = Math.max((targetKcal * 0.25) / 9, 0.6 * input.weightKg);
   const carbKcal = targetKcal - proteinG * 4 - fatG * 9;
   const carbG = Math.max(carbKcal / 4, 0);
@@ -124,6 +151,7 @@ export function computeTargets(input: BodyInput): NutritionTargets {
     saltMaxG: input.sex === "MALE" ? 7.5 : 6.5,
     deficitLimited,
     energyBasis: hasMeasurement ? "measured" : "estimated",
+    bodyBasis: lean === null ? "weight" : "lean",
   };
 }
 

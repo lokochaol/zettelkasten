@@ -4,6 +4,7 @@ import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { ValidationError } from "@/lib/errors";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ageFromBirthYear, computeTargets, type NutritionTargets } from "@/lib/nutritionTargets";
+import * as body from "@/lib/bodyComposition";
 import type { ActivityLevel, BiologicalSex, HealthDailyMetric, HealthProfile } from "@/generated/prisma/client";
 
 export type { HealthProfile, HealthDailyMetric };
@@ -20,6 +21,9 @@ export interface ProfileInput {
   activityLevel: ActivityLevel;
   weeklyKgDelta: number;
   fallbackWeightKg: number | null;
+  /** The composition being aimed at. Once a scale is reporting, this is
+   * the goal and the weekly figure above is derived from it. */
+  targetBodyFatPercent: number | null;
 }
 
 export async function getProfile(ownerSub: string): Promise<HealthProfile | null> {
@@ -42,6 +46,15 @@ export async function upsertProfile(ownerSub: string, input: ProfileInput): Prom
   if (input.fallbackWeightKg !== null && !(input.fallbackWeightKg >= 25 && input.fallbackWeightKg <= 300)) {
     throw new ValidationError("healthProfileInvalid", "Weight must be between 25 and 300 kg");
   }
+  // Below the essential-fat line is not a goal anyone should be able to
+  // type into a meal planner. The floors are the essential body fat
+  // figures — the fat the body is built out of, not the fat it stores.
+  if (input.targetBodyFatPercent !== null) {
+    const floor = input.sex === "MALE" ? 6 : 14;
+    if (!(input.targetBodyFatPercent >= floor && input.targetBodyFatPercent <= 40)) {
+      throw new ValidationError("healthGoalTooAggressive", `Target body fat must be between ${floor}% and 40%`);
+    }
+  }
   const data = { ...input };
   return prisma.healthProfile.upsert({ where: { ownerSub }, create: { ownerSub, ...data }, update: data });
 }
@@ -54,6 +67,8 @@ export interface MetricInput {
   dateKey: string;
   weightKg?: number | null;
   activeEnergyKcal?: number | null;
+  bodyFatPercent?: number | null;
+  leanBodyMassKg?: number | null;
   steps?: number | null;
 }
 
@@ -83,6 +98,8 @@ export async function recordDailyMetric(ownerSub: string, input: MetricInput): P
   const provided = {
     ...(input.weightKg !== undefined ? { weightKg: input.weightKg } : {}),
     ...(input.activeEnergyKcal !== undefined ? { activeEnergyKcal: input.activeEnergyKcal } : {}),
+    ...(input.bodyFatPercent !== undefined ? { bodyFatPercent: input.bodyFatPercent } : {}),
+    ...(input.leanBodyMassKg !== undefined ? { leanBodyMassKg: input.leanBodyMassKg } : {}),
     ...(input.steps !== undefined ? { steps: input.steps } : {}),
   };
   return prisma.healthDailyMetric.upsert({
@@ -140,10 +157,22 @@ export async function ownerForIngestToken(token: string): Promise<string | null>
 
 /* ---------- targets ---------- */
 
+export interface CompositionView {
+  /** Averaged over a week, because a day of it is mostly water. */
+  current: body.Window;
+  trend: body.Trend;
+  band: body.Band | null;
+  targetBodyFatPercent: number | null;
+  suggested: { from: number; to: number };
+  plan: body.CompositionPlan | null;
+}
+
 export interface CurrentTargets {
   targets: NutritionTargets;
   weightKg: number;
   weightSource: "measured" | "manual";
+  /** Null until a scale reports a body fat percentage. */
+  composition: CompositionView | null;
   /** The measurement window the active-energy average came from, for the
    * UI to say what the numbers are actually based on. */
   activeEnergyDays: number;
@@ -176,6 +205,15 @@ export async function currentTargets(ownerSub: string, todayKey: string): Promis
   const energies = window.filter((m) => m.dateKey !== todayKey && m.activeEnergyKcal !== null).map((m) => m.activeEnergyKcal as number);
   const avgActive = energies.length > 0 ? energies.reduce((a, b) => a + b, 0) / energies.length : null;
 
+  const composition = await compositionFor(ownerSub, todayKey, profile);
+  // Averaged lean mass, not today's reading: the targets shouldn't move
+  // because yesterday was salty.
+  const leanMassKg = composition?.current.leanMassKg ?? null;
+  // With a composition goal, the weekly rate is worked out from the gap
+  // rather than typed in — the owner says what body they want, not how
+  // fast to lose weight.
+  const weeklyKgDelta = composition?.plan?.weeklyKgDelta ?? profile.weeklyKgDelta;
+
   return {
     targets: computeTargets({
       heightCm: profile.heightCm,
@@ -183,13 +221,67 @@ export async function currentTargets(ownerSub: string, todayKey: string): Promis
       age: ageFromBirthYear(profile.birthYear),
       sex: profile.sex,
       activityLevel: profile.activityLevel,
-      weeklyKgDelta: profile.weeklyKgDelta,
+      weeklyKgDelta,
+      leanMassKg,
       measuredActiveEnergyKcal: avgActive,
     }),
     weightKg,
     weightSource: weighed?.weightKg ? "measured" : "manual",
+    composition,
     activeEnergyDays: energies.length,
     lastSyncedDateKey: window[0]?.dateKey ?? null,
+  };
+}
+
+/** How many days of readings the trend looks back over: two weeks, so
+ * there is a week to compare against a week. */
+const COMPOSITION_WINDOW_DAYS = 14;
+
+/**
+ * The body as the scale has been seeing it.
+ *
+ * Null when no body fat percentage has ever arrived — a weight alone
+ * says nothing about composition, and this file would rather report
+ * nothing than a number it made up.
+ */
+async function compositionFor(
+  ownerSub: string,
+  todayKey: string,
+  profile: HealthProfile,
+): Promise<CompositionView | null> {
+  const rows = await prisma.healthDailyMetric.findMany({
+    where: { ownerSub, dateKey: { gt: shiftDateKey(todayKey, -COMPOSITION_WINDOW_DAYS), lte: todayKey } },
+    orderBy: { dateKey: "asc" },
+  });
+  const measurements: body.Measurement[] = rows.map((r) => ({
+    dateKey: r.dateKey,
+    weightKg: r.weightKg,
+    bodyFatPercent: r.bodyFatPercent,
+    leanBodyMassKg: r.leanBodyMassKg,
+  }));
+  const trend = body.trendOf(measurements, 7);
+  const current = trend.recent;
+  if (current.bodyFatPercent === null || current.weightKg === null || current.leanMassKg === null) return null;
+
+  const target = profile.targetBodyFatPercent;
+  return {
+    current,
+    trend,
+    band: body.bandOf(current.bodyFatPercent, profile.sex),
+    targetBodyFatPercent: target,
+    suggested: body.suggestedTarget(profile.sex),
+    plan:
+      target === null
+        ? null
+        : body.planFor(
+            {
+              weightKg: current.weightKg,
+              bodyFatPercent: current.bodyFatPercent,
+              fatMassKg: current.fatMassKg ?? 0,
+              leanMassKg: current.leanMassKg,
+            },
+            target,
+          ),
   };
 }
 

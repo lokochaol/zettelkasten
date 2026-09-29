@@ -277,9 +277,28 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
   const t = targetsNow.targets;
   const dates = Array.from({ length: DAYS_IN_PLAN }, (_, i) => shiftDateKey(weekStartDateKey, i));
 
+  const composition = targetsNow.composition;
   const brief = [
     `対象の7日間: ${dates.join(", ")}`,
     `買い物日: ${dates[0]}（この日に1回だけ買い物をする）`,
+    "",
+    ...(composition && composition.current.leanMassKg !== null
+      ? [
+          "",
+          "体組成（体組成計の直近7日平均）:",
+          `  体重 ${composition.current.weightKg?.toFixed(1)} kg / 体脂肪率 ${composition.current.bodyFatPercent?.toFixed(1)}% / 除脂肪量 ${composition.current.leanMassKg.toFixed(1)} kg`,
+          composition.targetBodyFatPercent !== null
+            ? `  目標の体脂肪率 ${composition.targetBodyFatPercent}%（${
+                composition.plan?.direction === "lose_fat"
+                  ? "脂肪を減らす局面"
+                  : composition.plan?.direction === "gain_lean"
+                    ? "除脂肪量を増やす局面"
+                    : "維持する局面"
+              }）`
+            : "",
+          "  たんぱく質の目標は除脂肪量から計算しています。筋肉を保つことが最優先で、カロリーを削るために下げてよい項目ではありません。",
+        ].filter((line) => line !== "")
+      : []),
     "",
     "1日あたりの栄養目標（毎日これを満たす）:",
     `  エネルギー ${t.targetKcal} kcal（±100 kcal 以内）`,

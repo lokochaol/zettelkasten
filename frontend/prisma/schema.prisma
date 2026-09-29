@@ -478,6 +478,11 @@ model HealthProfile {
   /// Bounded in the UI — an aggressive deficit is how a "healthy meals"
   /// app ends up recommending something unhealthy.
   weeklyKgDelta Float         @default(0) @map("weekly_kg_delta")
+  /// The body composition being aimed at, as a body fat percentage. Once
+  /// the scale is reporting, this replaces the weight goal: "athletic and
+  /// functional" is a composition, not a number on a scale — the same
+  /// 70 kg can be two very different bodies.
+  targetBodyFatPercent Float? @map("target_body_fat_percent")
   /// Weight to use until the phone starts sending one — without it the
   /// targets can't be computed at all, and making the whole feature wait
   /// on a Shortcut being set up correctly is a bad first run.
@@ -501,6 +506,15 @@ model HealthDailyMetric {
   /// Apple's "active energy" — movement only, excluding resting burn, which
   /// is why the TDEE calculation adds it to BMR rather than replacing it.
   activeEnergyKcal  Float?   @map("active_energy_kcal")
+  /// From a body composition scale, through Apple Health. The reason the
+  /// targets can stop guessing: with a body fat percentage the lean mass
+  /// is known, and lean mass is what protein and resting burn actually
+  /// scale with — body weight is only ever a proxy for it.
+  bodyFatPercent    Float?   @map("body_fat_percent")
+  /// Sent when the scale reports it directly. Otherwise derived from
+  /// weight and body fat, which is the same arithmetic — kept separate so
+  /// a measured figure is never overwritten by a computed one.
+  leanBodyMassKg    Float?   @map("lean_body_mass_kg")
   steps             Int?
   receivedAt        DateTime @default(now()) @map("received_at")
 
