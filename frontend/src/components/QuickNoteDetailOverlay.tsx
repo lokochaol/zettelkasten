@@ -5,7 +5,7 @@ import { LoadingBlock } from "@/components/LoadingSpinner";
 import { QuickNoteContentSection } from "@/components/QuickNoteContentSection";
 import { QuickNoteLiteratureSection } from "@/components/QuickNoteLiteratureSection";
 import { QuickNoteProjectSection } from "@/components/QuickNoteProjectSection";
-import { getQuickNoteDetailAction } from "@/app/scratch/actions";
+import { getQuickNoteDetailAction } from "@/app/dash-off/actions";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
@@ -24,10 +24,10 @@ function formatDate(date: Date, locale: Locale) {
 }
 
 /**
- * The same layout /scratch/[id] uses (source/date header, content,
+ * The same layout /dash-off/[id] uses (source/date header, content,
  * literature, and project sections) rendered as an overlay inside
  * ZettelkastenScreen's ③ column instead — editing a 走り書き from here never
- * navigates to the real /scratch/[id] URL, mirroring how NoteDetailOverlay
+ * navigates to the real /dash-off/[id] URL, mirroring how NoteDetailOverlay
  * already opens a PermanentNote in-place rather than routing to it.
  */
 export function QuickNoteDetailOverlay({

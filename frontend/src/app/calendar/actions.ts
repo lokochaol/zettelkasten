@@ -202,7 +202,7 @@ export async function upsertCalendarTaskNoteAction(
 export async function createQuickNoteForProjectAction(projectId: string): Promise<QuickNoteDetail> {
   const ownerSub = await requireOwnerSub();
   const note = await quickNotes.create(ownerSub, "SCRATCH", undefined, projectId);
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   revalidatePath(`/projects/${projectId}`);
   return note;
 }

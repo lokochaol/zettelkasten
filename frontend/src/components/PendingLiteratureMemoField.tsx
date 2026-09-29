@@ -17,7 +17,7 @@ function urlOf(selection: LiteratureSelection): string | null {
 
 /**
  * 文献メモ linking for a not-yet-created 走り書き — same picker
- * (LiteratureMemoPicker) as the /scratch/[id] detail page's
+ * (LiteratureMemoPicker) as the /dash-off/[id] detail page's
  * LiteratureMemoField, but there's no note id yet to persist a link
  * against, so this just holds the picked LiteratureSelection as plain local
  * state. NewQuickNoteOverlay passes it to createQuickNoteWithContentAction,

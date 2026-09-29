@@ -9,7 +9,7 @@ export interface TimelineRow {
 
 /**
  * The vertical dot+line timeline visual, extracted from the original
- * src/app/page.tsx home layout. Shared by /scratch's active-quick-note
+ * src/app/page.tsx home layout. Shared by /dash-off's active-quick-note
  * timeline and PileDrill's flat (<=FLAT_THRESHOLD) view so a fully drilled
  * pile reads exactly like the 走り書き timeline.
  */

@@ -9,7 +9,7 @@ import { Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 const KIND_HREF: Record<UnifiedSearchResult["kind"], (id: string) => string> = {
-  QUICK_NOTE: (id) => `/scratch/${id}`,
+  QUICK_NOTE: (id) => `/dash-off/${id}`,
   PERMANENT_NOTE: (id) => `/zettelkasten?open=${id}`,
 };
 

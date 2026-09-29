@@ -3,7 +3,7 @@ import type { Dictionary } from "@/lib/i18n/types";
 import { localeTag } from "@/lib/i18n/dictionary";
 import type { Locale } from "@/lib/i18n/types";
 
-/** Shown at the top of /scratch when the most recent discovery batch run
+/** Shown at the top of /dash-off when the most recent discovery batch run
  * (manual trigger or cron) failed outright — expired/invalid API key, rate
  * limit, etc. See discovery.getRunStatus / DiscoveryRunStatus. A run
  * that simply found nothing is not an error and never shows this. */

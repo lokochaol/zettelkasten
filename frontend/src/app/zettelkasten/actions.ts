@@ -127,7 +127,7 @@ export async function completePromotionAction(
   const locale = await getLocale();
   try {
     const result = await promotion.completePromotion(ownerSub, input, locale);
-    revalidatePath("/scratch");
+    revalidatePath("/dash-off");
     revalidatePath("/zettelkasten");
     return { result };
   } catch (e) {

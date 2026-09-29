@@ -5,7 +5,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 /**
  * Small corner button (outside the note card, top-right) that expands into
- * an 編集/削除 menu — used on both /scratch's timeline and Zettelkasten's ③
+ * an 編集/削除 menu — used on both /dash-off's timeline and Zettelkasten's ③
  * column so every quick-note card has the same action entry point. Deliberately
  * overlaps outside the card rather than sitting inside it; the list
  * containers that render these cards reserve horizontal padding on both

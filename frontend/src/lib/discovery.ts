@@ -88,7 +88,7 @@ export type DiscoveryErrorCode = "authError" | "rateLimitError" | "apiError" | "
 /** Thrown by a provider call when the request itself failed outright (bad
  * key, rate limit, etc.) — as opposed to succeeding but finding nothing,
  * which just resolves to []. runForActiveNotes catches this to record a
- * DiscoveryRunStatus the /scratch page can surface as a banner. */
+ * DiscoveryRunStatus the /dash-off page can surface as a banner. */
 export class DiscoveryProviderError extends Error {
   code: DiscoveryErrorCode;
   status: number | null;
@@ -289,7 +289,7 @@ async function findViaGoogle(apiKey: string, noteText: string): Promise<Discover
  * credential configured resolves to no findings (that's a normal,
  * unconfigured state, not an error). A request that fails outright throws
  * DiscoveryProviderError — runForActiveNotes is what catches that and
- * records it as a DiscoveryRunStatus for the /scratch banner; unparseable
+ * records it as a DiscoveryRunStatus for the /dash-off banner; unparseable
  * output still just yields no findings (see parseFindings).
  */
 export async function findCandidatesForNote(ownerSub: string, noteText: string): Promise<DiscoveryFinding[]> {
@@ -356,7 +356,7 @@ export interface DiscoveryRunStatusSummary {
   lastErrorAt: Date | null;
 }
 
-/** For the /scratch banner — null means "never run yet" (e.g. no AI
+/** For the /dash-off banner — null means "never run yet" (e.g. no AI
  * provider has ever been configured, or no discovery run has fired). */
 export async function getRunStatus(ownerSub: string): Promise<DiscoveryRunStatusSummary | null> {
   const row = await prisma.discoveryRunStatus.findUnique({ where: { ownerSub } });
@@ -556,7 +556,7 @@ export async function resolveLiteratureForCandidate(
 }
 
 /** Creates a new QuickNote already linked to the candidate's (resolved)
- * literature memo, and lands it on the real /scratch/[id] editor — the
+ * literature memo, and lands it on the real /dash-off/[id] editor — the
  * literature link needs that page's dedicated section, so unlike
  * NewQuickNoteOverlay's compose-then-save flow, this one still
  * creates first and navigates to edit. */

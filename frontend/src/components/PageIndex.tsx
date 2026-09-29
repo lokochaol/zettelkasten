@@ -43,7 +43,7 @@ export const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[]
   {
     titleKey: "write",
     entries: [
-      { key: "scratch", href: "/scratch" },
+      { key: "scratch", href: "/dash-off" },
       { key: "zettelkasten", href: "/zettelkasten" },
       { key: "literature", href: "/literature" },
     ],

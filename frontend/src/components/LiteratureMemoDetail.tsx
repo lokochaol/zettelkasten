@@ -138,7 +138,7 @@ export function LiteratureMemoDetail({ initialDetail }: { initialDetail: Literat
             {detail.quickNotes.map((n) => (
               <Link
                 key={n.id}
-                href={`/scratch/${n.id}`}
+                href={`/dash-off/${n.id}`}
                 className="rounded-lg border border-line bg-surface-alt px-3 py-2 text-sm text-ink transition-colors hover:border-accent/60"
               >
                 {n.preview || t.common.noContent}

@@ -4,7 +4,7 @@
 
 **https://word-log-two.vercel.app/**
 
-入り口は索引。書き始めるなら [/scratch](https://word-log-two.vercel.app/scratch)(走り書き)、考えを育てるなら [/zettelkasten](https://word-log-two.vercel.app/zettelkasten)、手法そのものの解説は [/guide](https://word-log-two.vercel.app/guide)。Googleログインが必要で、中身はログインしたアカウントごとに分かれる。
+入り口は索引。書き始めるなら [/dash-off](https://word-log-two.vercel.app/dash-off)(走り書き)、考えを育てるなら [/zettelkasten](https://word-log-two.vercel.app/zettelkasten)、手法そのものの解説は [/guide](https://word-log-two.vercel.app/guide)。Googleログインが必要で、中身はログインしたアカウントごとに分かれる。
 
 書く側の中心にあるのはニクラス・ルーマンの**ツェッテルカステン**(Zettelkasten、ドイツ語で「メモ箱」)で、そこに計画(プロジェクト・献立・家計)と記録(タスク・食事の実績・体組成・支出)が同じ日付の背骨に乗っている。
 
@@ -98,8 +98,8 @@ npx prisma migrate dev --name <変更内容>
 ## 画面
 
 - `/` — 全ページの索引。各ページのパスと一行の説明が並ぶ。ヘッダの左上は常に現在のパスで、押すと同じ索引が開く。
-- `/scratch` — 走り書きのタイムライン。書いた順に並び、その場で追記できる。各メモには探索レールが見つけた候補がぶら下がる。
-- `/scratch/[id]` — 走り書きの詳細。本文、文献メモの紐付け、プロジェクトの紐付け。
+- `/dash-off` — 走り書きのタイムライン。書いた順に並び、その場で追記できる。各メモには探索レールが見つけた候補がぶら下がる。
+- `/dash-off/[id]` — 走り書きの詳細。本文、文献メモの紐付け、プロジェクトの紐付け。
 - `/zettelkasten` — 本体の3ペイン画面。①永久保存版メモの「山」をドリルダウンして保存位置(既存の2件のあいだ)を選ぶ、②昇格エディタ、③走り書き一覧。少数の索引エントリはここから登録・参照する。一番左の固定アクションバーでプロジェクト/カレンダーに切り替わり、詳細やメモの編集もこの画面から出ずに開く。
 - `/literature`, `/literature/[id]` — 文献メモの一覧と詳細。Zoteroから書誌情報を検索して取り込める。
 - `/projects`, `/projects/[id]` — プロジェクトの一覧と詳細(目標ラダー、日毎のタスクメモ、紐づいたメモ、プロジェクトを閉じる操作)。

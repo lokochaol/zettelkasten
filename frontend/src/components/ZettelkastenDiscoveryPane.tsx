@@ -7,7 +7,7 @@ import {
   getDiscoveryScheduleAction,
   saveDiscoveryScheduleAction,
   runDiscoveryAction,
-} from "@/app/scratch/actions";
+} from "@/app/dash-off/actions";
 import { LoadingBlock, Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { DiscoveryNoteRow, DiscoverySchedule } from "@/lib/discovery";

@@ -67,7 +67,7 @@ export async function closeProjectAction(id: string): Promise<ProjectDetail> {
   const detail = await projects.close(ownerSub, id);
   revalidatePath(`/projects/${id}`);
   revalidatePath("/projects");
-  revalidatePath("/scratch");
+  revalidatePath("/dash-off");
   revalidatePath("/calendar");
   return detail;
 }

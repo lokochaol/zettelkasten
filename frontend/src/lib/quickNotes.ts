@@ -13,7 +13,7 @@ export interface QuickNoteSummary {
   /** First non-blank line of content, for a one-line summary in timelines/pickers. */
   preview: string;
   hasLiterature: boolean;
-  /** Linked LiteratureMemo's citation, if any — shown inline on the /scratch timeline card. */
+  /** Linked LiteratureMemo's citation, if any — shown inline on the /dash-off timeline card. */
   literatureCitation: string | null;
 }
 

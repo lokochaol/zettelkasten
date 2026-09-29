@@ -19,7 +19,7 @@ function previewFrom(content: string): string {
  * を一覧表示する" — every QuickNote/PermanentNote ever linked to this
  * project, both still-active and (for QuickNote) archived-by-project-close.
  * Opening a QuickNote shows it in QuickNoteDetailOverlay in place — never a
- * real navigation to /scratch/[id] — the same pattern the Zettelkasten
+ * real navigation to /dash-off/[id] — the same pattern the Zettelkasten
  * screen's own 走り書き list uses. Also lets you create a new QuickNote
  * already linked to this project directly from here (reusing the same
  * createQuickNoteForProjectAction the Calendar project cards use). */
