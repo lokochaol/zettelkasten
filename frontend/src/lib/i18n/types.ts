@@ -661,6 +661,7 @@ export interface Dictionary {
     timelineOpenDay: (date: string) => string;
     timelinePrevMonth: string;
     timelineNextMonth: string;
+    timelineThisMonth: string;
     todayBadge: string;
     backToToday: string;
     prevDay: string;

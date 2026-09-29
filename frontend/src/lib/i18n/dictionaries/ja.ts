@@ -675,6 +675,7 @@ export const ja: Dictionary = {
     timelineOpenDay: (date) => `${date}のメモを開く`,
     timelinePrevMonth: "前の月",
     timelineNextMonth: "次の月",
+    timelineThisMonth: "今月",
     todayBadge: "今日",
     backToToday: "今日に戻る",
     prevDay: "前の日",

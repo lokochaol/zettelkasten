@@ -676,6 +676,7 @@ export const en: Dictionary = {
     timelineOpenDay: (date) => `Open notes for ${date}`,
     timelinePrevMonth: "Previous month",
     timelineNextMonth: "Next month",
+    timelineThisMonth: "This month",
     todayBadge: "Today",
     backToToday: "Back to today",
     prevDay: "Previous day",

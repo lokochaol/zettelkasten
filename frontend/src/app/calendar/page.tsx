@@ -30,16 +30,19 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const currentMonth = today.getUTCMonth() + 1;
   const requestedYear = Number(searchParams.year);
   const requestedMonth = Number(searchParams.month);
+  // Future months are allowed — the timeline is for planning as much as for
+  // looking back, and a day's notes are editable whether or not the day has
+  // arrived. The bounds here are only about `Date.UTC` staying meaningful,
+  // not about which months are worth looking at.
   const isValidRequestedMonth =
-    Number.isInteger(requestedYear) && Number.isInteger(requestedMonth) && requestedMonth >= 1 && requestedMonth <= 12;
-  let viewedYear = isValidRequestedMonth ? requestedYear : currentYear;
-  let viewedMonth = isValidRequestedMonth ? requestedMonth : currentMonth;
-  // Clamp to the current month rather than trust an arbitrary future ?year=/?month= —
-  // a project can't have notes ahead of today.
-  if (viewedYear > currentYear || (viewedYear === currentYear && viewedMonth > currentMonth)) {
-    viewedYear = currentYear;
-    viewedMonth = currentMonth;
-  }
+    Number.isInteger(requestedYear) &&
+    Number.isInteger(requestedMonth) &&
+    requestedMonth >= 1 &&
+    requestedMonth <= 12 &&
+    requestedYear >= 1970 &&
+    requestedYear <= 9999;
+  const viewedYear = isValidRequestedMonth ? requestedYear : currentYear;
+  const viewedMonth = isValidRequestedMonth ? requestedMonth : currentMonth;
   const isCurrentViewedMonth = viewedYear === currentYear && viewedMonth === currentMonth;
   const monthLabel = new Date(Date.UTC(viewedYear, viewedMonth - 1, 1)).toLocaleDateString(localeTag(locale), {
     year: "numeric",

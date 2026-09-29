@@ -130,12 +130,22 @@ export function ZettelkastenCalendarPane({ onOpenProject }: { onOpenProject: (pr
               <h1 className="text-lg font-extrabold tracking-tight text-ink">{monthLabel}</h1>
               <button
                 onClick={() => shiftMonth(1)}
-                disabled={isCurrentViewedMonth}
                 aria-label={t.calendar.timelineNextMonth}
-                className="flex h-6 w-6 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-surface-alt hover:text-accent disabled:opacity-30 disabled:hover:bg-transparent"
+                className="flex h-6 w-6 items-center justify-center rounded-full text-ink-soft transition-colors hover:bg-surface-alt hover:text-accent"
               >
                 ›
               </button>
+              {!isCurrentViewedMonth && (
+                <button
+                  onClick={() => {
+                    setViewedYear(currentYear);
+                    setViewedMonth(currentMonth);
+                  }}
+                  className="rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent"
+                >
+                  {t.calendar.timelineThisMonth}
+                </button>
+              )}
             </div>
             {viewSwitch}
           </div>
