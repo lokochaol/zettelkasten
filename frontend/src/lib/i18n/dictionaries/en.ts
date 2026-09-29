@@ -5,6 +5,22 @@ export const en: Dictionary = {
     scratch: "Dash Off",
     zettelkasten: "Zettelkasten",
   },
+  pageIndex: {
+    heading: "Index of pages",
+    groups: { write: "Write", plan: "Plan and record", find: "Find and adjust" },
+    pages: {
+      scratch: { name: "Dash Off", note: "Whatever comes to mind, in the order it arrives. The way in." },
+      zettelkasten: { name: "Zettelkasten", note: "Rewrite scratch notes as permanent ones, filed between the notes they belong with." },
+      literature: { name: "Literature notes", note: "Books and papers in your own words. Zotero can fill in the citation." },
+      projects: { name: "Projects", note: "The ladder from the final goal down to today's, and each day's task note." },
+      calendar: { name: "Calendar", note: "The day's shape, open tasks, meals and spending. A month timeline too." },
+      meals: { name: "Meals", note: "A week of meals, one shopping trip, batch cooking, and the Coop Deli proposal." },
+      money: { name: "Money", note: "This month's plan against actuals, the year ahead, weekly advice, statement import." },
+      search: { name: "Search", note: "Across scratch and permanent notes, narrowing as you type." },
+      guide: { name: "Guide", note: "The Zettelkasten method, and how this app maps onto it." },
+      settings: { name: "Settings", note: "AI key, Google Calendar, the health intake and goal, display preferences." },
+    },
+  },
   common: {
     save: "Save",
     saving: "Saving…",

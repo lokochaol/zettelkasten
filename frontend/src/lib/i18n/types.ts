@@ -22,6 +22,14 @@ export interface Dictionary {
     scratch: string;
     zettelkasten: string;
   };
+  pageIndex: {
+    heading: string;
+    groups: { write: string; plan: string; find: string };
+    pages: Record<
+      "scratch" | "zettelkasten" | "literature" | "projects" | "calendar" | "meals" | "money" | "search" | "guide" | "settings",
+      { name: string; note: string }
+    >;
+  };
   common: {
     save: string;
     saving: string;

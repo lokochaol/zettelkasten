@@ -5,6 +5,22 @@ export const ja: Dictionary = {
     scratch: "走り書き",
     zettelkasten: "ツェッテルカステン",
   },
+  pageIndex: {
+    heading: "ページの索引",
+    groups: { write: "書く", plan: "組む・記録する", find: "探す・整える" },
+    pages: {
+      scratch: { name: "走り書き", note: "思いついた順に書き留める場所。ここが入り口。" },
+      zettelkasten: { name: "ツェッテルカステン", note: "走り書きを永久保存版メモに書き直し、既存のメモのあいだに置く。" },
+      literature: { name: "文献メモ", note: "本や論文を自分の言葉で要約して残す。Zoteroから取り込める。" },
+      projects: { name: "プロジェクト", note: "最終目標から1日の目標までの梯子と、日毎のタスクメモ。" },
+      calendar: { name: "カレンダー", note: "今日の流れ、未完了のタスク、食事、支出。月のタイムラインにも切り替わる。" },
+      meals: { name: "献立", note: "1週間の献立と買い物リスト、作り置きの配分、コープデリの注文案。" },
+      money: { name: "家計", note: "今月の計画と実績、1年の見通し、週1回の助言、明細CSVの取り込み。" },
+      search: { name: "検索", note: "走り書きと永久保存版メモを横断して、打ちながら絞り込む。" },
+      guide: { name: "ガイド", note: "ツェッテルカステンという手法と、このアプリでの対応関係。" },
+      settings: { name: "設定", note: "AIのキー、Googleカレンダー、体組成の受け口と目標、表示の設定。" },
+    },
+  },
   common: {
     save: "保存",
     saving: "保存中…",
