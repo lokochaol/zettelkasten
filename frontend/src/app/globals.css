@@ -68,7 +68,22 @@ body {
   color: var(--color-ink);
 }
 
-@media (pointer: fine) {
+/* Which input the device is being driven by — not which device it is.
+   `mouse` is a primary pointer that can hover and aim finely: a mouse or a
+   trackpad. `touch` is the exact complement — fingers, pens, and anything
+   else — so every device lands in one or the other and never neither.
+
+   Asked of the input, not of the user agent: a touchscreen laptop driven by
+   its trackpad should keep the desktop UI, and a narrow desktop window is
+   still a mouse. Anything revealed on hover must use `mouse:` to hide it,
+   so that on touch — where nothing ever hovers — it is simply shown. */
+@custom-variant mouse (@media (hover: hover) and (pointer: fine));
+@custom-variant touch (@media not all and (hover: hover) and (pointer: fine));
+
+/* The drawn cursor (CustomCursor) replaces the system one only under the
+   same condition it draws itself — any mismatch leaves either two cursors
+   or none. */
+@media (hover: hover) and (pointer: fine) {
   body {
     cursor: none;
   }

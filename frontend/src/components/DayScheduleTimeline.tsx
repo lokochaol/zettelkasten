@@ -234,7 +234,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                       <p className="min-w-0 flex-1 truncate text-[11.5px] leading-tight font-semibold text-ink">{b.title}</p>
                       <button
                         onClick={() => removeBlock(b.id)}
-                        className="shrink-0 font-mono text-[9px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent"
+                        className="shrink-0 font-mono text-[9px] text-ink-faint transition-opacity mouse:opacity-0 group-hover:opacity-100 hover:text-accent touch:px-1.5"
                       >
                         {t.common.delete}
                       </button>

@@ -184,7 +184,7 @@ export function MoneyPlanPanel({
               <span className="font-mono text-[11px] text-ink">¥{c.monthlyYen.toLocaleString()}</span>
               <button
                 onClick={() => run(() => removeCommitmentAction(c.id, todayKey))}
-                className="font-mono text-[9px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent"
+                className="font-mono text-[9px] text-ink-faint transition-opacity mouse:opacity-0 group-hover:opacity-100 hover:text-accent touch:-my-1 touch:px-1.5 touch:py-1 touch:text-[10.5px]"
               >
                 {t.common.delete}
               </button>
@@ -215,7 +215,7 @@ export function MoneyPlanPanel({
                 </span>
                 <button
                   onClick={() => run(() => removeGoalAction(g.id, todayKey))}
-                  className="font-mono text-[9px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent"
+                  className="font-mono text-[9px] text-ink-faint transition-opacity mouse:opacity-0 group-hover:opacity-100 hover:text-accent touch:-my-1 touch:px-1.5 touch:py-1 touch:text-[10.5px]"
                 >
                   {t.common.delete}
                 </button>

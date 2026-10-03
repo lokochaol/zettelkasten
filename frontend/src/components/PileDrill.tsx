@@ -225,7 +225,7 @@ function GapSlot({
       />
       <span
         className={`absolute rounded-sm bg-surface px-1.5 font-mono text-[9px] ${
-          chosen ? "text-accent opacity-100" : "text-ink-faint opacity-0 group-hover:opacity-100"
+          chosen ? "text-accent opacity-100" : "text-ink-faint mouse:opacity-0 group-hover:opacity-100"
         }`}
       >
         {chosen ? t.zettelkasten.gapSlotChosen : t.zettelkasten.gapSlotSave}

@@ -103,7 +103,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
               <span className="font-mono text-[11px] text-ink">¥{e.amountYen.toLocaleString()}</span>
               <button
                 onClick={() => startTransition(async () => setView(await removeExpenseAction(e.id, dateKey)))}
-                className="font-mono text-[9px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100 hover:text-accent"
+                className="font-mono text-[9px] text-ink-faint transition-opacity mouse:opacity-0 group-hover:opacity-100 hover:text-accent touch:-my-1 touch:px-1.5 touch:py-1 touch:text-[10.5px]"
               >
                 {t.common.delete}
               </button>

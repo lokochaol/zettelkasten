@@ -70,16 +70,32 @@ export function MoneyScreen() {
  * Scaled to the largest month rather than to a fixed ceiling: the point
  * is the shape of the year — which months run hot — and a fixed axis
  * would flatten that for anyone whose spending is steady.
+ *
+ * A month's amount shows on hover with a mouse, and on tap otherwise:
+ * showing all twelve at once would overlap on a phone, and on touch there
+ * is no hover to reveal them.
  */
 function MonthlyTrend({ months, heading, note }: { months: MonthTotal[]; heading: string; note: string }) {
   const peak = Math.max(1, ...months.map((m) => m.totalYen));
+  const [picked, setPicked] = useState<string | null>(null);
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
       <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{heading}</p>
       <div className="flex h-28 items-end gap-1.5">
         {months.map((m) => (
-          <div key={m.month} className="group flex h-full min-w-0 flex-1 flex-col items-center gap-1">
-            <span className="font-mono text-[8.5px] text-ink-faint opacity-0 transition-opacity group-hover:opacity-100">
+          <button
+            key={m.month}
+            type="button"
+            onClick={() => setPicked((current) => (current === m.month ? null : m.month))}
+            aria-label={`${m.month} ¥${m.totalYen.toLocaleString()}`}
+            aria-pressed={picked === m.month}
+            className="group flex h-full min-w-0 flex-1 flex-col items-center gap-1"
+          >
+            <span
+              className={`font-mono text-[8.5px] whitespace-nowrap text-ink-faint transition-opacity group-hover:opacity-100 ${
+                picked === m.month ? "opacity-100" : "opacity-0"
+              }`}
+            >
               ¥{m.totalYen.toLocaleString()}
             </span>
             <div className="flex w-full flex-1 flex-col justify-end">
@@ -89,8 +105,8 @@ function MonthlyTrend({ months, heading, note }: { months: MonthTotal[]; heading
                 title={`${m.month} ¥${m.totalYen.toLocaleString()}`}
               />
             </div>
-            <span className="font-mono text-[8.5px] text-ink-faint">{m.month.slice(5)}</span>
-          </div>
+            <span className={`font-mono text-[8.5px] ${picked === m.month ? "text-accent" : "text-ink-faint"}`}>{m.month.slice(5)}</span>
+          </button>
         ))}
       </div>
       <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{note}</p>
