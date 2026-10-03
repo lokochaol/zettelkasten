@@ -1,15 +1,26 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useHasMouse } from "@/lib/pointer";
 
 const INTERACTIVE_SELECTOR = "a, button, input, textarea, [role='button']";
 
+/**
+ * The drawn cursor, for a mouse or trackpad only.
+ *
+ * Not rendered at all on touch. It used to be shown on any screen 768px or
+ * wider while only ever being moved by mouse events, so on a tablet the dot
+ * and ring sat in the top-left corner for good. Whether to draw it now
+ * follows the input (see src/lib/pointer.ts), the same condition under which
+ * globals.css hides the system cursor.
+ */
 export function CustomCursor() {
+  const hasMouse = useHasMouse();
   const dotRef = useRef<HTMLDivElement>(null);
   const ringRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!window.matchMedia("(pointer: fine)").matches) return;
+    if (!hasMouse) return;
 
     const dot = dotRef.current;
     const ring = ringRef.current;
@@ -25,6 +36,10 @@ export function CustomCursor() {
     function onMove(e: MouseEvent) {
       mouseX = e.clientX;
       mouseY = e.clientY;
+      // Hidden until the pointer has a position: before the first move it
+      // would be drawn at (0, 0), the top-left corner.
+      dot!.style.opacity = "1";
+      ring!.style.opacity = "1";
       dot!.style.transform = `translate(${mouseX}px, ${mouseY}px) translate(-50%, -50%)`;
 
       const target = e.target as Element | null;
@@ -59,19 +74,21 @@ export function CustomCursor() {
       window.removeEventListener("mousedown", onDown);
       cancelAnimationFrame(raf);
     };
-  }, []);
+  }, [hasMouse]);
+
+  if (!hasMouse) return null;
 
   return (
-    <div className="pointer-events-none fixed inset-0 z-[9999] hidden md:block" aria-hidden="true">
+    <div className="pointer-events-none fixed inset-0 z-[9999]" aria-hidden="true">
       <div
         ref={dotRef}
         className="fixed top-0 left-0 h-1.5 w-1.5 rounded-full bg-accent"
-        style={{ transform: "translate(-50%, -50%)" }}
+        style={{ transform: "translate(-50%, -50%)", opacity: 0 }}
       />
       <div
         ref={ringRef}
         className="fixed top-0 left-0 h-7 w-7 rounded-full border transition-[width,height,border-color] duration-150 ease-out"
-        style={{ transform: "translate(-50%, -50%)" }}
+        style={{ transform: "translate(-50%, -50%)", opacity: 0 }}
       />
     </div>
   );
