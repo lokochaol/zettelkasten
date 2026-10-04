@@ -1,10 +1,26 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
-/** Generic modal confirmation, e.g. "Add to index?" (§9's one genuinely new interaction primitive). */
+/**
+ * Generic modal confirmation, e.g. "Add to index?" (§9's one genuinely new
+ * interaction primitive).
+ *
+ * Rendered into <body> and fixed to the viewport, so it covers the screen
+ * whatever opened it. It used to be `absolute inset-0`, which only covers
+ * the nearest positioned ancestor: fine inside a modal, but opened from
+ * a plain button — プロジェクトを閉じる sits in a `relative` box the size of
+ * the button — the 300px card was centred in that box and squeezed into a
+ * column at the edge of the page.
+ *
+ * React still treats it as a child of whatever rendered it, so clicks inside
+ * it bubble up the component tree as before. That's safe for the overlays it
+ * opens from: their backdrops only dismiss on a press and release on the
+ * backdrop itself (useBackdropDismiss).
+ */
 export function ConfirmDialog({
   open,
   title,
@@ -30,14 +46,30 @@ export function ConfirmDialog({
   confirmPending?: boolean;
 }) {
   const { t } = useI18n();
-  if (!open) return null;
+
+  // Esc means "no", as it does for every other dialog on the platform.
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onCancel();
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open, onCancel]);
+
+  if (!open || typeof document === "undefined") return null;
 
   const resolvedConfirmLabel = confirmLabel ?? t.confirmDialog.confirmLabel;
   const resolvedCancelLabel = cancelLabel ?? t.confirmDialog.cancelLabel;
 
-  return (
-    <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
-      <div className="w-[300px] rounded-xl border border-accent/40 bg-surface p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]">
+  return createPortal(
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-label={title}
+        className="w-[300px] max-w-full rounded-xl border border-accent/40 bg-surface p-4 shadow-[0_20px_50px_-20px_rgba(0,0,0,0.8)]"
+      >
         <p className="text-sm font-bold text-ink">{title}</p>
         {warning && (
           <p className="mt-2 mb-4 rounded-r-md border-l-2 border-accent bg-accent-soft px-2.5 py-2 text-xs leading-relaxed text-ink-soft">
@@ -62,6 +94,7 @@ export function ConfirmDialog({
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
