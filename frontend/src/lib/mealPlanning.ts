@@ -1,3 +1,4 @@
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { askForJson, AiJsonError } from "@/lib/aiJson";
 import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
@@ -14,10 +15,21 @@ const DAYS_IN_PLAN = 7;
 
 /* ---------- preferences ---------- */
 
+/** The owner's meal preferences, created with defaults the first time.
+ * Two first reads at once would both find nothing and both insert, and the
+ * loser would fail on the unique owner — so losing that race reads the
+ * winner's row back instead (same as moneyPlan.getProfile). */
 export async function getPreference(ownerSub: string): Promise<MealPreference> {
   const row = await prisma.mealPreference.findUnique({ where: { ownerSub } });
   if (row) return row;
-  return prisma.mealPreference.create({ data: { ownerSub } });
+  try {
+    return await prisma.mealPreference.create({ data: { ownerSub } });
+  } catch (e) {
+    if (!(e instanceof Prisma.PrismaClientKnownRequestError) || e.code !== "P2002") throw e;
+    const created = await prisma.mealPreference.findUnique({ where: { ownerSub } });
+    if (!created) throw e;
+    return created;
+  }
 }
 
 export interface PreferenceInput {
@@ -183,10 +195,38 @@ function buildView(plan: MealPlan, meals: PlannedMeal[], shoppingItems: Shopping
   };
 }
 
-/** The meals for one day, for the dashboard. */
-export async function getMealsForDay(ownerSub: string, dateKey: string): Promise<PlannedMeal[]> {
+/**
+ * The meals for one day, for the dashboard — from one plan only.
+ *
+ * Plans are stored per week, keyed by the day the week starts, so two plans
+ * can cover the same day: change the week's start from Monday to Saturday
+ * and the plan for Mon 9/28–Sun 10/4 still exists beside the new one for
+ * Sat 10/3–Fri 10/9. Reading every plan's meals for a date then showed two
+ * breakfasts, two lunches and two dinners on the overlap, and added both
+ * into the day's planned total.
+ *
+ * The plan chosen is the one /meals shows for that day under the current
+ * week-start setting, so the two screens agree. Days with no such plan —
+ * the past, from before the setting changed — fall back to the most recently
+ * made plan that covers them.
+ */
+export async function getMealsForDay(
+  ownerSub: string,
+  dateKey: string,
+  /** Pass it when the caller already has it, to save the read. */
+  preference?: MealPreference,
+): Promise<PlannedMeal[]> {
+  const plans = await prisma.mealPlan.findMany({
+    where: { ownerSub, meals: { some: { dateKey } } },
+    select: { id: true, weekStartDateKey: true },
+    orderBy: { createdAt: "desc" },
+  });
+  if (plans.length === 0) return [];
+  const { weekStartWeekday } = preference ?? (await getPreference(ownerSub));
+  const shownWeek = weekStartFor(dateKey, weekStartWeekday);
+  const plan = plans.find((p) => p.weekStartDateKey === shownWeek) ?? plans[0];
   return prisma.plannedMeal.findMany({
-    where: { dateKey, plan: { ownerSub } },
+    where: { planId: plan.id, dateKey },
     orderBy: { slot: "asc" },
   });
 }
@@ -561,7 +601,8 @@ export async function scheduledMealsForDay(
   dateKey: string,
   timeZone: string,
 ): Promise<ScheduledMeal[]> {
-  const [preference, meals] = await Promise.all([getPreference(ownerSub), getMealsForDay(ownerSub, dateKey)]);
+  const preference = await getPreference(ownerSub);
+  const meals = await getMealsForDay(ownerSub, dateKey, preference);
   return meals.map((meal) => {
     const start = localTimeUtc(dateKey, slotMinutes(preference, meal.slot), timeZone);
     return { meal, start, end: new Date(start.getTime() + slotDurationMinutes(meal.prepMinutes) * 60_000) };
