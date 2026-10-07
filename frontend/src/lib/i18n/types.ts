@@ -90,6 +90,13 @@ export interface Dictionary {
     saveLabel: string;
     unsavedLabel: string;
   };
+  noteKeyBar: {
+    label: string;
+    indent: string;
+    outdent: string;
+    /** Under each button — a word or two, so ten of them fit across a phone. */
+    short: Record<"indent" | "outdent" | "-" | "x" | ">" | "<" | "o" | "~" | "*" | "!", string>;
+  };
   bulletLegend: {
     title: string;
     meanings: {

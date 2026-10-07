@@ -72,6 +72,23 @@ export const ja: Dictionary = {
     saveLabel: "保存",
     unsavedLabel: "未保存",
   },
+  noteKeyBar: {
+    label: "行の操作",
+    indent: "字下げ（子にする）",
+    outdent: "字下げを戻す",
+    short: {
+      outdent: "戻す",
+      indent: "下げる",
+      "-": "タスク",
+      x: "完了",
+      ">": "翌日",
+      "<": "予定へ",
+      o: "出来事",
+      "~": "メモ",
+      "*": "優先",
+      "!": "ひらめき",
+    },
+  },
   bulletLegend: {
     title: "凡例",
     meanings: {

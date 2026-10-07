@@ -2,7 +2,10 @@
 
 import { useEffect, useRef, useState, type ChangeEvent, type KeyboardEvent } from "react";
 import { EmbeddedContentPreview } from "@/components/EmbeddedContentPreview";
+import { NoteKeyBar } from "@/components/NoteKeyBar";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { editLines, indentLine, outdentLine, setGlyph, toggleSignifier } from "@/lib/lineEdits";
+import { useHasMouse } from "@/lib/pointer";
 import { useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
 const SAVED_FLASH_MS = 2000;
@@ -125,6 +128,9 @@ function deleteRange(el: HTMLTextAreaElement, start: number, end: number) {
  * Tab/Shift+Tab insert or remove soft-tab spaces aligned to the
  * next/previous 4-column stop at the cursor, and Enter carries the current
  * line's indentation — both routed through execCommand so undo still works.
+ * A phone has neither Tab nor easy access to the glyphs, so on touch devices
+ * a row of keys (NoteKeyBar) sits on top of the keyboard while the note is
+ * focused, with indent/outdent and the Bullet Journal markers as line edits.
  *
  * Passing `onChange` instead of `onSave` switches to live-sync mode, for
  * callers whose "save" is just local draft state (see PromotionEditor):
@@ -149,6 +155,7 @@ export function MarkdownNoteEditor({
   const [value, setValue] = useState(content);
   const [savedValue, setSavedValue] = useState(content);
   const [focused, setFocused] = useState(false);
+  const hasMouse = useHasMouse();
   const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
@@ -272,6 +279,23 @@ export function MarkdownNoteEditor({
     insertText(el, " ".repeat(TAB_WIDTH - (column % TAB_WIDTH)));
   }
 
+  /** Applies a whole-line edit from NoteKeyBar to the caret's line (or the
+   * selected lines), through execCommand like every other edit here so it
+   * lands on the undo stack. */
+  function applyLines(transform: (line: string) => string) {
+    const el = textareaRef.current;
+    if (!el) return;
+    const r = editLines(el.value, el.selectionStart, el.selectionEnd, transform);
+    // Nothing to do (outdenting a line with no indent): an edit that changes
+    // nothing would still leave an empty step on the undo stack.
+    if (r.text !== el.value.slice(r.from, r.to)) {
+      el.focus();
+      el.setSelectionRange(r.from, r.to);
+      insertText(el, r.text);
+    }
+    el.setSelectionRange(r.selectionStart, r.selectionEnd);
+  }
+
   const statusLabel =
     status === "saving"
       ? (savingLabelOverride ?? t.noteEditor.savingLabel)
@@ -314,7 +338,13 @@ export function MarkdownNoteEditor({
           }, 0);
         }}
         onFocus={() => setFocused(true)}
-        onBlur={() => setFocused(false)}
+        onBlur={(e) => {
+          // Checked a tick later: a tap on the key bar can blur and refocus
+          // within one gesture on some phones, and the bar must still be
+          // there to receive the tap's click.
+          const el = e.currentTarget;
+          setTimeout(() => setFocused(document.activeElement === el), 0);
+        }}
         placeholder={t.noteEditor.placeholder}
         rows={1}
         style={{
@@ -333,6 +363,15 @@ export function MarkdownNoteEditor({
       {/* Only renders when the content actually has a diagram, code fence or
           image in it — a plain-text note is nothing but the textarea. */}
       <EmbeddedContentPreview content={previewSource} embedsOnly />
+
+      {focused && !hasMouse && (
+        <NoteKeyBar
+          onIndent={() => applyLines(indentLine)}
+          onOutdent={() => applyLines(outdentLine)}
+          onGlyph={(glyph) => applyLines((line) => setGlyph(line, glyph))}
+          onSignifier={(signifier) => applyLines((line) => toggleSignifier(line, signifier))}
+        />
+      )}
     </div>
   );
 }

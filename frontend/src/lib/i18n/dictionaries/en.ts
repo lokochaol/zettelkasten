@@ -72,6 +72,23 @@ export const en: Dictionary = {
     saveLabel: "Save",
     unsavedLabel: "Unsaved",
   },
+  noteKeyBar: {
+    label: "Line actions",
+    indent: "Indent (make it a child)",
+    outdent: "Outdent",
+    short: {
+      outdent: "Out",
+      indent: "In",
+      "-": "Task",
+      x: "Done",
+      ">": "Next",
+      "<": "Sched",
+      o: "Event",
+      "~": "Note",
+      "*": "Pri",
+      "!": "Idea",
+    },
+  },
   bulletLegend: {
     title: "Legend",
     meanings: {
