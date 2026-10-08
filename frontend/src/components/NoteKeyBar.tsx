@@ -9,27 +9,44 @@ const GLYPHS: Glyph[] = ["-", "x", ">", "<", "o", "~"];
 const SIGNIFIERS: Signifier[] = ["*", "!"];
 
 /**
- * How far the bottom of the visible area sits above the bottom of the
- * layout viewport — the height of the on-screen keyboard on iOS, where the
- * keyboard covers the page instead of resizing it. Zero where the keyboard
- * resizes the page (Android Chrome), which is also exactly right.
+ * Where the bottom of the visible area is, in the coordinates `position:
+ * fixed` uses — the top edge of the on-screen keyboard. null where the
+ * browser has no visualViewport, and the bar falls back to `bottom: 0`.
+ *
+ * Measured from the top (`offsetTop + height`) rather than as a gap from
+ * the bottom (`innerHeight - height - offsetTop`). The gap version was what
+ * shipped first, and on a real iPhone the bar never appeared: what
+ * `innerHeight` means while the keyboard is up differs between iOS versions
+ * and between Safari and a Home Screen app, and where it shrinks with the
+ * keyboard the gap comes out as zero — the bar sat at the very bottom,
+ * behind the keyboard. The top edge of the visible area doesn't involve
+ * `innerHeight` at all, and gives the same answer where the gap was right.
+ *
+ * Re-measured on every viewport change, and a few times while the keyboard
+ * is still sliding in: iOS doesn't promise an event for each step of that.
  */
-function useKeyboardInset(): number {
-  const [inset, setInset] = useState(0);
+function useVisibleBottom(): number | null {
+  const [bottom, setBottom] = useState<number | null>(null);
   useEffect(() => {
     const vv = window.visualViewport;
     if (!vv) return;
-    const update = () => setInset(Math.max(0, Math.round(window.innerHeight - vv.height - vv.offsetTop)));
+    const update = () => setBottom(Math.round(vv.offsetTop + vv.height));
     const frame = requestAnimationFrame(update);
+    const settle = [100, 300, 600].map((ms) => setTimeout(update, ms));
     vv.addEventListener("resize", update);
     vv.addEventListener("scroll", update);
+    window.addEventListener("scroll", update);
+    window.addEventListener("resize", update);
     return () => {
       cancelAnimationFrame(frame);
+      settle.forEach(clearTimeout);
       vv.removeEventListener("resize", update);
       vv.removeEventListener("scroll", update);
+      window.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
     };
   }, []);
-  return inset;
+  return bottom;
 }
 
 /** Keeps the note focused while a button is pressed: the default action of
@@ -76,7 +93,7 @@ export function NoteKeyBar({
   onSignifier: (signifier: Signifier) => void;
 }) {
   const { t } = useI18n();
-  const inset = useKeyboardInset();
+  const visibleBottom = useVisibleBottom();
   if (typeof document === "undefined") return null;
 
   return createPortal(
@@ -84,7 +101,12 @@ export function NoteKeyBar({
       role="toolbar"
       aria-label={t.noteKeyBar.label}
       data-note-keybar
-      style={{ bottom: inset, paddingBottom: inset === 0 ? "env(safe-area-inset-bottom)" : 0 }}
+      style={
+        visibleBottom === null
+          ? { bottom: 0, paddingBottom: "env(safe-area-inset-bottom)" }
+          : // Pinned by its own bottom edge to the bottom of what's visible.
+            { top: 0, transform: `translateY(calc(${visibleBottom}px - 100%))` }
+      }
       className="fixed inset-x-0 z-40 border-t border-line bg-surface/95 px-1.5 py-1 backdrop-blur"
     >
       <div className="flex items-stretch gap-0.5">
