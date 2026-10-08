@@ -390,6 +390,9 @@ export function GuideContentEn() {
             ]}
           />
           <Prose>A collapsed legend can be shown beside the notes (turn it on or off in Settings).</Prose>
+          <Prose>
+            On a phone, a row of keys sits on top of the keyboard while you write a note: indent (⇥), outdent (⇤), and the symbols above. Each acts on the line the cursor is on (or every selected line), so pressing “x” on “- send the files” marks it done. Pressing the same symbol again takes it off.
+          </Prose>
         </PageSection>
 
         <PageSection
