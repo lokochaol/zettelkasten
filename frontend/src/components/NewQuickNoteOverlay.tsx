@@ -85,7 +85,12 @@ export function NewQuickNoteOverlay({
           <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
             <span className="text-accent">{"//"}</span> {t.scratch.contentHeading}
           </h2>
-          <MarkdownNoteEditor content="" onSave={handleSave} savingLabelOverride={isOffline ? t.common.savingOffline : undefined} />
+          <MarkdownNoteEditor
+            content=""
+            onSave={handleSave}
+            savingLabelOverride={isOffline ? t.common.savingOffline : undefined}
+            draftKey="quicknote:new"
+          />
         </section>
 
         <section className="flex flex-col gap-3">

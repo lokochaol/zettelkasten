@@ -6,15 +6,17 @@ import {
   generateMealPlanAction,
   saveMealPreferenceAction,
   syncMealsToCalendarAction,
-  toggleShoppingItemAction,
+  listInventoryAction,
   type MealWeekView,
 } from "@/app/meals/actions";
 import { CoopOrderPanel } from "@/components/CoopOrderPanel";
 import { LoadingBlock } from "@/components/LoadingSpinner";
+import { MealChatPanel } from "@/components/MealChatPanel";
+import { ShoppingStockPanel } from "@/components/ShoppingStockPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
-import type { MealKind, MealSlot } from "@/generated/prisma/client";
+import type { InventoryItem, MealKind, MealSlot } from "@/generated/prisma/client";
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 
@@ -50,6 +52,12 @@ export function MealWeekScreen() {
   useEffect(() => {
     getMealWeekAction(anchorKey).then(setData);
   }, [anchorKey]);
+
+  // What's at home doesn't belong to a week, so it loads once.
+  const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
+  useEffect(() => {
+    listInventoryAction().then(setInventory);
+  }, []);
 
   // Switching panes is safe — the request keeps running and the plan is
   // saved — but closing the tab can cut it off mid-call, which costs the
@@ -291,46 +299,47 @@ export function MealWeekScreen() {
         </section>
       )}
 
-      {view && view.shoppingItems.length > 0 && (
-        <section className="flex flex-col gap-2 rounded-xl border border-line bg-surface p-4">
-          <div className="flex items-center gap-3">
-            <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.shoppingHeading}</p>
-            <span
-              className={`ml-auto font-mono text-[11px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink"}`}
-            >
-              {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
-            </span>
-          </div>
-          {/* The estimate was made before the week; this is what the week
-              actually cost. Shown together because the gap is what makes
-              the next budget a real number rather than a wish. */}
-          <p
-            className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}
-          >
-            {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
-          </p>
-          <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>
-          {[...new Set(view.shoppingItems.map((i) => i.category))].map((category) => (
-            <div key={category} className="flex flex-col gap-1">
-              <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{category}</p>
-              {view.shoppingItems
-                .filter((i) => i.category === category)
-                .map((item) => (
-                  <label key={item.id} className="flex items-center gap-2.5">
-                    <input
-                      type="checkbox"
-                      defaultChecked={item.checked}
-                      onChange={(e) => void toggleShoppingItemAction(item.id, e.target.checked)}
-                      className="h-3.5 w-3.5 accent-[var(--color-accent)]"
-                    />
-                    <span className="text-[11.5px] text-ink">{item.name}</span>
-                    <span className="font-mono text-[9.5px] text-ink-faint">{item.quantity}</span>
-                    <span className="ml-auto font-mono text-[10px] text-ink-soft">¥{item.estimatedYen.toLocaleString()}</span>
-                  </label>
-                ))}
-            </div>
-          ))}
-        </section>
+      {/* Shown even without a plan: the fridge list is worth keeping either way. */}
+      <ShoppingStockPanel
+        key={data.weekStartDateKey}
+        shoppingItems={view?.shoppingItems ?? []}
+        inventory={inventory ?? []}
+        onInventoryChange={setInventory}
+        header={
+          view && (
+            <>
+              <div className="flex items-center gap-3">
+                <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.shoppingHeading}</p>
+                <span
+                  className={`ml-auto font-mono text-[11px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink"}`}
+                >
+                  {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
+                </span>
+              </div>
+              {/* The estimate was made before the week; this is what the week
+                  actually cost. Shown together because the gap is what makes
+                  the next budget a real number rather than a wish. */}
+              <p
+                className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}
+              >
+                {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
+              </p>
+              <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>
+            </>
+          )
+        }
+      />
+
+      {view && (
+        <MealChatPanel
+          key={`chat:${data.weekStartDateKey}`}
+          weekStartDateKey={data.weekStartDateKey}
+          todayKey={todayKey}
+          onApplied={(week, items) => {
+            setData(week);
+            setInventory(items);
+          }}
+        />
       )}
 
       <CoopOrderPanel weekStartDateKey={data.weekStartDateKey} todayKey={todayKey} />

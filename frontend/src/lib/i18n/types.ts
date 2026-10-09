@@ -89,6 +89,13 @@ export interface Dictionary {
     savedLabel: string;
     saveLabel: string;
     unsavedLabel: string;
+    saveFailedLabel: string;
+    saveFailedKept: string;
+    saveFailedNotKept: string;
+    reload: string;
+    restored: string;
+    restoredChanged: string;
+    discardRestored: string;
   };
   noteKeyBar: {
     label: string;
@@ -267,6 +274,31 @@ export interface Dictionary {
     coopCopied: string;
     prefDeliveryDay: string;
     prefOrderLeadDays: string;
+    shoppingTab: string;
+    stockTab: (n: number) => string;
+    stockHeading: string;
+    stockBoughtNote: string;
+    stockEmpty: string;
+    stockNamePlaceholder: string;
+    stockQuantityPlaceholder: string;
+    stockAdd: string;
+    location: { FRIDGE: string; FREEZER: string; PANTRY: string };
+    chatHeading: string;
+    chatIntro: string;
+    chatPlaceholder: string;
+    chatSend: string;
+    chatSending: string;
+    chatEmpty: string;
+    chatSuggestions: string[];
+    chatMealsLabel: string;
+    chatStockLabel: string;
+    chatShoppingLabel: string;
+    chatApply: string;
+    chatApplying: string;
+    chatApplied: string;
+    chatDismiss: string;
+    chatDismissed: string;
+    chatAppliedNote: string;
   };
   health: {
     basicsHeading: string;
@@ -704,6 +736,10 @@ export interface Dictionary {
     mealPlanNotFound: string;
     coopPlanMissing: string;
     coopOrderNotFound: string;
+    inventoryInvalid: string;
+    inventoryNotFound: string;
+    mealChatInvalid: string;
+    mealChatProposalGone: string;
     timeBlockInvalid: string;
     timeBlockNotFound: string;
     moneyPlanInvalid: string;

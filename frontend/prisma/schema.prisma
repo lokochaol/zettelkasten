@@ -651,6 +651,7 @@ model MealPlan {
 
   meals         PlannedMeal[]
   shoppingItems ShoppingItem[]
+  chatMessages  MealChatMessage[]
 
   @@unique([ownerSub, weekStartDateKey])
   @@index([ownerSub, weekStartDateKey])
@@ -706,6 +707,8 @@ model ShoppingItem {
   checked      Boolean  @default(false)
   /// Position within its category, as the planner ordered it.
   sortOrder    Int      @map("sort_order")
+  /// The stock this item became when it was ticked off — see InventoryItem.
+  inventoryItem InventoryItem?
 
   @@index([planId])
   @@map("shopping_item")
@@ -975,4 +978,61 @@ model SpendingAdvice {
   @@unique([ownerSub, weekStartDateKey])
   @@index([ownerSub])
   @@map("spending_advice")
+}
+
+/// Where something is kept. Decides which list it shows in, and tells the
+/// planner how long it can wait to be used.
+enum StorageLocation {
+  FRIDGE
+  FREEZER
+  PANTRY
+}
+
+/// One thing in the fridge, freezer or cupboard.
+///
+/// Free text on purpose — "鶏むね肉 1枚" and "卵 残り4個" are how stock is
+/// actually counted at home, and a unit system would get in the way of
+/// writing it down at the shop. The meal chat reads and edits these as text.
+model InventoryItem {
+  id        String          @id @default(uuid())
+  ownerSub  String          @map("owner_sub")
+  name      String
+  quantity  String          @default("")
+  location  StorageLocation @default(FRIDGE)
+  /// Set when the item came from ticking a shopping-list line, so unticking
+  /// it takes the same stock back out. Cleared (not deleted) if the plan the
+  /// line belonged to is regenerated: what was bought is still in the fridge.
+  shoppingItemId String?       @unique @map("shopping_item_id")
+  shoppingItem   ShoppingItem? @relation(fields: [shoppingItemId], references: [id], onDelete: SetNull)
+  createdAt DateTime        @default(now()) @map("created_at")
+  updatedAt DateTime        @updatedAt @map("updated_at")
+
+  @@index([ownerSub])
+  @@map("inventory_item")
+}
+
+enum MealChatRole {
+  USER
+  ASSISTANT
+}
+
+/// One message in the conversation about a week's meals — what was actually
+/// bought, what ran out, what to change. Kept per plan and stored, so the
+/// conversation survives a reload (and a login that runs out) mid-shop.
+model MealChatMessage {
+  id          String       @id @default(uuid())
+  planId      String       @map("plan_id")
+  plan        MealPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  role        MealChatRole
+  content     String
+  /// An assistant message's proposed changes — meals, stock, extra shopping —
+  /// as JSON (see src/lib/mealChat.ts). Nothing changes until it's applied.
+  proposal    Json?
+  appliedAt   DateTime?    @map("applied_at")
+  /// Turned down: the proposal stays readable but can no longer be applied.
+  dismissedAt DateTime?    @map("dismissed_at")
+  createdAt   DateTime     @default(now()) @map("created_at")
+
+  @@index([planId, createdAt])
+  @@map("meal_chat_message")
 }

@@ -30,6 +30,7 @@ import { midpointRank } from "@/lib/rank";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useBackdropDismiss } from "@/lib/useBackdropDismiss";
 import { useUnsavedChanges, useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
+import { readDraft, removeDraft, writeDraft } from "@/lib/draftBackup";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { RotateDeviceGate } from "@/components/RotateDeviceGate";
 
@@ -425,6 +426,30 @@ function NoteDetailOverlay({
 
   const dirty = !!detail && editing && (draftTitle !== detail.title || draftContent !== detail.content);
   const requestClose = () => guard(onClose);
+
+  // The same local backup MarkdownNoteEditor keeps (src/lib/draftBackup.ts),
+  // for the title and body edited together here: written while the edit is
+  // unsaved, put back — already in edit mode — the next time this note
+  // opens, and removed once it's saved or the edit is abandoned.
+  const draftKey = `permanent:${noteId}`;
+  const [restoredDraft, setRestoredDraft] = useState(false);
+  useEffect(() => {
+    if (!detail) return;
+    if (!dirty) {
+      if (!editing) removeDraft(draftKey);
+      return;
+    }
+    const timer = setTimeout(
+      () =>
+        writeDraft(
+          draftKey,
+          JSON.stringify({ title: draftTitle, content: draftContent }),
+          JSON.stringify({ title: detail.title, content: detail.content }),
+        ),
+      300,
+    );
+    return () => clearTimeout(timer);
+  }, [detail, dirty, editing, draftKey, draftTitle, draftContent]);
   const backdrop = useBackdropDismiss(requestClose);
 
   function startEditing(note: PermanentNoteDetail) {
@@ -436,12 +461,24 @@ function NoteDetailOverlay({
 
   async function save() {
     setSaving(true);
-    const res = await updatePermanentNoteAction(noteId, draftTitle, draftContent);
+    let res: Awaited<ReturnType<typeof updatePermanentNoteAction>>;
+    try {
+      res = await updatePermanentNoteAction(noteId, draftTitle, draftContent);
+    } catch (e) {
+      // Not a validation error but the call itself failing — an expired
+      // login, or a deploy since this page loaded. The edit is in the local
+      // backup, so saying so and offering a reload is safe.
+      setSaving(false);
+      setError(t.noteEditor.saveFailedKept);
+      throw e;
+    }
     setSaving(false);
     if ("error" in res) {
       setError(res.error);
       throw new Error(res.error); // keeps the unsaved-changes guard from leaving
     }
+    removeDraft(draftKey);
+    setRestoredDraft(false);
     setDetail(res.note);
     setEditing(false);
     onNoteChanged();
@@ -450,7 +487,10 @@ function NoteDetailOverlay({
   useRegisterUnsavedEditor({
     isDirty: () => dirty,
     save,
-    discard: () => setEditing(false),
+    discard: () => {
+      setEditing(false);
+      setRestoredDraft(false);
+    },
   });
 
   async function openDeleteConfirm() {
@@ -466,7 +506,21 @@ function NoteDetailOverlay({
   useEffect(() => {
     let cancelled = false;
     getPermanentNoteDetailAction(noteId).then((d) => {
-      if (!cancelled) setDetail(d);
+      if (cancelled) return;
+      setDetail(d);
+      // An edit left unsaved last time comes back open, ready to save.
+      const draft = readDraft(`permanent:${noteId}`);
+      if (!draft) return;
+      try {
+        const { title, content } = JSON.parse(draft.value) as { title: string; content: string };
+        if (title === d.title && content === d.content) return;
+        setDraftTitle(title);
+        setDraftContent(content);
+        setEditing(true);
+        setRestoredDraft(true);
+      } catch {
+        // A backup that doesn't parse is no backup.
+      }
     });
     return () => {
       cancelled = true;
@@ -522,7 +576,10 @@ function NoteDetailOverlay({
                       {saving ? t.common.saving : t.common.save}
                     </button>
                     <button
-                      onClick={() => setEditing(false)}
+                      onClick={() => {
+                        setEditing(false);
+                        setRestoredDraft(false);
+                      }}
                       className="font-mono text-[10px] text-ink-soft hover:text-accent"
                     >
                       {t.common.cancel}
@@ -550,8 +607,15 @@ function NoteDetailOverlay({
               </div>
             </div>
 
+            {restoredDraft && editing && (
+              <p className="mb-2 rounded-md bg-surface-alt px-2.5 py-2 text-[11px] leading-relaxed text-ink-soft">
+                {t.noteEditor.restored}
+              </p>
+            )}
             {editing ? (
-              <MarkdownNoteEditor key={detail.id} content={detail.content} onChange={setDraftContent} />
+              // Starts from the draft, not the saved body: they're the same
+              // text unless an unsaved edit was just restored.
+              <MarkdownNoteEditor key={detail.id} content={draftContent} onChange={setDraftContent} />
             ) : (
               <EmbeddedContentPreview content={detail.content} />
             )}

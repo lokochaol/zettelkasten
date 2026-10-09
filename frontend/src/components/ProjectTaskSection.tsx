@@ -77,7 +77,7 @@ export function ProjectTaskSection({
       {loading ? (
         <p className="py-4 text-center font-mono text-xs text-ink-soft">{t.projects.detailLoading}</p>
       ) : (
-        <MarkdownNoteEditor key={selectedDate} content={note.content} onSave={save} />
+        <MarkdownNoteEditor key={selectedDate} content={note.content} onSave={save} draftKey={`task:${projectId}:${selectedDate}`} />
       )}
     </div>
   );

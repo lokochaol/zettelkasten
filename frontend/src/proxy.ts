@@ -3,7 +3,10 @@ import { auth } from "@/auth";
 
 export const proxy = auth((req) => {
   if (!req.auth) {
+    // Carries the page along, so signing in again comes back to it — see
+    // src/lib/returnPath.ts.
     const signInUrl = new URL("/signin", req.nextUrl.origin);
+    signInUrl.searchParams.set("from", req.nextUrl.pathname + req.nextUrl.search);
     return NextResponse.redirect(signInUrl);
   }
 });
