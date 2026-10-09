@@ -52,6 +52,14 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.coopPlanMissing;
     case "coopOrderNotFound":
       return dict.coopOrderNotFound;
+    case "inventoryInvalid":
+      return dict.inventoryInvalid;
+    case "inventoryNotFound":
+      return dict.inventoryNotFound;
+    case "mealChatInvalid":
+      return dict.mealChatInvalid;
+    case "mealChatProposalGone":
+      return dict.mealChatProposalGone;
     case "timeBlockInvalid":
       return dict.timeBlockInvalid;
     case "timeBlockNotFound":

@@ -5,6 +5,7 @@ import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
 import * as googleCalendar from "@/lib/googleCalendar";
 import { currentTargets } from "@/lib/health";
 import { ValidationError } from "@/lib/errors";
+import { inventoryBrief, listInventory } from "@/lib/inventory";
 import type { MealKind, MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
 export type { MealKind, MealPreference, MealStatus, PlannedMeal, ShoppingItem };
@@ -231,12 +232,6 @@ export async function getMealsForDay(
   });
 }
 
-export async function setShoppingItemChecked(ownerSub: string, itemId: string, checked: boolean): Promise<void> {
-  const item = await prisma.shoppingItem.findFirst({ where: { id: itemId, plan: { ownerSub } }, select: { id: true } });
-  if (!item) throw new ValidationError("mealPlanNotFound", "Shopping item not found");
-  await prisma.shoppingItem.update({ where: { id: itemId }, data: { checked } });
-}
-
 /* ---------- generation ---------- */
 
 const SYSTEM_PROMPT = `あなたは管理栄養士です。1週間分の献立（朝・昼・夕 × 7日）と、それを作るための買い物リストを設計します。
@@ -339,6 +334,7 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
   );
 
   const composition = targetsNow.composition;
+  const stock = await listInventory(ownerSub);
   const brief = [
     `対象の7日間: ${dates.join(", ")}`,
     `買い物日: ${shoppingDay}（この日に1回だけ買い物をする）`,
@@ -380,6 +376,11 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     `まとめ調理の日の調理時間: 1日あたり合計 ${Math.max(preference.weekdayCookMinutes, 60)} 分まで`,
     preference.dislikes ? `苦手・避けたいもの: ${preference.dislikes}` : "苦手な食材: 特になし",
     preference.allergies ? `アレルギー（絶対に使わない）: ${preference.allergies}` : "アレルギー: なし",
+    "",
+    // What's already at home, so the week uses it up before buying more of
+    // the same — and the shopping list doesn't ask for what's in the fridge.
+    "家にある食材（冷蔵庫在庫。まずこれを使い、買い物リストには入れない）:",
+    inventoryBrief(stock),
   ].join("\n");
 
   const { value, truncated } = await askForJson(ownerSub, SYSTEM_PROMPT, brief);

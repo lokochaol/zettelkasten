@@ -21,5 +21,5 @@ export function QuickNoteContentSection({
     onSaved?.(detail);
   }
 
-  return <MarkdownNoteEditor content={content} onSave={save} />;
+  return <MarkdownNoteEditor content={content} onSave={save} draftKey={`quicknote:${noteId}`} />;
 }

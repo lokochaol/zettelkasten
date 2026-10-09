@@ -5,11 +5,14 @@ import { EmbeddedContentPreview } from "@/components/EmbeddedContentPreview";
 import { NoteKeyBar } from "@/components/NoteKeyBar";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { editLines, indentLine, outdentLine, setGlyph, toggleSignifier } from "@/lib/lineEdits";
+import { readDraft, removeDraft, writeDraft } from "@/lib/draftBackup";
 import { useHasMouse } from "@/lib/pointer";
 import { useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
 const SAVED_FLASH_MS = 2000;
 const PREVIEW_DELAY_MS = 600;
+/** How long typing has to pause before the local backup is rewritten. */
+const DRAFT_WRITE_DELAY_MS = 300;
 const TAB_WIDTH = 4;
 /** How much room to keep between the caret and the bottom of the scrollport
  * while typing, so the line being written never sits on the screen edge. */
@@ -132,6 +135,11 @@ function deleteRange(el: HTMLTextAreaElement, start: number, end: number) {
  * a row of keys (NoteKeyBar) sits on top of the keyboard while the note is
  * focused, with indent/outdent and the Bullet Journal markers as line edits.
  *
+ * With `draftKey`, unsaved text is also kept in this browser until it's
+ * saved (src/lib/draftBackup.ts) and put back the next time the same note
+ * opens — so a tab Chrome discarded, a Save that failed after a deploy, or a
+ * login that ran out doesn't take the text with it.
+ *
  * Passing `onChange` instead of `onSave` switches to live-sync mode, for
  * callers whose "save" is just local draft state (see PromotionEditor):
  * every keystroke propagates and there is no Save button or dirty tracking.
@@ -141,8 +149,12 @@ export function MarkdownNoteEditor({
   onSave,
   onChange,
   savingLabelOverride,
+  draftKey,
 }: {
   content: string;
+  /** Identifies this note for the local backup of unsaved text (e.g.
+   * `task:<projectId>:<date>`). Without it, nothing is kept locally. */
+  draftKey?: string;
   /** Persists the buffer. Rejecting leaves the editor dirty. */
   onSave?: (content: string) => void | Promise<void>;
   /** Live-sync mode: called on every keystroke, no explicit save. */
@@ -156,7 +168,10 @@ export function MarkdownNoteEditor({
   const [savedValue, setSavedValue] = useState(content);
   const [focused, setFocused] = useState(false);
   const hasMouse = useHasMouse();
-  const [status, setStatus] = useState<"idle" | "saving" | "saved">("idle");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "failed">("idle");
+  /** Set when unsaved text from an earlier visit was put back; `changed`
+   * when what's saved has moved on since that text was written. */
+  const [restored, setRestored] = useState<{ changed: boolean } | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   const live = !onSave && !!onChange;
@@ -175,6 +190,62 @@ export function MarkdownNoteEditor({
     },
     [],
   );
+
+  // Puts back text left unsaved by an earlier visit to this note. Read after
+  // mount, in a callback, because the server-rendered page has no
+  // localStorage to read and the first render has to match it. Until it has
+  // looked, the effect below mustn't clear the backup it's about to read.
+  const draftCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!draftKey || live) return;
+    draftCheckedRef.current = false;
+    const timer = setTimeout(() => {
+      draftCheckedRef.current = true;
+      const draft = readDraft(draftKey);
+      if (!draft || draft.value === content) {
+        if (draft) removeDraft(draftKey);
+        return;
+      }
+      setValue(draft.value);
+      valueRef.current = draft.value;
+      setRestored({ changed: draft.base !== content });
+      requestAnimationFrame(() => autoGrow(textareaRef.current));
+    }, 0);
+    return () => clearTimeout(timer);
+    // Only on opening the note: `content` changing later is a save landing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [draftKey]);
+
+  // Keeps the backup in step with the buffer: written shortly after typing
+  // pauses while there are unsaved changes, removed once there aren't.
+  useEffect(() => {
+    if (!draftKey || live || !draftCheckedRef.current) return;
+    if (!dirty) {
+      removeDraft(draftKey);
+      return;
+    }
+    const timer = setTimeout(() => writeDraft(draftKey, value, savedValue), DRAFT_WRITE_DELAY_MS);
+    return () => clearTimeout(timer);
+  }, [draftKey, live, dirty, value, savedValue]);
+
+  // And immediately when the page is being hidden or torn down — a tab put
+  // in the background is the one Chrome may discard, and the pause above
+  // might not have elapsed yet.
+  useEffect(() => {
+    if (!draftKey || live) return;
+    const flush = () => {
+      if (valueRef.current !== savedValue) writeDraft(draftKey, valueRef.current, savedValue);
+    };
+    const onVisibility = () => {
+      if (document.visibilityState === "hidden") flush();
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("pagehide", flush);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("pagehide", flush);
+    };
+  }, [draftKey, live, savedValue]);
 
   // The focus padding changes the box height, so re-fit after it lands.
   useEffect(() => autoGrow(textareaRef.current), [focused]);
@@ -198,12 +269,21 @@ export function MarkdownNoteEditor({
     const running = Promise.resolve(onSave(snapshot))
       .then(() => {
         setSavedValue(snapshot);
+        setRestored(null);
+        // Removed here as well as by the effect: a caller may close the
+        // editor the moment the save resolves (a new 走り書き does), before
+        // the effect gets to run.
+        if (draftKey && valueRef.current === snapshot) removeDraft(draftKey);
         setStatus("saved");
         if (savedTimerRef.current) clearTimeout(savedTimerRef.current);
         savedTimerRef.current = setTimeout(() => setStatus("idle"), SAVED_FLASH_MS);
       })
       .catch((error: unknown) => {
-        setStatus("idle");
+        // Said out loud: a quiet "未保存" after pressing Save reads as if it
+        // worked. The text is still in the editor (and, with a draftKey, in
+        // the local backup), so reloading to recover is safe.
+        setStatus("failed");
+        if (draftKey) writeDraft(draftKey, valueRef.current, savedValue);
         throw error;
       })
       .finally(() => {
@@ -216,7 +296,10 @@ export function MarkdownNoteEditor({
   useRegisterUnsavedEditor({
     isDirty: () => !live && valueRef.current !== savedValue,
     save,
-    discard: () => setValue(savedValue),
+    discard: () => {
+      setValue(savedValue);
+      setRestored(null);
+    },
   });
 
   // Stays true from compositionstart until a tick after compositionend, so
@@ -301,9 +384,11 @@ export function MarkdownNoteEditor({
       ? (savingLabelOverride ?? t.noteEditor.savingLabel)
       : status === "saved"
         ? t.noteEditor.savedLabel
-        : dirty
-          ? t.noteEditor.unsavedLabel
-          : null;
+        : status === "failed"
+          ? t.noteEditor.saveFailedLabel
+          : dirty
+            ? t.noteEditor.unsavedLabel
+            : null;
 
   return (
     <div className="flex flex-col gap-1">
@@ -311,7 +396,9 @@ export function MarkdownNoteEditor({
           in and out shifts everything below it, which reads as the whole page
           jumping around while you type. */}
       <div className="flex h-6 items-center justify-end gap-2">
-        <span className="font-mono text-[9.5px] tracking-wide text-ink-faint">{statusLabel}</span>
+        <span className={`font-mono text-[9.5px] tracking-wide ${status === "failed" ? "text-accent" : "text-ink-faint"}`}>
+          {statusLabel}
+        </span>
         {!live && (
           <button
             type="button"
@@ -323,6 +410,36 @@ export function MarkdownNoteEditor({
           </button>
         )}
       </div>
+
+      {status === "failed" && (
+        <p className="rounded-md bg-accent-soft px-2.5 py-2 text-[11px] leading-relaxed text-ink-soft">
+          {draftKey ? t.noteEditor.saveFailedKept : t.noteEditor.saveFailedNotKept}{" "}
+          <button
+            type="button"
+            onClick={() => window.location.reload()}
+            className="font-semibold text-accent underline underline-offset-2"
+          >
+            {t.noteEditor.reload}
+          </button>
+        </p>
+      )}
+      {restored && (
+        <p className="flex flex-wrap items-baseline gap-x-2 rounded-md bg-surface-alt px-2.5 py-2 text-[11px] leading-relaxed text-ink-soft">
+          <span>{restored.changed ? t.noteEditor.restoredChanged : t.noteEditor.restored}</span>
+          <button
+            type="button"
+            onClick={() => {
+              setValue(savedValue);
+              setRestored(null);
+              if (draftKey) removeDraft(draftKey);
+              requestAnimationFrame(() => autoGrow(textareaRef.current));
+            }}
+            className="font-semibold text-accent underline underline-offset-2"
+          >
+            {t.noteEditor.discardRestored}
+          </button>
+        </p>
+      )}
 
       <textarea
         ref={textareaRef}

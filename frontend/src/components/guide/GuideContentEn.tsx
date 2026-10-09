@@ -73,11 +73,15 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only five things use it — meal planning, the Coop Deli order proposal, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning and the meal chat, the Coop Deli order proposal, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
               body: "If the connection drops, actions like saving a Dash Off note are held and saved once you're back online. Added to your home screen or Dock, the app also opens with no connection at all.",
+            },
+            {
+              title: "Unsaved text stays on the device",
+              body: "What you are typing in a note or task is kept on this device before it is saved. If a save fails — the tab was discarded, or the login ran out — it says so, and reopening the page brings the text back. Signing in again returns you to the page you were on.",
             },
           ]}
         />
@@ -418,6 +422,14 @@ export function GuideContentEn() {
               {
                 title: "Write to Google Calendar",
                 body: "Put the week's meals into your calendar at the meal times you've set.",
+              },
+              {
+                title: "Fridge inventory",
+                body: "Ticking a shopping item puts it into the inventory (fridge, freezer or pantry); unticking takes it out. On a phone the shopping list and the inventory are two tabs; on a wide screen they sit side by side. The next plan uses what's at home first.",
+              },
+              {
+                title: "Replan by chat",
+                body: "Write something like “they were out of chicken, so I bought pork” and you get a proposal for the meals from today on that haven't been eaten. Nothing changes until you check the meal, inventory and shopping changes and press Apply — then the calendar is rewritten too.",
               },
               {
                 title: "Coop Deli order proposal",

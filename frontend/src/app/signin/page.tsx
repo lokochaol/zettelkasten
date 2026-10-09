@@ -1,8 +1,10 @@
 import { googleSignIn } from "@/app/actions";
+import { safeReturnPath } from "@/lib/returnPath";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
 
-export default async function SignInPage() {
+export default async function SignInPage(props: PageProps<"/signin">) {
+  const { from } = await props.searchParams;
   const dict = getDictionary(await getLocale());
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-6">
@@ -10,6 +12,7 @@ export default async function SignInPage() {
         <h1 className="mb-2 text-2xl font-extrabold tracking-tight text-ink">{dict.signin.title}</h1>
         <p className="mb-8 text-sm leading-relaxed text-ink-soft">{dict.signin.tagline}</p>
         <form action={googleSignIn}>
+          {typeof from === "string" && <input type="hidden" name="from" value={safeReturnPath(from)} />}
           <button
             type="submit"
             className="btn-sheen inline-flex w-full items-center justify-center gap-3 rounded-lg bg-accent px-5 py-3 text-sm font-semibold text-on-accent transition-transform duration-150 hover:scale-[1.02] active:scale-[0.98]"

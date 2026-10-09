@@ -89,6 +89,9 @@ export function CalendarTodayView({
           </div>
           <MarkdownNoteEditor
             content={note.content}
+            // Same key as the project page's editor for this day, so text left
+            // unsaved in one place comes back in the other.
+            draftKey={`task:${note.projectId}:${dateKey}`}
             onSave={async (content) => {
               await upsertCalendarTaskNoteAction(note.projectId, dateKey, content);
             }}

@@ -4,6 +4,8 @@ import { revalidatePath } from "next/cache";
 import * as mealPlanning from "@/lib/mealPlanning";
 import * as coopOrder from "@/lib/coopOrder";
 import * as expenses from "@/lib/expenses";
+import * as inventory from "@/lib/inventory";
+import * as mealChat from "@/lib/mealChat";
 import { shiftDateKey } from "@/lib/dateKey";
 import type { MealPlanView, PreferenceInput } from "@/lib/mealPlanning";
 import { AiJsonError } from "@/lib/aiJson";
@@ -91,10 +93,175 @@ export async function generateMealPlanAction(
   }
 }
 
-export async function toggleShoppingItemAction(itemId: string, checked: boolean): Promise<void> {
+/**
+ * Ticks a shopping line, and with it puts the item into the inventory (or,
+ * unticked, takes it back out — see inventory.setShoppingItemBought).
+ * Returns the inventory as it now stands, so the list beside the shopping
+ * list moves in the same tap.
+ */
+export async function toggleShoppingItemAction(itemId: string, checked: boolean): Promise<inventory.InventoryItem[]> {
   const ownerSub = await requireOwnerSub();
-  await mealPlanning.setShoppingItemChecked(ownerSub, itemId, checked);
+  await inventory.setShoppingItemBought(ownerSub, itemId, checked);
   revalidatePath("/meals");
+  return inventory.listInventory(ownerSub);
+}
+
+/* ---------- inventory ---------- */
+
+export async function listInventoryAction(): Promise<inventory.InventoryItem[]> {
+  return inventory.listInventory(await requireOwnerSub());
+}
+
+type InventoryResult = { items: inventory.InventoryItem[] } | { error: string };
+
+async function inventoryChange(change: (ownerSub: string) => Promise<unknown>): Promise<InventoryResult> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await change(ownerSub);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  revalidatePath("/meals");
+  return { items: await inventory.listInventory(ownerSub) };
+}
+
+export async function addInventoryItemAction(input: inventory.InventoryInput): Promise<InventoryResult> {
+  return inventoryChange((ownerSub) => inventory.addInventoryItem(ownerSub, input));
+}
+
+export async function updateInventoryItemAction(id: string, input: Partial<inventory.InventoryInput>): Promise<InventoryResult> {
+  return inventoryChange((ownerSub) => inventory.updateInventoryItem(ownerSub, id, input));
+}
+
+export async function removeInventoryItemAction(id: string): Promise<InventoryResult> {
+  return inventoryChange((ownerSub) => inventory.removeInventoryItem(ownerSub, id));
+}
+
+/* ---------- meal chat ---------- */
+
+/** A chat message as the screen gets it: plain values only, the proposal
+ * already read out of its JSON column. */
+export interface MealChatMessageView {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  proposal: mealChat.Proposal | null;
+  applied: boolean;
+  dismissed: boolean;
+}
+
+function toView(m: mealChat.MealChatMessage): MealChatMessageView {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    proposal: (m.proposal as unknown as mealChat.Proposal | null) ?? null,
+    applied: m.appliedAt !== null,
+    dismissed: m.dismissedAt !== null,
+  };
+}
+
+function aiErrorMessage(dict: ReturnType<typeof getDictionary>, e: AiJsonError): string {
+  const byCode: Record<string, string> = {
+    notConfigured: dict.meals.errorNoAiKey,
+    authError: dict.meals.errorAuth,
+    rateLimitError: dict.meals.errorRateLimit,
+    invalidResponse: dict.meals.errorBadResponse,
+    truncated: dict.meals.errorTruncated,
+    apiError: dict.meals.errorApi,
+  };
+  if (e.code === "notConfigured") return byCode.notConfigured;
+  return `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}`;
+}
+
+export async function getMealChatAction(weekStartDateKey: string): Promise<MealChatMessageView[]> {
+  const ownerSub = await requireOwnerSub();
+  const plan = await mealPlanning.getPlan(ownerSub, weekStartDateKey);
+  if (!plan) return [];
+  return (await mealChat.listMessages(ownerSub, plan.plan.id)).map(toView);
+}
+
+export async function sendMealChatAction(
+  weekStartDateKey: string,
+  text: string,
+  todayKey: string,
+): Promise<{ messages: MealChatMessageView[] } | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  try {
+    const messages = await mealChat.sendMessage(ownerSub, weekStartDateKey, text, todayKey);
+    return { messages: messages.map(toView) };
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    if (e instanceof AiJsonError) {
+      console.error("meal chat failed", e.code, e.message);
+      return { error: aiErrorMessage(getDictionary(locale), e) };
+    }
+    throw e;
+  }
+}
+
+/**
+ * Applies a proposal from the chat, and hands back everything it moved —
+ * the week, the inventory, the conversation — so the screen updates in one
+ * go. If the replaced meals had been written to Google Calendar, those
+ * events are rewritten too; a failure there is reported but doesn't undo
+ * the plan change.
+ */
+export async function applyMealChatProposalAction(
+  messageId: string,
+  weekStartDateKey: string,
+  todayKey: string,
+  timeZone: string,
+): Promise<
+  | { week: MealWeekView; inventory: inventory.InventoryItem[]; messages: MealChatMessageView[]; calendarError: string | null }
+  | { error: string }
+> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
+  let calendarNeedsUpdate = false;
+  try {
+    ({ calendarNeedsUpdate } = await mealChat.applyProposal(ownerSub, messageId, todayKey));
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    throw e;
+  }
+  let calendarError: string | null = null;
+  if (calendarNeedsUpdate) {
+    try {
+      await mealPlanning.syncWeekToCalendar(ownerSub, weekStartDateKey, timeZone);
+    } catch (e) {
+      if (e instanceof GoogleCalendarNotLinkedError) calendarError = dict.meals.syncNotLinked;
+      else if (e instanceof GoogleCalendarAuthError) calendarError = dict.meals.syncReauth;
+      else if (e instanceof GoogleCalendarApiError) calendarError = dict.meals.syncFailed;
+      else throw e;
+    }
+  }
+  revalidatePath("/meals");
+  revalidatePath("/calendar");
+  const plan = await mealPlanning.getPlan(ownerSub, weekStartDateKey);
+  return {
+    week: await getMealWeekAction(weekStartDateKey),
+    inventory: await inventory.listInventory(ownerSub),
+    messages: plan ? (await mealChat.listMessages(ownerSub, plan.plan.id)).map(toView) : [],
+    calendarError,
+  };
+}
+
+export async function dismissMealChatProposalAction(
+  messageId: string,
+  weekStartDateKey: string,
+): Promise<{ messages: MealChatMessageView[] } | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    await mealChat.dismissProposal(ownerSub, messageId);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+  return { messages: await getMealChatAction(weekStartDateKey) };
 }
 
 /**
