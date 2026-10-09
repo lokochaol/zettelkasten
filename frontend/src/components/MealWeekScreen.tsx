@@ -16,9 +16,17 @@ import { ShoppingStockPanel } from "@/components/ShoppingStockPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
+import { replaceQuery } from "@/lib/viewState";
 import type { InventoryItem, MealKind, MealSlot } from "@/generated/prisma/client";
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
+
+/** Whole weeks from `todayKey` to `dateKey` (0 when absent or malformed). */
+function weeksFrom(todayKey: string, dateKey: string | undefined): number {
+  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return 0;
+  const days = (Date.parse(`${dateKey}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / 86_400_000;
+  return Number.isFinite(days) ? Math.round(days / 7) : 0;
+}
 
 /**
  * A week of meals and the single shopping trip that supplies it.
@@ -29,12 +37,12 @@ const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
  * themselves (see checkAgainstBrief) rather than taken from what it
  * claimed.
  */
-export function MealWeekScreen() {
+export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being looked at before a reload. */ initialWeek?: string }) {
   const { t, locale } = useI18n();
   const todayKey = todayKeyValue();
   // Weeks are navigable because ordering runs ahead of eating: the Coop
   // list for a week has to be written a fortnight before anyone eats it.
-  const [weekOffset, setWeekOffset] = useState(0);
+  const [weekOffset, setWeekOffset] = useState(() => weeksFrom(todayKey, initialWeek));
   const [data, setData] = useState<MealWeekView | null>(null);
   // Only what this run added on top of the stored check (a cut-off reply).
   // The rest is recomputed server-side on every read, so switching panes
@@ -51,7 +59,9 @@ export function MealWeekScreen() {
 
   useEffect(() => {
     getMealWeekAction(anchorKey).then(setData);
-  }, [anchorKey]);
+    // Kept in the address so a reload stays on this week (src/lib/viewState.ts).
+    replaceQuery({ week: weekOffset === 0 ? null : anchorKey });
+  }, [anchorKey, weekOffset]);
 
   // What's at home doesn't belong to a week, so it loads once.
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);

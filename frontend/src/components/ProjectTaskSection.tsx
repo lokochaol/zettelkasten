@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { replaceQuery } from "@/lib/viewState";
 import { BulletJournalLegend } from "@/components/BulletJournalLegend";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -41,6 +42,7 @@ export function ProjectTaskSection({
     // buffer would vanish — guard asks 保存 / 破棄 first.
     guard(async () => {
       setSelectedDate(date);
+      replaceQuery({ date });
       setLoading(true);
       const result = await getProjectTaskNoteAction(projectId, date);
       setNote(result);
