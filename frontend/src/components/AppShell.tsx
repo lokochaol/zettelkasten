@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AppSideBar, type ShellView } from "@/components/AppSideBar";
@@ -12,6 +12,7 @@ import { ThemeToggle } from "@/components/ThemeToggle";
 import { SignOutButton } from "@/components/SignOutButton";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
+import { usePaneScrollMemory } from "@/lib/viewState";
 
 /** Which index entry the header names, per screen — the bar's view keys and
  * the index's page keys are two vocabularies for the same six screens, and
@@ -56,6 +57,9 @@ export function AppShell({
 }) {
   const router = useRouter();
   const { t } = useI18n();
+  // A reload comes back to the same place in the pane — see src/lib/viewState.ts.
+  const paneRef = useRef<HTMLDivElement>(null);
+  usePaneScrollMemory(paneRef);
 
   return (
     <div className="relative flex h-dvh flex-col overflow-hidden bg-bg">
@@ -90,7 +94,7 @@ export function AppShell({
 
       <div className="flex min-h-0 flex-1">
         <AppSideBar active={view} />
-        <div className={`min-h-0 min-w-0 flex-1 overflow-auto ${bleed ? "" : "px-6 py-6"}`}>{children}</div>
+        <div ref={paneRef} className={`min-h-0 min-w-0 flex-1 overflow-auto ${bleed ? "" : "px-6 py-6"}`}>{children}</div>
       </div>
     </div>
   );

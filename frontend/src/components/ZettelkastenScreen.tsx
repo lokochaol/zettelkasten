@@ -31,6 +31,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useBackdropDismiss } from "@/lib/useBackdropDismiss";
 import { useUnsavedChanges, useRegisterUnsavedEditor } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import { readDraft, removeDraft, writeDraft } from "@/lib/draftBackup";
+import { replaceQuery } from "@/lib/viewState";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { RotateDeviceGate } from "@/components/RotateDeviceGate";
 
@@ -69,6 +70,12 @@ export function ZettelkastenScreen({
   const [openNoteId, setOpenNoteId] = useState<string | null>(deepLinkOpenId ?? null);
   const [col1Mode, setCol1Mode] = useState<"notes" | "literature">("notes");
   const [focusQuickNoteRequest, setFocusQuickNoteRequest] = useState<{ id: string; token: number } | null>(null);
+
+  // The open note lives in the address too (the same ?open= a deep link
+  // uses), so a reload reopens it — see src/lib/viewState.ts.
+  useEffect(() => {
+    replaceQuery({ open: openNoteId });
+  }, [openNoteId]);
 
   function focusQuickNote(id: string) {
     setFocusQuickNoteRequest((prev) => ({ id, token: (prev?.token ?? 0) + 1 }));
