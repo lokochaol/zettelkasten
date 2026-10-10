@@ -21,9 +21,15 @@ export interface ProfileInput {
   activityLevel: ActivityLevel;
   weeklyKgDelta: number;
   fallbackWeightKg: number | null;
-  /** The composition being aimed at. Once a scale is reporting, this is
-   * the goal and the weekly figure above is derived from it. */
+}
+
+/** The composition being aimed at — set on /training, where it sits next
+ * to the current one, rather than with the profile basics. Once a scale is
+ * reporting, the body fat figure is the goal and the weekly weight change
+ * is derived from it. */
+export interface CompositionTargetInput {
   targetBodyFatPercent: number | null;
+  targetLeanMassKg: number | null;
 }
 
 export async function getProfile(ownerSub: string): Promise<HealthProfile | null> {
@@ -46,17 +52,55 @@ export async function upsertProfile(ownerSub: string, input: ProfileInput): Prom
   if (input.fallbackWeightKg !== null && !(input.fallbackWeightKg >= 25 && input.fallbackWeightKg <= 300)) {
     throw new ValidationError("healthProfileInvalid", "Weight must be between 25 and 300 kg");
   }
+  const data = { ...input };
+  return prisma.healthProfile.upsert({ where: { ownerSub }, create: { ownerSub, ...data }, update: data });
+}
+
+export async function setCompositionTarget(ownerSub: string, input: CompositionTargetInput): Promise<HealthProfile> {
+  const profile = await getProfile(ownerSub);
+  if (!profile) throw new ValidationError("healthProfileMissing", "Fill in the health profile first");
   // Below the essential-fat line is not a goal anyone should be able to
   // type into a meal planner. The floors are the essential body fat
   // figures — the fat the body is built out of, not the fat it stores.
   if (input.targetBodyFatPercent !== null) {
-    const floor = input.sex === "MALE" ? 6 : 14;
+    const floor = profile.sex === "MALE" ? 6 : 14;
     if (!(input.targetBodyFatPercent >= floor && input.targetBodyFatPercent <= 40)) {
       throw new ValidationError("healthGoalTooAggressive", `Target body fat must be between ${floor}% and 40%`);
     }
   }
-  const data = { ...input };
-  return prisma.healthProfile.upsert({ where: { ownerSub }, create: { ownerSub, ...data }, update: data });
+  if (input.targetLeanMassKg !== null && !(input.targetLeanMassKg >= 20 && input.targetLeanMassKg <= 150)) {
+    throw new ValidationError("healthProfileInvalid", "Target lean mass must be between 20 and 150 kg");
+  }
+  return prisma.healthProfile.update({ where: { ownerSub }, data: input });
+}
+
+export interface CompositionWeek {
+  /** The last day of the 7-day window. */
+  endDateKey: string;
+  window: body.Window;
+}
+
+/**
+ * Week-by-week averages, oldest first, ending today — the line a trainer
+ * reads to see whether the work is moving the body, and which part of it.
+ * Weeks without a reading stay in the list with `days: 0`, so a gap shows
+ * as a gap rather than closing up.
+ */
+export async function compositionHistory(ownerSub: string, todayKey: string, weeks = 12): Promise<CompositionWeek[]> {
+  const rows = await prisma.healthDailyMetric.findMany({
+    where: { ownerSub, dateKey: { gt: shiftDateKey(todayKey, -7 * weeks), lte: todayKey } },
+  });
+  const measurements: body.Measurement[] = rows.map((r) => ({
+    dateKey: r.dateKey,
+    weightKg: r.weightKg,
+    bodyFatPercent: r.bodyFatPercent,
+    leanBodyMassKg: r.leanBodyMassKg,
+  }));
+  return Array.from({ length: weeks }, (_, i) => {
+    const endDateKey = shiftDateKey(todayKey, -7 * (weeks - 1 - i));
+    const startExclusive = shiftDateKey(endDateKey, -7);
+    return { endDateKey, window: body.averageOf(measurements.filter((m) => m.dateKey > startExclusive && m.dateKey <= endDateKey)) };
+  });
 }
 
 export async function listRecentMetrics(ownerSub: string, limit = 14): Promise<HealthDailyMetric[]> {

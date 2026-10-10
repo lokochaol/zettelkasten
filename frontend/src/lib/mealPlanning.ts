@@ -325,6 +325,13 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
 
   const composition = targetsNow.composition;
   const stock = await listInventory(ownerSub);
+  // Training days from /training, so protein and carbohydrate can sit
+  // where the work is. Read directly rather than through lib/training,
+  // which itself reads this file for the week's start day.
+  const trainingDays = await prisma.trainingSession.findMany({
+    where: { plan: { ownerSub }, dateKey: { gte: dates[0], lte: dates[6] }, status: { not: "SKIPPED" } },
+    orderBy: { dateKey: "asc" },
+  });
   const brief = [
     `対象の7日間: ${dates.join(", ")}`,
     `買い物日: ${shoppingDay}（この日に1回だけ買い物をする）`,
@@ -358,6 +365,13 @@ export async function generatePlan(ownerSub: string, weekStartDateKey: string, t
     `  食物繊維 ${t.fiberG} g 以上`,
     `  食塩相当量 ${t.saltMaxG} g 未満`,
     "",
+    ...(trainingDays.length > 0
+      ? [
+          "トレーニングの予定（この日はたんぱく質を3食に分けて確保し、トレーニング前後の食事に炭水化物を寄せる）:",
+          ...trainingDays.map((s) => `  ${s.dateKey} ${s.title}（${s.minutes}分）`),
+          "",
+        ]
+      : []),
     `週の食費: ${preference.weeklyBudgetYen} 円以内`,
     `台所に立つ日: 週 ${preference.cookSessionsPerWeek} 日まで（この日以外はCOOKの料理を置かない）`,
     `  → ${dates[0]}（週の初日）を1回目のまとめ調理の日にする`,
