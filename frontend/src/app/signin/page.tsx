@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { googleSignIn } from "@/app/actions";
 import { safeReturnPath } from "@/lib/returnPath";
 import { getLocale } from "@/lib/i18n/locale";
@@ -5,7 +6,8 @@ import { getDictionary } from "@/lib/i18n/dictionary";
 
 export default async function SignInPage(props: PageProps<"/signin">) {
   const { from } = await props.searchParams;
-  const dict = getDictionary(await getLocale());
+  const locale = await getLocale();
+  const dict = getDictionary(locale);
   return (
     <main className="flex min-h-screen flex-col items-center justify-center bg-bg px-6">
       <div className="w-full max-w-sm rounded-xl border border-line bg-surface p-10 text-center shadow-sm">
@@ -22,6 +24,17 @@ export default async function SignInPage(props: PageProps<"/signin">) {
           </button>
         </form>
       </div>
+      <nav className="mt-6 flex gap-4 font-mono text-[11px] text-ink-soft">
+        <Link href="/guide" className="hover:text-accent">
+          /guide
+        </Link>
+        <Link href="/privacy" className="hover:text-accent">
+          {locale === "ja" ? "プライバシーポリシー" : "Privacy Policy"}
+        </Link>
+        <Link href="/terms" className="hover:text-accent">
+          {locale === "ja" ? "利用規約" : "Terms of Service"}
+        </Link>
+      </nav>
     </main>
   );
 }

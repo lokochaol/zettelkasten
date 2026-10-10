@@ -18,12 +18,15 @@ export const proxy = auth((req) => {
  * content is about how the app works rather than about anyone's notes — see
  * src/app/robots.ts.
  *
+ * `privacy` and `terms` are exempt because Google's OAuth consent screen
+ * links to them, and a policy behind a login is no policy at all.
+ *
  * `api/health` is exempt for a different reason: the iPhone Shortcut that
  * posts there has no browser session, so a redirect to /signin is all it
  * would ever get. Its bearer token is the whole of its authentication —
  * see src/app/api/health/ingest/route.ts. */
 export const config = {
   matcher: [
-    "/((?!api/auth|api/cron|api/health|signin|guide|robots.txt|sitemap.xml|_next/static|_next/image|favicon.ico|icon.svg|apple-icon|icon-192.png|icon-512.png|manifest.webmanifest|sw.js|offline).*)",
+    "/((?!api/auth|api/cron|api/health|signin|guide|privacy|terms|robots.txt|sitemap.xml|_next/static|_next/image|favicon.ico|icon.svg|apple-icon|icon-192.png|icon-512.png|manifest.webmanifest|sw.js|offline).*)",
   ],
 };
