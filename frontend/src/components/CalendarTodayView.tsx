@@ -59,45 +59,51 @@ export function CalendarTodayView({
           column would be the opposite of unobtrusive. */}
       {initialNotes.length > 0 && <BulletJournalLegend />}
 
-      {initialNotes.map((note) => (
-        <HudFrame key={note.projectId} active={false} innerClassName="flex flex-col gap-2 rounded-xl px-4 py-3.5">
-          <div className="flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-ink">{note.projectName}</span>
-              {note.isDefault && (
-                <span className="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[9px] tracking-wider text-accent uppercase">
-                  {t.projects.defaultBadge}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={() => createQuickNote(note.projectId)}
-                disabled={creatingForProject === note.projectId}
-                className="flex items-center gap-1.5 rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
-              >
-                {creatingForProject === note.projectId && <Spinner size="xs" />}
-                {t.calendar.createQuickNoteButton}
-              </button>
-              <button
-                onClick={() => openProject(note.projectId)}
-                className="rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent"
-              >
-                {t.calendar.openProjectDetail}
-              </button>
-            </div>
-          </div>
-          <MarkdownNoteEditor
-            content={note.content}
-            // Same key as the project page's editor for this day, so text left
-            // unsaved in one place comes back in the other.
-            draftKey={`task:${note.projectId}:${dateKey}`}
-            onSave={async (content) => {
-              await upsertCalendarTaskNoteAction(note.projectId, dateKey, content);
-            }}
-          />
-        </HudFrame>
-      ))}
+      {/* Side by side where there's room: a day's task note is a few lines,
+          and one card per full-width row left most of the screen empty. */}
+      <div className="@container">
+        <div className="grid items-start gap-4 @[640px]:grid-cols-2 @[1000px]:grid-cols-3">
+          {initialNotes.map((note) => (
+            <HudFrame key={note.projectId} active={false} innerClassName="flex flex-col gap-2 rounded-xl px-4 py-3.5">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2">
+                  <span className="truncate font-bold text-ink">{note.projectName}</span>
+                  {note.isDefault && (
+                    <span className="rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[9px] tracking-wider text-accent uppercase">
+                      {t.projects.defaultBadge}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => createQuickNote(note.projectId)}
+                    disabled={creatingForProject === note.projectId}
+                    className="flex items-center gap-1.5 rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent disabled:opacity-50"
+                  >
+                    {creatingForProject === note.projectId && <Spinner size="xs" />}
+                    {t.calendar.createQuickNoteButton}
+                  </button>
+                  <button
+                    onClick={() => openProject(note.projectId)}
+                    className="rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent"
+                  >
+                    {t.calendar.openProjectDetail}
+                  </button>
+                </div>
+              </div>
+              <MarkdownNoteEditor
+                content={note.content}
+                // Same key as the project page's editor for this day, so text left
+                // unsaved in one place comes back in the other.
+                draftKey={`task:${note.projectId}:${dateKey}`}
+                onSave={async (content) => {
+                  await upsertCalendarTaskNoteAction(note.projectId, dateKey, content);
+                }}
+              />
+            </HudFrame>
+          ))}
+        </div>
+      </div>
 
       {openQuickNoteId && (
         <QuickNoteDetailOverlay
