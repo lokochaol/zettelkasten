@@ -1,113 +1,22 @@
 "use client";
 
-import { useState, useTransition, type ReactNode } from "react";
-import {
-  addInventoryItemAction,
-  removeInventoryItemAction,
-  toggleShoppingItemAction,
-  updateInventoryItemAction,
-} from "@/app/meals/actions";
+import { useState, useTransition } from "react";
+import { addInventoryItemAction, removeInventoryItemAction, updateInventoryItemAction } from "@/app/meals/actions";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useEnterKey } from "@/lib/ime";
-import type { InventoryItem, ShoppingItem, StorageLocation } from "@/generated/prisma/client";
+import type { InventoryItem, StorageLocation } from "@/generated/prisma/client";
 
 const LOCATIONS: StorageLocation[] = ["FRIDGE", "FREEZER", "PANTRY"];
 
 /**
- * The shopping list and what's already at home, side by side.
- *
- * At the shop the question is "do I still have some?" as often as "what's
- * next on the list?", so the two are one panel: next to each other where
- * there's room, two tabs on a phone. Ticking a line puts it into the fridge
- * list in the same tap (and unticking takes it back out — see
- * inventory.setShoppingItemBought), so by the time you're home the
- * inventory already says what you bought.
+ * The inventory, always on screen: it's what the next plan uses first, what
+ * the to-buy list subtracts, and what gets checked in the aisle ("do I
+ * still have some?"). Ticking a line on the to-buy list adds to it.
  */
-export function ShoppingStockPanel({
-  shoppingItems,
-  inventory,
-  onInventoryChange,
-  header,
-}: {
-  /** Empty when the week has no plan — the inventory is still useful then. */
-  shoppingItems: ShoppingItem[];
-  inventory: InventoryItem[];
-  onInventoryChange: (items: InventoryItem[]) => void;
-  /** The list's own heading row (estimate, actual spend), owned by the screen. */
-  header?: ReactNode;
-}) {
-  const { t } = useI18n();
-  const [tab, setTab] = useState<"shopping" | "stock">(shoppingItems.length > 0 ? "shopping" : "stock");
-  // Ticks are tracked here rather than read back from the plan, so a tick
-  // shows immediately and survives the inventory list re-rendering.
-  const [checked, setChecked] = useState<Record<string, boolean>>({});
-  const isChecked = (item: ShoppingItem) => checked[item.id] ?? item.checked;
-
-  function toggle(item: ShoppingItem, next: boolean) {
-    setChecked((prev) => ({ ...prev, [item.id]: next }));
-    void toggleShoppingItemAction(item.id, next).then(onInventoryChange);
-  }
-
-  const hasShopping = shoppingItems.length > 0;
-  const categories = [...new Set(shoppingItems.map((i) => i.category))];
-
-  const shoppingList = (
-    <div className="flex flex-col gap-2">
-      {header}
-      <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.stockBoughtNote}</p>
-      {categories.map((category) => (
-        <div key={category} className="flex flex-col gap-0.5">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{category}</p>
-          {shoppingItems
-            .filter((i) => i.category === category)
-            .map((item) => (
-              // Big rows: this is tapped one-handed in a supermarket aisle.
-              <label key={item.id} className="flex min-h-9 items-center gap-2.5 rounded-md px-1 active:bg-surface-alt">
-                <input
-                  type="checkbox"
-                  checked={isChecked(item)}
-                  onChange={(e) => toggle(item, e.target.checked)}
-                  className="h-4 w-4 shrink-0 accent-[var(--color-accent)]"
-                />
-                <span className={`min-w-0 flex-1 truncate text-[12px] ${isChecked(item) ? "text-ink-faint line-through" : "text-ink"}`}>
-                  {item.name}
-                </span>
-                <span className="shrink-0 font-mono text-[9.5px] text-ink-faint">{item.quantity}</span>
-                <span className="w-14 shrink-0 text-right font-mono text-[10px] text-ink-soft">¥{item.estimatedYen.toLocaleString()}</span>
-              </label>
-            ))}
-        </div>
-      ))}
-    </div>
-  );
-
-  const stockList = <StockList inventory={inventory} onChange={onInventoryChange} />;
-
+export function StockPanel({ inventory, onChange }: { inventory: InventoryItem[]; onChange: (items: InventoryItem[]) => void }) {
   return (
-    <section className="@container flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-      {/* Two tabs where it's narrow; on a wide screen both lists show at once
-          and the tabs aren't needed. */}
-      {hasShopping && (
-        <div className="flex gap-1 rounded-full border border-line-strong p-1 @[720px]:hidden">
-          {(["shopping", "stock"] as const).map((key) => (
-            <button
-              key={key}
-              type="button"
-              onClick={() => setTab(key)}
-              className={`flex-1 rounded-full px-3 py-1.5 font-mono text-[11px] transition-colors ${
-                tab === key ? "bg-accent text-on-accent" : "text-ink-soft"
-              }`}
-            >
-              {key === "shopping" ? t.meals.shoppingTab : t.meals.stockTab(inventory.length)}
-            </button>
-          ))}
-        </div>
-      )}
-
-      <div className="grid gap-6 @[720px]:grid-cols-2">
-        {hasShopping && <div className={tab === "shopping" ? "" : "hidden @[720px]:block"}>{shoppingList}</div>}
-        <div className={!hasShopping || tab === "stock" ? "" : "hidden @[720px]:block"}>{stockList}</div>
-      </div>
+    <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
+      <StockList inventory={inventory} onChange={onChange} />
     </section>
   );
 }

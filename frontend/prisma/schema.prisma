@@ -688,10 +688,15 @@ model PlannedMeal {
   @@map("planned_meal")
 }
 
+/// A line to buy. Belongs to exactly one of: a plan (the list the planner
+/// priced the week with — what the budget check reads), or a purchase list
+/// (what the owner actually takes to the shop — see PurchaseList).
 model ShoppingItem {
   id           String   @id @default(uuid())
-  planId       String   @map("plan_id")
-  plan         MealPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+  planId       String?  @map("plan_id")
+  plan         MealPlan? @relation(fields: [planId], references: [id], onDelete: Cascade)
+  listId       String?  @map("list_id")
+  list         PurchaseList? @relation(fields: [listId], references: [id], onDelete: Cascade)
   category     String
   name         String
   quantity     String
@@ -703,7 +708,29 @@ model ShoppingItem {
   inventoryItem InventoryItem?
 
   @@index([planId])
+  @@index([listId])
   @@map("shopping_item")
+}
+
+/// What to buy on the next trip: the meals from one day for a few days,
+/// less what's already at home. Made on request, after the meals are
+/// settled, rather than with the plan — the plan is for a calendar week,
+/// a trip covers whatever days come next, and the meals in between may have
+/// been changed since. One per owner; making a new one replaces it.
+model PurchaseList {
+  id          String   @id @default(uuid())
+  ownerSub    String   @unique @map("owner_sub")
+  fromDateKey String   @map("from_date_key")
+  toDateKey   String   @map("to_date_key")
+  /// The meals the list was made from, as text. When the meals in those
+  /// days no longer match, the list is out of date and says so.
+  mealsDigest String   @map("meals_digest")
+  note        String   @default("")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  items ShoppingItem[]
+
+  @@map("purchase_list")
 }
 
 enum ExpenseSource {

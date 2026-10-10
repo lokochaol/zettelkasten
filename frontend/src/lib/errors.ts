@@ -19,6 +19,8 @@ export type DomainErrorCode =
   | "mealPlanNotFound"
   | "inventoryInvalid"
   | "inventoryNotFound"
+  | "purchaseListInvalid"
+  | "purchaseListNoMeals"
   | "mealChatInvalid"
   | "mealChatProposalGone"
   | "timeBlockInvalid"

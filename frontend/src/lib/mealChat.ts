@@ -12,12 +12,14 @@ export type { MealChatMessage };
  *
  * Plans meet the shop: the chicken was sold out so it's pork, the eggs ran
  * out early, Thursday's dinner isn't going to happen. Said in a sentence,
- * that turns into three edits across the plan, the fridge and the shopping
- * list — so the owner says it, and the planner proposes the edits.
+ * that turns into edits to the plan and the inventory — so the owner says
+ * it, and the planner proposes the edits. What to buy follows from those
+ * two, so it isn't proposed here: the purchase list is remade from the
+ * settled meals afterwards (src/lib/purchaseList.ts).
  *
  * A proposal is only a proposal. It's stored with the assistant's reply and
- * shown as a card; nothing in the plan, the inventory or the shopping list
- * changes until it's applied. Replacement meals land in the same plan the
+ * shown as a card; nothing in the plan or the inventory changes
+ * until it's applied. Replacement meals land in the same plan the
  * calendar reads, so applying one is what "reflects it in the calendar"
  * means.
  *
@@ -56,21 +58,13 @@ export interface ProposedStock {
   location: StorageLocation;
 }
 
-export interface ProposedShopping {
-  category: string;
-  name: string;
-  quantity: string;
-  estimatedYen: number;
-}
-
 export interface Proposal {
   meals: ProposedMeal[];
   inventory: ProposedStock[];
-  shopping: ProposedShopping[];
 }
 
 export function isEmptyProposal(p: Proposal): boolean {
-  return p.meals.length === 0 && p.inventory.length === 0 && p.shopping.length === 0;
+  return p.meals.length === 0 && p.inventory.length === 0;
 }
 
 const num = (v: unknown): number => {
@@ -135,20 +129,7 @@ export function parseChatReply(value: unknown, changeable: Map<string, string>):
     });
   }
 
-  const shopping: ProposedShopping[] = [];
-  for (const s of Array.isArray(raw.shopping) ? raw.shopping : []) {
-    const item = (s ?? {}) as Record<string, unknown>;
-    const name = str(item.name, 100);
-    if (!name) continue;
-    shopping.push({
-      category: str(item.category, 40) || "その他",
-      name,
-      quantity: str(item.quantity, 100),
-      estimatedYen: Math.round(num(item.estimatedYen)),
-    });
-  }
-
-  return { reply: str(raw.reply, 2000), proposal: { meals, inventory, shopping } };
+  return { reply: str(raw.reply, 2000), proposal: { meals, inventory } };
 }
 
 const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の今週の献立の担当です。買い物中や調理の前後に相談を受け、必要なら残りの献立を組み直します。
@@ -156,11 +137,11 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の今週の献
 相談の例: 「鶏むね肉が売り切れで豚こまを買った」「卵を使い切った」「木曜の夜は外食になった」「この料理は作る気が起きない」
 
 すること:
-- 相手の話に合わせて、残りの献立の差し替え・家にある食材（在庫）の変化・買い足しを提案する。
+- 相手の話に合わせて、残りの献立の差し替えと、家にある食材（在庫）の変化を提案する。買い物リストはこの後に献立と在庫から作り直されるので、買い足しは提案しなくてよい。
 - 差し替えは必要な食事だけにする。変えなくてよい食事は meals に含めない。「変更してよい食事」に挙がっていない食事は絶対に変えない。
-- 差し替えた日も1日の栄養目標を満たすようにする（特にたんぱく質）。家にある食材を優先して使い、それでも足りないものだけを shopping に買い足しとして入れる。
+- 差し替えた日も1日の栄養目標を満たすようにする（特にたんぱく質）。家にある食材を優先して使う。
 - 在庫の変化は、相手の話から確実に分かるものだけを inventory に入れる（買った物は add、使い切った・捨てた物は remove、量が変わった物は set）。推測で在庫を消さない。
-- 相談が質問だけで、何も変える必要がなければ meals・inventory・shopping は空の配列にする。
+- 相談が質問だけで、何も変える必要がなければ meals・inventory は空の配列にする。
 - reply は日本語で、何をどう変える提案かを2〜4文で簡潔に。変える必要がないならその理由を短く。
 - 苦手な食材は使わない。アレルギーの食材は絶対に使わない。
 
@@ -172,9 +153,6 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の今週の献
   ],
   "inventory": [
     { "op": "add", "name": "豚こま切れ肉", "quantity": "300g", "location": "FRIDGE" }
-  ],
-  "shopping": [
-    { "category": "野菜", "name": "キャベツ", "quantity": "1/2玉", "estimatedYen": 120 }
   ]
 }
 
@@ -192,7 +170,7 @@ export async function listMessages(ownerSub: string, planId: string): Promise<Me
 async function requirePlan(ownerSub: string, weekStartDateKey: string) {
   const plan = await prisma.mealPlan.findUnique({
     where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
-    include: { meals: { orderBy: [{ dateKey: "asc" }, { slot: "asc" }] }, shoppingItems: { orderBy: { sortOrder: "asc" } } },
+    include: { meals: { orderBy: [{ dateKey: "asc" }, { slot: "asc" }] } },
   });
   if (!plan) throw new ValidationError("mealPlanNotFound", "There is no plan for that week");
   return plan;
@@ -222,9 +200,10 @@ export async function sendMessage(
   const content = text.trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!content) throw new ValidationError("mealChatInvalid", "message is empty");
   const plan = await requirePlan(ownerSub, weekStartDateKey);
-  const [preference, stock, history] = await Promise.all([
+  const [preference, stock, purchase, history] = await Promise.all([
     prisma.mealPreference.findUnique({ where: { ownerSub } }),
     listInventory(ownerSub),
+    prisma.purchaseList.findUnique({ where: { ownerSub }, include: { items: { orderBy: { sortOrder: "asc" } } } }),
     prisma.mealChatMessage.findMany({ where: { planId: plan.id }, orderBy: { createdAt: "desc" }, take: HISTORY_TURNS }),
   ]);
 
@@ -254,8 +233,12 @@ export async function sendMessage(
     "家にある食材（在庫）:",
     inventoryBrief(stock),
     "",
-    "今週の買い物リスト（✓は買えたもの）:",
-    ...plan.shoppingItems.map((i) => `  ${i.checked ? "✓" : "□"} ${i.name} ${i.quantity}`),
+    ...(purchase
+      ? [
+          `購入予定リスト（${purchase.fromDateKey}〜${purchase.toDateKey}の分。✓は買えたもの）:`,
+          ...purchase.items.map((i) => `  ${i.checked ? "✓" : "□"} ${i.name} ${i.quantity}`),
+        ]
+      : ["購入予定リスト: まだ作っていない"]),
     "",
     "これまでの会話:",
     ...(history.length === 0
@@ -293,15 +276,14 @@ function readProposal(value: unknown): Proposal | null {
   return {
     meals: Array.isArray(p.meals) ? p.meals : [],
     inventory: Array.isArray(p.inventory) ? p.inventory : [],
-    shopping: Array.isArray(p.shopping) ? p.shopping : [],
   };
 }
 
 const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
 
 /**
- * Applies a proposal: replaces the meals, changes the stock, adds the extra
- * shopping — all in one transaction, so a half-applied proposal can't exist.
+ * Applies a proposal: replaces the meals and changes the stock — all in one
+ * transaction, so a half-applied proposal can't exist.
  *
  * Re-checked at apply time, not trusted from when it was made: a meal eaten
  * in the meantime, or a day that has passed, is left alone. A proposal can
@@ -318,7 +300,7 @@ export async function applyProposal(
 ): Promise<{ calendarNeedsUpdate: boolean }> {
   const message = await prisma.mealChatMessage.findFirst({
     where: { id: messageId, plan: { ownerSub } },
-    include: { plan: { include: { meals: true, shoppingItems: { select: { sortOrder: true } } } } },
+    include: { plan: { include: { meals: true } } },
   });
   const proposal = readProposal(message?.proposal);
   if (!message || !proposal || message.appliedAt || message.dismissedAt) {
@@ -326,7 +308,6 @@ export async function applyProposal(
   }
   const changeable = changeableMeals(message.plan.meals, todayKey);
   const meals = proposal.meals.filter((m) => changeable.has(`${m.dateKey}|${m.slot}`));
-  let sortOrder = Math.max(-1, ...message.plan.shoppingItems.map((i) => i.sortOrder)) + 1;
   const replacedKeys = new Set(meals.map((m) => `${m.dateKey}|${m.slot}`));
   const calendarNeedsUpdate = message.plan.meals.some(
     (m) => m.googleEventId && replacedKeys.has(`${m.dateKey}|${m.slot}`),
@@ -366,12 +347,6 @@ export async function applyProposal(
           await tx.inventoryItem.create({ data: { ownerSub, name: s.name, quantity: s.quantity, location: s.location } });
         }
       }
-    }
-
-    for (const s of proposal.shopping) {
-      await tx.shoppingItem.create({
-        data: { planId: message.planId, category: s.category, name: s.name, quantity: s.quantity, estimatedYen: s.estimatedYen, sortOrder: sortOrder++ },
-      });
     }
 
     await tx.mealChatMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });

@@ -52,6 +52,10 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.inventoryInvalid;
     case "inventoryNotFound":
       return dict.inventoryNotFound;
+    case "purchaseListInvalid":
+      return dict.purchaseListInvalid;
+    case "purchaseListNoMeals":
+      return dict.purchaseListNoMeals;
     case "mealChatInvalid":
       return dict.mealChatInvalid;
     case "mealChatProposalGone":

@@ -250,18 +250,6 @@ function ProposalCard({
           ))}
         </div>
       )}
-      {proposal.shopping.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{t.meals.chatShoppingLabel}</p>
-          {proposal.shopping.map((s, i) => (
-            <span key={i} className="text-[11.5px] text-ink">
-              {s.name}
-              <span className="ml-1.5 font-mono text-[10px] text-ink-faint">{s.quantity}</span>
-              <span className="ml-1.5 font-mono text-[10px] text-ink-soft">¥{s.estimatedYen.toLocaleString()}</span>
-            </span>
-          ))}
-        </div>
-      )}
 
       {state === "applied" ? (
         <p className="font-mono text-[10.5px] text-accent">{t.meals.chatApplied}</p>

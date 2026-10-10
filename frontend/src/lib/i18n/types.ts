@@ -256,8 +256,18 @@ export interface Dictionary {
     prevWeek: string;
     nextWeek: string;
     weeksAhead: (n: number) => string;
-    shoppingTab: string;
-    stockTab: (n: number) => string;
+    purchaseIntro: string;
+    purchaseFrom: string;
+    purchaseDays: (n: number) => string;
+    purchaseCreate: string;
+    purchaseRecreate: string;
+    purchaseCreating: string;
+    purchaseRange: (from: string, to: string) => string;
+    purchaseProgress: (done: number, total: number) => string;
+    purchaseTotal: (yen: number) => string;
+    purchaseStale: string;
+    purchasePast: string;
+    purchaseFinish: string;
     stockHeading: string;
     stockBoughtNote: string;
     stockEmpty: string;
@@ -274,7 +284,6 @@ export interface Dictionary {
     chatSuggestions: string[];
     chatMealsLabel: string;
     chatStockLabel: string;
-    chatShoppingLabel: string;
     chatApply: string;
     chatApplying: string;
     chatApplied: string;
@@ -718,6 +727,8 @@ export interface Dictionary {
     mealPlanNotFound: string;
     inventoryInvalid: string;
     inventoryNotFound: string;
+    purchaseListInvalid: string;
+    purchaseListNoMeals: string;
     mealChatInvalid: string;
     mealChatProposalGone: string;
     timeBlockInvalid: string;
