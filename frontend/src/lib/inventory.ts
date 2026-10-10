@@ -84,7 +84,7 @@ export async function removeInventoryItem(ownerSub: string, id: string): Promise
  * out. One transaction, so the list and the fridge can't disagree.
  */
 export async function setShoppingItemBought(ownerSub: string, itemId: string, checked: boolean): Promise<void> {
-  const item = await prisma.shoppingItem.findFirst({ where: { id: itemId, plan: { ownerSub } } });
+  const item = await prisma.shoppingItem.findFirst({ where: { id: itemId, OR: [{ plan: { ownerSub } }, { list: { ownerSub } }] } });
   if (!item) throw new ValidationError("mealPlanNotFound", "Shopping item not found");
   await prisma.$transaction(async (tx) => {
     await tx.shoppingItem.update({ where: { id: itemId }, data: { checked } });

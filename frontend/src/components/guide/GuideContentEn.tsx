@@ -73,7 +73,7 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning and the meal chat, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning, the meal chat and the to-buy list, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
@@ -423,12 +423,16 @@ export function GuideContentEn() {
                 body: "Put the week's meals into your calendar at the meal times you've set.",
               },
               {
-                title: "To-buy list and inventory",
-                body: "Tick what you bought on the to-buy list and it goes into the inventory (fridge, freezer or pantry); untick to take it out. On a phone the two lists are tabs; on a wide screen they sit side by side. The next plan uses what's at home first.",
+                title: "Replan by chat",
+                body: "Write something like “they were out of chicken, so I bought pork” or “eating out on Thursday” and you get a proposal for the meals from today on that haven't been eaten. Nothing changes until you check the meal and inventory changes and press Apply — then the calendar is rewritten too.",
               },
               {
-                title: "Replan by chat",
-                body: "Write something like “they were out of chicken, so I bought pork” and you get a proposal for the meals from today on that haven't been eaten. Nothing changes until you check the meal, inventory and shopping changes and press Apply — then the calendar is rewritten too.",
+                title: "To-buy list",
+                body: "Once the meals are settled, choose the day you shop and how many days to buy for, and press “Make the to-buy list”. It lists what those days' recipes need, less what's in the inventory. If the meals change, the list offers to remake itself. Tick what you buy and it goes into the inventory; press “Done shopping” to close it.",
+              },
+              {
+                title: "Inventory",
+                body: "Always on screen, split into fridge, freezer and cupboard, with amounts and places editable in place. The next plan and the next to-buy list both use what's at home first.",
               },
             ]}
           />

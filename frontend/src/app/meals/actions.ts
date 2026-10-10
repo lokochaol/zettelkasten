@@ -5,6 +5,7 @@ import * as mealPlanning from "@/lib/mealPlanning";
 import * as expenses from "@/lib/expenses";
 import * as inventory from "@/lib/inventory";
 import * as mealChat from "@/lib/mealChat";
+import * as purchaseList from "@/lib/purchaseList";
 import { shiftDateKey } from "@/lib/dateKey";
 import type { MealPlanView, PreferenceInput } from "@/lib/mealPlanning";
 import { AiJsonError } from "@/lib/aiJson";
@@ -103,6 +104,41 @@ export async function toggleShoppingItemAction(itemId: string, checked: boolean)
   await inventory.setShoppingItemBought(ownerSub, itemId, checked);
   revalidatePath("/meals");
   return inventory.listInventory(ownerSub);
+}
+
+/* ---------- purchase list ---------- */
+
+export type PurchaseListView = purchaseList.PurchaseListView;
+
+export async function getPurchaseListAction(): Promise<PurchaseListView | null> {
+  return purchaseList.getPurchaseList(await requireOwnerSub());
+}
+
+/** Makes the to-buy list for `days` days from `fromDateKey` — the step
+ * after the meals are settled. Replaces the current list. */
+export async function createPurchaseListAction(
+  fromDateKey: string,
+  days: number,
+): Promise<{ list: PurchaseListView; inventory: inventory.InventoryItem[] } | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  try {
+    const list = await purchaseList.createPurchaseList(ownerSub, fromDateKey, days);
+    revalidatePath("/meals");
+    return { list, inventory: await inventory.listInventory(ownerSub) };
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    if (e instanceof AiJsonError) {
+      console.error("purchase list failed", e.code, e.message);
+      return { error: aiErrorMessage(getDictionary(locale), e) };
+    }
+    throw e;
+  }
+}
+
+export async function clearPurchaseListAction(): Promise<void> {
+  await purchaseList.clearPurchaseList(await requireOwnerSub());
+  revalidatePath("/meals");
 }
 
 /* ---------- inventory ---------- */

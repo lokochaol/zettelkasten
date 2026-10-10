@@ -6,12 +6,15 @@ import {
   generateMealPlanAction,
   saveMealPreferenceAction,
   syncMealsToCalendarAction,
+  getPurchaseListAction,
   listInventoryAction,
   type MealWeekView,
+  type PurchaseListView,
 } from "@/app/meals/actions";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { MealChatPanel } from "@/components/MealChatPanel";
-import { ShoppingStockPanel } from "@/components/ShoppingStockPanel";
+import { PurchaseListPanel } from "@/components/PurchaseListPanel";
+import { StockPanel } from "@/components/StockPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
@@ -62,10 +65,14 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
     replaceQuery({ week: weekOffset === 0 ? null : anchorKey });
   }, [anchorKey, weekOffset]);
 
-  // What's at home doesn't belong to a week, so it loads once.
+  // What's at home, and the list for the next trip, don't belong to the
+  // week being looked at, so they load once. `undefined` is "not loaded
+  // yet", `null` is "no list".
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
+  const [purchase, setPurchase] = useState<PurchaseListView | null | undefined>(undefined);
   useEffect(() => {
     listInventoryAction().then(setInventory);
+    getPurchaseListAction().then(setPurchase);
   }, []);
 
   // Switching panes is safe — the request keeps running and the plan is
@@ -306,37 +313,25 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         </section>
       )}
 
-      {/* Shown even without a plan: the fridge list is worth keeping either way. */}
-      <ShoppingStockPanel
-        key={data.weekStartDateKey}
-        shoppingItems={view?.shoppingItems ?? []}
-        inventory={inventory ?? []}
-        onInventoryChange={setInventory}
-        header={
-          view && (
-            <>
-              <div className="flex items-center gap-3">
-                <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.shoppingHeading}</p>
-                <span
-                  className={`ml-auto font-mono text-[11px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink"}`}
-                >
-                  {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
-                </span>
-              </div>
-              {/* The estimate was made before the week; this is what the week
-                  actually cost. Shown together because the gap is what makes
-                  the next budget a real number rather than a wish. */}
-              <p
-                className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}
-              >
-                {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
-              </p>
-              <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>
-            </>
-          )
-        }
-      />
+      {view && (
+        // What the plan was priced at when it was made, next to what the
+        // week actually cost. Shown together because the gap is what makes
+        // the next budget a real number rather than a wish.
+        <div className="flex flex-col gap-0.5">
+          <p className={`font-mono text-[10.5px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
+            {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
+          </p>
+          <p className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
+            {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
+          </p>
+          <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>
+        </div>
+      )}
 
+      {/* The flow, top to bottom: the meals above, adjusted here by chat,
+          then the to-buy list made from them — next to the inventory, which
+          is always shown because it's checked both while planning and in
+          the shop. */}
       {view && (
         <MealChatPanel
           key={`chat:${data.weekStartDateKey}`}
@@ -345,9 +340,21 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
           onApplied={(week, items) => {
             setData(week);
             setInventory(items);
+            // Changed meals can leave the to-buy list behind; re-read it so
+            // it can say so.
+            getPurchaseListAction().then(setPurchase);
           }}
         />
       )}
+
+      <div className="@container">
+        <div className="grid items-start gap-6 @[760px]:grid-cols-2">
+          {purchase !== undefined && (
+            <PurchaseListPanel list={purchase} todayKey={todayKey} onListChange={setPurchase} onInventoryChange={setInventory} />
+          )}
+          <StockPanel inventory={inventory ?? []} onChange={setInventory} />
+        </div>
+      </div>
 
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
         <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.prefHeading}</p>
