@@ -536,8 +536,8 @@ export const en: Dictionary = {
     summaryPlaceholder: "What the source said (in your own words)",
   },
   signin: {
-    title: "Zettelkasten",
-    tagline: "A personal knowledge system where your notes grow by linking to one another.",
+    title: "hibino",
+    tagline: "Notes, plans, meals, money and training — written down and put together in one place.",
     googleButton: "Sign in with Google",
   },
   scratch: {

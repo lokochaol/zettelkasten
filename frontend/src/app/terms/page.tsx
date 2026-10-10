@@ -16,7 +16,7 @@ export default async function TermsPage() {
 function Ja() {
   return (
     <LegalPage title="利用規約" updated="最終更新日: 2026年10月11日">
-      <p className="text-ink-soft">この規約は、hibino（以下「本サービス」）の利用条件を定めるものです。本サービスを利用した時点で、この規約に同意したものとします。</p>
+      <p className="text-ink-soft">この規約は、日々の（hibino。以下「本サービス」）の利用条件を定めるものです。本サービスを利用した時点で、この規約に同意したものとします。</p>
       <Section heading="1. サービスの内容">
         <p className="text-ink-soft">本サービスは、メモ・予定・献立・家計・運動などを個人で記録・計画するためのウェブアプリです。Googleアカウントでログインして利用します。</p>
       </Section>
