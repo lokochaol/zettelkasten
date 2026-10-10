@@ -5,9 +5,9 @@ import { progressReporter, type ChatProgress } from "@/lib/chatProgress";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
 import { currentTargets } from "@/lib/health";
-import { guessLocation, inventoryBrief, isLocation, listInventory } from "@/lib/inventory";
+import { inventoryBrief, listInventory } from "@/lib/inventory";
 import { getPreference } from "@/lib/mealPlanning";
-import type { MealChatMessage, MealKind, MealSlot, PlannedMeal, StorageLocation } from "@/generated/prisma/client";
+import type { MealChatMessage, MealKind, MealSlot, PlannedMeal } from "@/generated/prisma/client";
 
 export type { MealChatMessage };
 
@@ -17,14 +17,18 @@ export type { MealChatMessage };
  * It starts before there are any meals: "plan next week — I cook on Monday
  * and Thursday, eating out on Friday" gets a proposal for the whole week.
  * Then the same conversation carries every change after it — a different
- * dinner on the 14th, the chicken sold out so it's pork, eggs used up.
+ * dinner on the 14th, the chicken sold out so it's pork.
  * What to buy follows from the settled meals and the inventory, so it isn't
  * proposed here: the purchase list is made from them afterwards
  * (src/lib/purchaseList.ts).
  *
+ * The chat reads the inventory but never changes it. Stock moves only when
+ * the owner ticks something bought on the purchase list, or edits it by
+ * hand: a model inferring "you must have 2 kg of rice now" from a
+ * conversation put things in the fridge list that weren't in the fridge.
+ *
  * A proposal is only a proposal. It's stored with the assistant's reply and
- * shown as a card; nothing in the plan or the inventory changes until it's
- * applied. Applying the first one creates the week's plan; meals land in the
+ * shown as a card; nothing in the plan changes until it's applied. Applying the first one creates the week's plan; meals land in the
  * same plan the calendar reads, so applying is what "reflects it in the
  * calendar" means.
  *
@@ -60,20 +64,12 @@ export interface ProposedMeal {
   replaces: string;
 }
 
-export interface ProposedStock {
-  op: "add" | "set" | "remove";
-  name: string;
-  quantity: string;
-  location: StorageLocation;
-}
-
 export interface Proposal {
   meals: ProposedMeal[];
-  inventory: ProposedStock[];
 }
 
 export function isEmptyProposal(p: Proposal): boolean {
-  return p.meals.length === 0 && p.inventory.length === 0;
+  return p.meals.length === 0;
 }
 
 const num = (v: unknown): number => {
@@ -92,7 +88,7 @@ const str = (v: unknown, max = 500): string => (typeof v === "string" ? v.trim()
  * non-negative, kinds and locations fall back to safe defaults.
  */
 export function parseChatReply(value: unknown, changeable: Map<string, string>): { reply: string; proposal: Proposal } {
-  const raw = (value ?? {}) as { reply?: unknown; meals?: unknown; inventory?: unknown; shopping?: unknown };
+  const raw = (value ?? {}) as { reply?: unknown; meals?: unknown };
   const seen = new Set<string>();
 
   const meals: ProposedMeal[] = [];
@@ -123,22 +119,7 @@ export function parseChatReply(value: unknown, changeable: Map<string, string>):
   }
   meals.sort((a, b) => a.dateKey.localeCompare(b.dateKey) || SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot));
 
-  const inventory: ProposedStock[] = [];
-  for (const s of Array.isArray(raw.inventory) ? raw.inventory : []) {
-    const item = (s ?? {}) as Record<string, unknown>;
-    const op = str(item.op, 10);
-    const name = str(item.name, 100);
-    if ((op !== "add" && op !== "set" && op !== "remove") || !name) continue;
-    const quantity = str(item.quantity, 100);
-    inventory.push({
-      op,
-      name,
-      quantity,
-      location: isLocation(item.location) ? item.location : guessLocation("", name, quantity),
-    });
-  }
-
-  return { reply: str(raw.reply, 2000), proposal: { meals, inventory } };
+  return { reply: str(raw.reply, 2000), proposal: { meals } };
 }
 
 const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担当です。会話しながら1週間の献立を一緒に作り、その後も日ごとの変更や買い物中の相談を受けて組み直します。
@@ -146,15 +127,14 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担
 相談の例:
 - 献立づくり: 「この週の献立を作って」「月曜と木曜にまとめて作る。金曜の夜は外食」「平日の朝はパンで簡単に」
 - 日ごとの変更: 「14日の夕食を魚にして」「水曜は帰りが遅いので夜は温めるだけに」
-- 買い物・在庫: 「鶏むね肉が売り切れで豚こまを買った」「卵を使い切った」
+- 買い物中: 「鶏むね肉が売り切れで豚こまを買った」（買ったものに合わせて献立を組み直す）
 
 すること:
-- 相手の話に合わせて、献立（meals）と家にある食材の変化（inventory）を提案する。買い物リストは献立と在庫から別に作るので、買う物は提案しなくてよい。
+- 相手の話に合わせて、献立（meals）を提案する。在庫（家にある食材）は本人が自分で記録するので、在庫の変更は提案しない。買い物リストは献立と在庫から別に作るので、買う物も提案しなくてよい。
 - 「空き」になっている食事は新しく埋めてよい。献立づくりを頼まれたら、空きの食事をまとめて提案する（朝・昼・夕を日ごとにすべて）。
 - 変更は必要な食事だけにする。変えなくてよい食事は meals に含めない。「変更してよい食事」に挙がっていない食事は絶対に変えない。
-- 在庫の変化は、相手の話から確実に分かるものだけを inventory に入れる（買った物は add、使い切った・捨てた物は remove、量が変わった物は set）。推測で在庫を消さない。
 - 情報が足りなくて決められないことがあれば、meals は空にして reply で短く質問してよい。ただし、決められる範囲は提案する。
-- 相談が質問だけで、何も変える必要がなければ meals・inventory は空の配列にする。
+- 相談が質問だけで、何も変える必要がなければ meals は空の配列にする。
 - reply は日本語で、何をどう提案したかを2〜4文で簡潔に。
 
 献立のルール:
@@ -178,13 +158,10 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担
   "reply": "相手への返事",
   "meals": [
     { "dateKey": "YYYY-MM-DD", "slot": "DINNER", "kind": "COOK", "title": "料理名", "recipe": "材料（分量つき）と作り方。120字以内。", "kcal": 520, "proteinG": 32, "fatG": 15, "carbG": 55, "fiberG": 6, "saltG": 1.8, "prepMinutes": 20 }
-  ],
-  "inventory": [
-    { "op": "add", "name": "豚こま切れ肉", "quantity": "300g", "location": "FRIDGE" }
   ]
 }
 
-slot は BREAKFAST / LUNCH / DINNER、kind は COOK（その日に作る）/ BATCH（作り置きを食べる）/ READY（冷凍食品・惣菜・外食）、location は FRIDGE（冷蔵）/ FREEZER（冷凍）/ PANTRY（常温）のいずれか。`;
+slot は BREAKFAST / LUNCH / DINNER、kind は COOK（その日に作る）/ BATCH（作り置きを食べる）/ READY（冷凍食品・惣菜・外食）のいずれか。`;
 
 const SLOT_LABEL: Record<MealSlot, string> = { BREAKFAST: "朝", LUNCH: "昼", DINNER: "夕" };
 
@@ -367,14 +344,11 @@ function readProposal(value: unknown): Proposal | null {
   const p = value as Partial<Proposal>;
   return {
     meals: Array.isArray(p.meals) ? p.meals : [],
-    inventory: Array.isArray(p.inventory) ? p.inventory : [],
   };
 }
 
-const sameName = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
-
 /**
- * Applies a proposal: fills or replaces the meals and changes the stock —
+ * Applies a proposal: fills or replaces the meals —
  * all in one transaction, so a half-applied proposal can't exist. The
  * week's plan is created by the first one applied, with the targets and
  * constraints of that moment, the same snapshot a plan always carries.
@@ -436,7 +410,7 @@ export async function applyProposal(
         })
       ).id;
     }
-    // A whole week is 21 meals and a dozen stock changes. Written as a few
+    // A whole week is 21 meals. Written as a few
     // bulk statements rather than one query per row: on the production
     // database each query is a network round trip, and one at a time a full
     // week ran past the transaction's time limit and was rolled back.
@@ -466,21 +440,6 @@ export async function applyProposal(
           googleEventId: eventIds.get(`${m.dateKey}|${m.slot}`) ?? null,
         })),
       });
-    }
-
-    if (proposal.inventory.length > 0) {
-      const stock = await tx.inventoryItem.findMany({ where: { ownerSub } });
-      const removeIds = new Set<string>();
-      const adds: { ownerSub: string; name: string; quantity: string; location: StorageLocation }[] = [];
-      for (const s of proposal.inventory) {
-        const matches = stock.filter((i) => sameName(i.name, s.name) && !removeIds.has(i.id));
-        if (s.op === "remove") matches.forEach((i) => removeIds.add(i.id));
-        else if (s.op === "set" && matches.length > 0) {
-          await tx.inventoryItem.update({ where: { id: matches[0].id }, data: { quantity: s.quantity, location: s.location } });
-        } else adds.push({ ownerSub, name: s.name, quantity: s.quantity, location: s.location });
-      }
-      if (removeIds.size > 0) await tx.inventoryItem.deleteMany({ where: { id: { in: [...removeIds] } } });
-      if (adds.length > 0) await tx.inventoryItem.createMany({ data: adds });
     }
 
     await tx.mealChatMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });

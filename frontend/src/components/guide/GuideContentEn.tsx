@@ -425,7 +425,7 @@ export function GuideContentEn() {
               },
               {
                 title: "Make and change it by chat",
-                body: "Ask “plan this week — I batch-cook on Monday and Thursday” for a whole week, or write “fish for dinner on the 14th”, “they were out of chicken, so I bought pork” or “eating out on Thursday” for a proposal covering the meals from today on that haven't been eaten. Tapping a day, an empty meal, or “Ask about this meal” in a recipe puts its date in the box. Nothing changes until you check the meal and inventory changes and press Apply — then the calendar is rewritten too.",
+                body: "Ask “plan this week — I batch-cook on Monday and Thursday” for a whole week, or write “fish for dinner on the 14th”, “they were out of chicken, so I bought pork” or “eating out on Thursday” for a proposal covering the meals from today on that haven't been eaten. Tapping a day, an empty meal, or “Ask about this meal” in a recipe puts its date in the box. Nothing changes until you check the meal changes and press Apply — then the calendar is rewritten too. The chat never changes the inventory.",
               },
               {
                 title: "To-buy list",
@@ -433,7 +433,7 @@ export function GuideContentEn() {
               },
               {
                 title: "Inventory",
-                body: "Always on screen, split into fridge, freezer and cupboard, with amounts and places editable in place. The next plan and the next to-buy list both use what's at home first.",
+                body: "Always on screen, split into fridge, freezer and cupboard, with amounts and places editable in place. It only grows when you tick something bought on the to-buy list or add it yourself. Meals and the to-buy list use what's at home first, and anything on the to-buy list that matches the inventory is set aside under “In stock, left off”.",
               },
             ]}
           />

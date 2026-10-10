@@ -729,6 +729,11 @@ model PurchaseList {
   /// days no longer match, the list is out of date and says so.
   mealsDigest String   @map("meals_digest")
   note        String   @default("")
+  /// Lines the model asked for that the inventory already holds, set aside
+  /// rather than dropped: [{ category, name, quantity, estimatedYen, stock }]
+  /// where `stock` is the inventory line it matched. Shown under the list so
+  /// a short supply ("4 eggs, need 10") can be put back with one tap.
+  excluded    Json     @default("[]")
   createdAt   DateTime @default(now()) @map("created_at")
 
   items ShoppingItem[]

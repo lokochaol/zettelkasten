@@ -112,3 +112,67 @@ export function inventoryBrief(items: InventoryItem[]): string {
   const label: Record<StorageLocation, string> = { FRIDGE: "冷蔵", FREEZER: "冷凍", PANTRY: "常温" };
   return items.map((i) => `  [${label[i.location]}] ${i.name}${i.quantity ? ` ${i.quantity}` : ""}`).join("\n");
 }
+
+/**
+ * Kanji and kana spellings of the same food, for the comparison below:
+ * each written form on the left is read as the one on the right. Reading
+ * arbitrary kanji would take a morphological dictionary tens of megabytes
+ * big; the foods that actually turn up on a shopping list are a short list,
+ * and the model also names the stock line it matched (purchaseList), which
+ * covers what this doesn't. Keys are written as they look after katakana
+ * has become hiragana.
+ */
+const FOOD_SPELLINGS: [string, string][] = [
+  // meat
+  ["鶏", "とり"], ["鳥", "とり"], ["胸", "むね"], ["腿", "もも"], ["手羽", "てば"],
+  ["挽き肉", "ひき肉"], ["挽肉", "ひき肉"], ["みんち", "ひき肉"],
+  ["小間切れ", "こま切れ"], ["細切れ", "こま切れ"], ["小間", "こま"],
+  // vegetables
+  ["玉葱", "たまねぎ"], ["玉ねぎ", "たまねぎ"], ["長葱", "ながねぎ"], ["長ねぎ", "ながねぎ"], ["葱", "ねぎ"],
+  ["人参", "にんじん"], ["大根", "だいこん"], ["牛蒡", "ごぼう"], ["蓮根", "れんこん"], ["生姜", "しょうが"], ["大蒜", "にんにく"],
+  ["茄子", "なす"], ["胡瓜", "きゅうり"], ["南瓜", "かぼちゃ"], ["白菜", "はくさい"], ["小松菜", "こまつな"],
+  ["法蓮草", "ほうれんそう"], ["ほうれん草", "ほうれんそう"], ["椎茸", "しいたけ"], ["舞茸", "まいたけ"], ["占地", "しめじ"],
+  ["薩摩芋", "さつまいも"], ["さつま芋", "さつまいも"], ["甘藷", "さつまいも"], ["じゃが芋", "じゃがいも"], ["馬鈴薯", "じゃがいも"],
+  ["里芋", "さといも"], ["長芋", "ながいも"], ["山芋", "やまいも"], ["枝豆", "えだまめ"], ["隠元", "いんげん"],
+  // fish and seafood
+  ["鮭", "さけ"], ["しゃけ", "さけ"], ["鯖", "さば"], ["鰯", "いわし"], ["鯵", "あじ"], ["鱈", "たら"], ["鰤", "ぶり"],
+  ["秋刀魚", "さんま"], ["鮪", "まぐろ"], ["海老", "えび"], ["烏賊", "いか"], ["蛸", "たこ"], ["浅蜊", "あさり"],
+  // eggs, fruit, staples
+  ["玉子", "たまご"], ["卵", "たまご"], ["お米", "米"],
+  ["檸檬", "れもん"], ["林檎", "りんご"], ["蜜柑", "みかん"], ["苺", "いちご"], ["葡萄", "ぶどう"],
+  // seasonings
+  ["醤油", "しょうゆ"], ["味醂", "みりん"], ["胡麻", "ごま"], ["味噌", "みそ"], ["砂糖", "さとう"], ["胡椒", "こしょう"], ["片栗", "かたくり"],
+].sort((a, b) => b[0].length - a[0].length) as [string, string][];
+
+/** A food name reduced to what makes two spellings the same item: width
+ * and case folded, katakana read as hiragana, spaces and bracketed notes
+ * ("鶏むね肉（皮なし）") dropped, and the common kanji/kana variants above
+ * ("鶏胸肉" / "鶏むね肉") written one way. */
+export function normalizeFoodName(name: string): string {
+  let out = name
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+  for (const [from, to] of FOOD_SPELLINGS) if (out.includes(from)) out = out.split(from).join(to);
+  return out;
+}
+
+/**
+ * The inventory line a shopping line is already covered by, if any: the
+ * same item by normalized name, or one name inside the other ("しょうゆ" /
+ * "減塩しょうゆ"). Containment needs two characters on the shorter side,
+ * so a one-character name like "米" only matches itself, never "米酢".
+ */
+export function matchStock<T extends { name: string }>(name: string, stock: T[]): T | null {
+  const a = normalizeFoodName(name);
+  if (!a) return null;
+  for (const item of stock) {
+    const b = normalizeFoodName(item.name);
+    if (!b) continue;
+    if (a === b) return item;
+    if (Math.min(a.length, b.length) >= 2 && (a.includes(b) || b.includes(a))) return item;
+  }
+  return null;
+}

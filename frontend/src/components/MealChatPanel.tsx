@@ -285,7 +285,6 @@ function ProposalCard({
   onDismiss: () => void;
 }) {
   const { t } = useI18n();
-  const opSign = { add: "+", remove: "−", set: "=" } as const;
   return (
     <div className={`flex flex-col gap-2.5 rounded-xl border p-3 ${state === "open" || state === "busy" ? "border-accent/50" : "border-line opacity-70"}`}>
       {proposal.meals.length > 0 && (
@@ -331,19 +330,6 @@ function ProposalCard({
               </div>
             );
           })}
-        </div>
-      )}
-      {proposal.inventory.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{t.meals.chatStockLabel}</p>
-          {proposal.inventory.map((s, i) => (
-            <span key={i} className="text-[11.5px] text-ink">
-              <span className="mr-1.5 font-mono text-accent">{opSign[s.op]}</span>
-              {s.name}
-              {s.quantity && <span className="ml-1.5 font-mono text-[10px] text-ink-faint">{s.quantity}</span>}
-              {s.op !== "remove" && <span className="ml-1.5 font-mono text-[9.5px] text-ink-faint">{t.meals.location[s.location]}</span>}
-            </span>
-          ))}
         </div>
       )}
 
