@@ -23,10 +23,10 @@ export function GuideContentEn() {
   return (
     <div className="flex flex-col gap-16">
       <section className="flex flex-col gap-5">
-        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">Guide</p>
-        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">How this app works</h1>
+        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">hibino · Guide</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">How hibino works</h1>
         <Prose>
-          One place for a person&rsquo;s notes, plans, records and tracking. Writing down what comes to mind, growing the ideas worth
+          hibino is one place for a person&rsquo;s notes, plans, records and tracking. Writing down what comes to mind, growing the ideas worth
           keeping, seeing today&rsquo;s schedule and tasks, planning a week of meals and a year of money — things that usually live in
           separate apps, kept together here so they can refer to each other.
         </Prose>

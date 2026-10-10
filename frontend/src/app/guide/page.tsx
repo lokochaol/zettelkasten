@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import Link from "next/link";
 import { PageIndex } from "@/components/PageIndex";
 import { auth } from "@/auth";
@@ -9,6 +10,15 @@ import { GuideContentJa } from "@/components/guide/GuideContentJa";
 import { GuideContentEn } from "@/components/guide/GuideContentEn";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
+
+/** Named "hibino" here, unlike the rest of the app's "／": this is the
+ * homepage Google's OAuth consent screen points at, and its review checks
+ * that the page shows the same app name as the consent screen. */
+export const metadata: Metadata = {
+  title: "hibino",
+  applicationName: "hibino",
+  openGraph: { siteName: "hibino", title: "hibino" },
+};
 
 /** The only page in the app that renders without a session — it explains
  * how the app works (every page, and the Zettelkasten method behind the

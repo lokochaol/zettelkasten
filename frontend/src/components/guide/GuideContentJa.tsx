@@ -23,10 +23,10 @@ export function GuideContentJa() {
   return (
     <div className="flex flex-col gap-16">
       <section className="flex flex-col gap-5">
-        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">Guide</p>
-        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">このアプリの使い方</h1>
+        <p className="font-mono text-[10.5px] tracking-[0.25em] text-accent uppercase">hibino · Guide</p>
+        <h1 className="text-3xl font-extrabold tracking-tight text-balance text-ink">hibino の使い方</h1>
         <Prose>
-          個人のメモ・計画・記録・追跡を1箇所にまとめる道具です。思いついたことを書き留め、育てたい考えをつなぎ、
+          hibino は、個人のメモ・計画・記録・追跡を1箇所にまとめる道具です。思いついたことを書き留め、育てたい考えをつなぎ、
           今日の予定とタスクを見て、1週間の食事と1年のお金を組み立てる — それぞれ別のアプリでやっていたことを、
           同じ場所で、互いに参照しあう形で扱います。
         </Prose>
