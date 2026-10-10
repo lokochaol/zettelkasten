@@ -536,7 +536,7 @@ export const ja: Dictionary = {
     summaryPlaceholder: "文献に書いてあったこと（自分の言葉で）",
   },
   signin: {
-    title: "日々の",
+    title: "/",
     tagline: "メモ・予定・献立・家計・運動を、1か所で書き留めて組み立てる道具。",
     googleButton: "Googleでログイン",
   },

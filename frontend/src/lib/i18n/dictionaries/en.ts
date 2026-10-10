@@ -536,7 +536,7 @@ export const en: Dictionary = {
     summaryPlaceholder: "What the source said (in your own words)",
   },
   signin: {
-    title: "hibino",
+    title: "/",
     tagline: "Notes, plans, meals, money and training — written down and put together in one place.",
     googleButton: "Sign in with Google",
   },
