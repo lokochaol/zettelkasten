@@ -1096,3 +1096,31 @@ model TrainingSession {
   @@index([planId, dateKey])
   @@map("training_session")
 }
+
+enum TrainingChatRole {
+  USER
+  ASSISTANT
+
+  @@map("training_chat_role")
+}
+
+/// The conversation with the trainer about a week — "my knee hurts",
+/// "only 30 minutes on Wednesday", "more upper body". Kept per owner and
+/// week like the meal chat, so it starts before there's a plan and
+/// survives remaking one.
+model TrainingChatMessage {
+  id               String           @id @default(uuid())
+  ownerSub         String           @map("owner_sub")
+  weekStartDateKey String           @map("week_start_date_key")
+  role             TrainingChatRole
+  content          String
+  /// An assistant message's proposed session changes as JSON (see
+  /// src/lib/trainingChat.ts). Nothing changes until it's applied.
+  proposal         Json?
+  appliedAt        DateTime?        @map("applied_at")
+  dismissedAt      DateTime?        @map("dismissed_at")
+  createdAt        DateTime         @default(now()) @map("created_at")
+
+  @@index([ownerSub, weekStartDateKey, createdAt])
+  @@map("training_chat_message")
+}

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useTransition, type ReactNode } from "react";
+import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import {
   generateTrainingWeekAction,
@@ -12,6 +12,7 @@ import {
   type TrainingOverview,
 } from "@/app/training/actions";
 import { LoadingBlock } from "@/components/LoadingSpinner";
+import { TrainerChatPanel, type TrainerChatHandle } from "@/components/TrainerChatPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
@@ -46,6 +47,7 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
   const [data, setData] = useState<TrainingOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generating, startGenerating] = useTransition();
+  const chatRef = useRef<TrainerChatHandle>(null);
   const anchorKey = shiftDateKey(todayKey, weekOffset * 7);
 
   useEffect(() => {
@@ -163,11 +165,33 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
         <div className="@container">
           <div className="grid items-start gap-3 @[720px]:grid-cols-2">
             {data.week.sessions.map((s) => (
-              <SessionCard key={s.id} session={s} dayLabel={day(s.dateKey)} isPast={s.dateKey < todayKey} isToday={s.dateKey === todayKey} onSaved={replaceSession} />
+              <SessionCard
+                key={s.id}
+                session={s}
+                dayLabel={day(s.dateKey)}
+                isPast={s.dateKey < todayKey}
+                isToday={s.dateKey === todayKey}
+                onSaved={replaceSession}
+                onAsk={() => chatRef.current?.insert(t.training.chatAboutSession(day(s.dateKey), s.title))}
+              />
             ))}
           </div>
         </div>
       </section>
+
+      {/* Talking it over: what the numbers can't say — pain, time, what
+          to do more of. Changes the sessions above when a proposal is
+          applied. */}
+      {!weekOver && (
+        <TrainerChatPanel
+          key={`trainer:${data.weekStartDateKey}`}
+          ref={chatRef}
+          weekStartDateKey={data.weekStartDateKey}
+          hasSessions={data.week.sessions.length > 0}
+          todayKey={todayKey}
+          onApplied={(week) => setData((prev) => (prev ? { ...prev, week } : prev))}
+        />
+      )}
 
       <PreferencePanel data={data} onSaved={(preference) => setData((prev) => (prev ? { ...prev, preference } : prev))} />
     </div>
@@ -364,12 +388,15 @@ function SessionCard({
   isPast,
   isToday,
   onSaved,
+  onAsk,
 }: {
   session: SessionView;
   dayLabel: string;
   isPast: boolean;
   isToday: boolean;
   onSaved: (s: SessionView) => void;
+  /** Starts a message to the trainer about this session. */
+  onAsk: () => void;
 }) {
   const { t } = useI18n();
   // The record is held here and sent whole on every change, so two quick
@@ -404,7 +431,17 @@ function SessionCard({
           </span>
         )}
       </div>
-      <p className="text-[13px] font-bold text-ink">{session.title}</p>
+      <div className="flex items-start gap-2">
+        <p className="min-w-0 flex-1 text-[13px] font-bold text-ink">{session.title}</p>
+        {!isPast && record.status === "PLANNED" && (
+          <button
+            onClick={onAsk}
+            className="shrink-0 rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
+          >
+            {t.training.chatAsk}
+          </button>
+        )}
+      </div>
       {session.notes && <p className="text-[11px] leading-relaxed text-ink-soft">{session.notes}</p>}
 
       {session.exercises.length > 0 && (

@@ -240,6 +240,16 @@ export interface Dictionary {
     prefLimitationsPlaceholder: string;
     prefFocus: string;
     prefFocusPlaceholder: string;
+    chatHeading: string;
+    chatIntro: string;
+    chatPlaceholder: string;
+    chatSuggestions: string[];
+    chatStartSuggestions: string[];
+    chatAppliedNote: string;
+    chatFocusLabel: string;
+    chatRestDay: string;
+    chatAsk: string;
+    chatAboutSession: (day: string, title: string) => string;
   };
   meals: {
     heading: string;

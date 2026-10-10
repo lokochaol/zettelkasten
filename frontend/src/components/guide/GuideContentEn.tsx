@@ -460,6 +460,10 @@ export function GuideContentEn() {
                 body: "“Plan this week” has the trainer read the composition trend and last week's sessions, effort and notes, write an analysis, and plan the week from it within your days, minutes, equipment and injuries. Replanning mid-week keeps the days already past as logged.",
               },
               {
+                title: "Talk to the trainer",
+                body: "Say “my knee hurts today”, “only 30 minutes on Wednesday” or “more upper body”, and the trainer proposes sessions to add, rewrite or turn into rest days; Apply changes the week. “Ask” on a session puts its day and title into the box.",
+              },
+              {
                 title: "Log it",
                 body: "From the day of a session on, mark it done or skipped, give the effort (1–10) and note what you actually did. That's what next week's analysis reads. Meal planning also takes training days into account for protein and carbohydrate.",
               },
