@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import Link from "next/link";
 import {
   getHealthOverviewAction,
   saveHealthProfileAction,
@@ -36,7 +37,6 @@ export function HealthSettings() {
     activityLevel: "LIGHT" as "SEDENTARY" | "LIGHT" | "MODERATE" | "ACTIVE",
     weeklyKgDelta: "0",
     fallbackWeightKg: "",
-    targetBodyFatPercent: "",
   });
 
   useEffect(() => {
@@ -50,8 +50,6 @@ export function HealthSettings() {
           activityLevel: d.profile.activityLevel,
           weeklyKgDelta: String(d.profile.weeklyKgDelta),
           fallbackWeightKg: d.profile.fallbackWeightKg === null ? "" : String(d.profile.fallbackWeightKg),
-          targetBodyFatPercent:
-            d.profile.targetBodyFatPercent === null ? "" : String(d.profile.targetBodyFatPercent),
         });
       }
     });
@@ -70,7 +68,6 @@ export function HealthSettings() {
           activityLevel: form.activityLevel,
           weeklyKgDelta: Number(form.weeklyKgDelta),
           fallbackWeightKg: form.fallbackWeightKg === "" ? null : Number(form.fallbackWeightKg),
-          targetBodyFatPercent: form.targetBodyFatPercent === "" ? null : Number(form.targetBodyFatPercent),
         },
         todayKey,
       );
@@ -147,15 +144,6 @@ export function HealthSettings() {
               className="w-full bg-transparent text-xs text-ink focus:outline-none"
             />
           </Field>
-          <Field label={t.health.targetBodyFatLabel}>
-            <input
-              value={form.targetBodyFatPercent}
-              onChange={(e) => setForm({ ...form, targetBodyFatPercent: e.target.value })}
-              inputMode="decimal"
-              placeholder={data.current?.composition ? String(data.current.composition.suggested.to) : "12"}
-              className="w-full bg-transparent text-xs text-ink focus:outline-none"
-            />
-          </Field>
           <Field label={t.health.fallbackWeightLabel}>
             <input
               value={form.fallbackWeightKg}
@@ -176,57 +164,14 @@ export function HealthSettings() {
         </button>
       </div>
 
-      {/* 体組成 — the scale's own report, before the targets it feeds */}
-      {data.current && (
-        <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface p-4">
-          <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.health.compositionHeading}</p>
-          {!data.current.composition ? (
-            <p className="text-[11px] leading-relaxed text-ink-soft">{t.health.compositionNone}</p>
-          ) : (
-            <>
-              <div className="flex flex-wrap gap-x-5 gap-y-2">
-                <Stat label={t.health.bodyFat} value={`${data.current.composition.current.bodyFatPercent!.toFixed(1)} %`} accent />
-                <Stat label={t.health.leanMass} value={`${data.current.composition.current.leanMassKg!.toFixed(1)} kg`} />
-                <Stat label={t.health.fatMass} value={`${data.current.composition.current.fatMassKg!.toFixed(1)} kg`} />
-                <Stat label={t.health.weightLabel} value={`${data.current.composition.current.weightKg!.toFixed(1)} kg`} />
-                <Stat label={t.health.bandLabel("")} value={bandName(data.current.composition.band, t)} />
-              </div>
-              {/* Fat and lean separately: losing a kilo of each reads as
-                  the same number on a scale and means opposite things. */}
-              {data.current.composition.trend.fatMassKgPerWeek !== null &&
-                data.current.composition.trend.leanMassKgPerWeek !== null && (
-                  <p className="font-mono text-[10px] text-ink-soft">
-                    {t.health.weeklyChange(
-                      round1(data.current.composition.trend.fatMassKgPerWeek),
-                      round1(data.current.composition.trend.leanMassKgPerWeek),
-                    )}
-                  </p>
-                )}
-              <p className="font-mono text-[9.5px] text-ink-faint">
-                {t.health.averagedOver(data.current.composition.current.days)} ·{" "}
-                {t.health.suggestedRange(data.current.composition.suggested.from, data.current.composition.suggested.to)}
-              </p>
-              {data.current.composition.targetIsAuto && (
-                <p className="font-mono text-[10px] text-accent">
-                  {t.health.targetAuto(data.current.composition.targetBodyFatPercent)}
-                </p>
-              )}
-              {data.current.composition.plan && (
-                <p className="text-[11px] leading-relaxed text-ink">
-                  {data.current.composition.plan.direction === "lose_fat"
-                    ? t.health.planLoseFat(
-                        data.current.composition.plan.gapKg,
-                        data.current.composition.plan.weeksToTarget ?? 0,
-                      )
-                    : data.current.composition.plan.direction === "gain_lean"
-                      ? t.health.planGainLean
-                      : t.health.planHold}
-                </p>
-              )}
-            </>
-          )}
-        </div>
-      )}
+      {/* The composition and the goal for it live with the training now,
+          where they're compared against each other week by week. */}
+      <p className="text-[11px] leading-relaxed text-ink-soft">
+        {t.health.compositionMoved}{" "}
+        <Link href="/training" className="font-mono text-accent hover:underline">
+          /training
+        </Link>
+      </p>
 
       {targets && (
         <div className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface p-4">
@@ -314,27 +259,6 @@ export function HealthSettings() {
       />
     </div>
   );
-}
-
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
-}
-
-function bandName(band: string | null, t: ReturnType<typeof useI18n>["t"]): string {
-  switch (band) {
-    case "essential":
-      return t.health.bandEssential;
-    case "athletic":
-      return t.health.bandAthletic;
-    case "fitness":
-      return t.health.bandFitness;
-    case "average":
-      return t.health.bandAverage;
-    case "high":
-      return t.health.bandHigh;
-    default:
-      return "—";
-  }
 }
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) {

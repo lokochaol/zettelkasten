@@ -483,6 +483,10 @@ model HealthProfile {
   /// functional" is a composition, not a number on a scale — the same
   /// 70 kg can be two very different bodies.
   targetBodyFatPercent Float? @map("target_body_fat_percent")
+  /// Lean mass to build up to, when the goal is more muscle rather than
+  /// only less fat. Optional: most goals are a body fat figure with the
+  /// lean mass held. Read by the trainer, not by the nutrition targets.
+  targetLeanMassKg Float?     @map("target_lean_mass_kg")
   /// Weight to use until the phone starts sending one — without it the
   /// targets can't be computed at all, and making the whole feature wait
   /// on a Shortcut being set up correctly is a bad first run.
@@ -1001,4 +1005,93 @@ model MealChatMessage {
 
   @@index([planId, createdAt])
   @@map("meal_chat_message")
+}
+
+/// How training fits into the owner's week — the constraints the trainer
+/// plans inside, like MealPreference is for meals.
+model TrainingPreference {
+  ownerSub          String   @id @map("owner_sub")
+  /// Days a week available to train. The plan never schedules more.
+  daysPerWeek       Int      @default(3) @map("days_per_week")
+  minutesPerSession Int      @default(45) @map("minutes_per_session")
+  /// Where and with what — "ジム", "自宅（ダンベル 2〜10kg、懸垂バー）".
+  /// Free text: equipment lists don't fit an enum.
+  equipment         String   @default("")
+  /// Injuries, pain, things not to load. Treated as hard constraints.
+  limitations       String   @default("")
+  /// What "functional" means for this owner beyond the composition —
+  /// "懸垂10回", "5kmを30分で", "腰痛を出さない".
+  focus             String   @default("")
+  experience        TrainingExperience @default(BEGINNER)
+  updatedAt         DateTime @updatedAt @map("updated_at")
+
+  @@map("training_preference")
+}
+
+enum TrainingExperience {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+
+  @@map("training_experience")
+}
+
+/// A week of training as the trainer wrote it, with the reading of the
+/// previous weeks that it was written from.
+model TrainingPlan {
+  id               String   @id @default(uuid())
+  ownerSub         String   @map("owner_sub")
+  weekStartDateKey String   @map("week_start_date_key")
+  /// The trainer's analysis: how the composition moved, what was actually
+  /// done, and what that changes this week. Shown above the sessions so
+  /// the plan arrives with its reasons.
+  analysis         String   @default("")
+  /// The week's aim in a sentence.
+  focus            String   @default("")
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  sessions TrainingSession[]
+
+  @@unique([ownerSub, weekStartDateKey])
+  @@map("training_plan")
+}
+
+enum TrainingKind {
+  STRENGTH
+  CARDIO
+  MOBILITY
+
+  @@map("training_kind")
+}
+
+enum TrainingStatus {
+  PLANNED
+  DONE
+  SKIPPED
+
+  @@map("training_status")
+}
+
+model TrainingSession {
+  id        String         @id @default(uuid())
+  planId    String         @map("plan_id")
+  plan      TrainingPlan   @relation(fields: [planId], references: [id], onDelete: Cascade)
+  dateKey   String         @map("date_key")
+  title     String
+  kind      TrainingKind
+  minutes   Int
+  /// [{ name, sets, reps, load, note }] — a list, not separate rows,
+  /// because it's read and written whole and never queried by exercise.
+  exercises Json
+  /// The trainer's cue for the session (form, effort, what to watch).
+  notes     String         @default("")
+  status    TrainingStatus @default(PLANNED)
+  /// How hard it felt, 1–10. With the log, what the next analysis reads.
+  rpe       Int?
+  /// What was actually done, in the owner's words.
+  log       String         @default("")
+  sortOrder Int            @map("sort_order")
+
+  @@index([planId, dateKey])
+  @@map("training_session")
 }

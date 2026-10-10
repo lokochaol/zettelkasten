@@ -15,22 +15,23 @@ import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { usePaneScrollMemory } from "@/lib/viewState";
 
 /** Which index entry the header names, per screen — the bar's view keys and
- * the index's page keys are two vocabularies for the same six screens, and
+ * the index's page keys are two vocabularies for the same seven screens, and
  * this is the one place they have to meet. */
 const PAGE_KEY: Record<ShellView, PageKey> = {
   notes: "zettelkasten",
   projects: "projects",
   calendar: "calendar",
   meals: "meals",
+  training: "training",
   money: "money",
   discovery: "discovery",
 };
 
 /**
- * The frame the six everyday screens are shown in: one header, the icon bar
+ * The frame the seven everyday screens are shown in: one header, the icon bar
  * down the left, and the screen itself in what's left.
  *
- * These six belong together because they get looked at in one sitting —
+ * These seven belong together because they get looked at in one sitting —
  * what today holds, what's left on the projects, what there is to eat, what
  * it costs. Switching between them is a glance, not a journey, so the bar
  * that switches them never leaves the screen. The pages NOT in the bar

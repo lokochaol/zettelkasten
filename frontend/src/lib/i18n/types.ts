@@ -33,6 +33,7 @@ export interface Dictionary {
       | "projects"
       | "calendar"
       | "meals"
+      | "training"
       | "money"
       | "discovery"
       | "search"
@@ -77,6 +78,7 @@ export interface Dictionary {
     discoveryLabel: string;
     calendarLabel: string;
     mealsLabel: string;
+    trainingLabel: string;
     moneyLabel: string;
   };
   confirmDialog: {
@@ -201,6 +203,44 @@ export interface Dictionary {
     monthPlanLeft: (yen: number) => string;
     dashboardHeading: string;
   };
+  training: {
+    heading: string;
+    profileMissing: string;
+    compositionHeading: string;
+    now: string;
+    goal: string;
+    gap: string;
+    targetLeanLabel: string;
+    targetNote: string;
+    historyHeading: string;
+    historyNote: string;
+    weekEnding: string;
+    weekHeading: string;
+    intro: string;
+    generate: string;
+    regenerate: string;
+    generating: string;
+    doneCount: (done: number, total: number) => string;
+    analysisHeading: string;
+    kind: Record<"STRENGTH" | "CARDIO" | "MOBILITY", string>;
+    status: Record<"PLANNED" | "DONE" | "SKIPPED", string>;
+    mark: Record<"DONE" | "SKIPPED", string>;
+    minutes: (n: number) => string;
+    rpeLabel: string;
+    rpeOption: (n: number) => string;
+    logPlaceholder: string;
+    prefHeading: string;
+    prefDays: string;
+    prefMinutes: string;
+    prefExperience: string;
+    experience: Record<"BEGINNER" | "INTERMEDIATE" | "ADVANCED", string>;
+    prefEquipment: string;
+    prefEquipmentPlaceholder: string;
+    prefLimitations: string;
+    prefLimitationsPlaceholder: string;
+    prefFocus: string;
+    prefFocusPlaceholder: string;
+  };
   meals: {
     heading: string;
     weekRange: (start: string, end: string) => string;
@@ -292,6 +332,7 @@ export interface Dictionary {
     chatAppliedNote: string;
   };
   health: {
+    compositionMoved: string;
     basicsHeading: string;
     heightLabel: string;
     birthYearLabel: string;
@@ -727,6 +768,10 @@ export interface Dictionary {
     mealPlanNotFound: string;
     inventoryInvalid: string;
     inventoryNotFound: string;
+    trainingPreferenceInvalid: string;
+    trainingSessionInvalid: string;
+    trainingSessionNotFound: string;
+    trainingWeekPast: string;
     purchaseListInvalid: string;
     purchaseListNoMeals: string;
     mealChatInvalid: string;

@@ -37,7 +37,7 @@ export function GuideContentEn() {
             { id: "setup", label: "Setting up" },
             { id: "rhythm", label: "Daily, weekly, monthly" },
             { id: "write", label: "Write — Dash Off, Zettelkasten, literature" },
-            { id: "plan", label: "Plan and record — calendar, projects, meals, money" },
+            { id: "plan", label: "Plan and record — calendar, projects, meals, training, money" },
             { id: "body", label: "Body and nutrition targets" },
             { id: "find", label: "Find and adjust — discovery, search, settings" },
           ]}
@@ -57,11 +57,11 @@ export function GuideContentEn() {
               ),
             },
             {
-              title: "The six everyday screens share an icon bar",
+              title: "The seven everyday screens share an icon bar",
               body: (
                 <>
-                  <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/money</Code>{" "}
-                  <Code>/discovery</Code> sit in one frame with an icon bar down the left that never goes away. Today&rsquo;s schedule,
+                  <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/training</Code>{" "}
+                  <Code>/money</Code> <Code>/discovery</Code> sit in one frame with an icon bar down the left that never goes away. Today&rsquo;s schedule,
                   what&rsquo;s left to do, what there is to eat and what it costs get looked at in one sitting, so switching between them is a
                   glance.
                 </>
@@ -73,7 +73,7 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning, the meal chat and the to-buy list, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning, the meal chat and the to-buy list, the training analysis and plan, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
@@ -140,6 +140,7 @@ export function GuideContentEn() {
               label: "Weekly",
               items: [
                 "Plan the week in /meals and shop once",
+                "Plan the week's training in /training (analysed from last week's log and the composition trend)",
                 "Ask for this week's advice in /money",
                 "Promote the Dash Off notes worth keeping (the rest clear themselves after a week)",
               ],
@@ -439,6 +440,34 @@ export function GuideContentEn() {
         </PageSection>
 
         <PageSection
+          id="training"
+          path="/training"
+          name="Training"
+          lead="Your target body composition next to the current one, and a week of training towards it written by the AI trainer. Each week it analyses how the composition moved and what last week's log says, and adjusts the next plan."
+        >
+          <Points
+            items={[
+              {
+                title: "Now and goal",
+                body: "Body fat, lean mass, fat mass and weight, now (seven-day average) against the goal, with the gap. Set the target body fat — and a target lean mass, if you want one — here; the nutrition targets for meals follow it.",
+              },
+              {
+                title: "Week by week",
+                body: "Twelve weeks of seven-day averages, each with its change from the week before — to see whether it was fat or lean mass that moved, not just weight.",
+              },
+              {
+                title: "Analyse, then plan",
+                body: "“Plan this week” has the trainer read the composition trend and last week's sessions, effort and notes, write an analysis, and plan the week from it within your days, minutes, equipment and injuries. Replanning mid-week keeps the days already past as logged.",
+              },
+              {
+                title: "Log it",
+                body: "From the day of a session on, mark it done or skipped, give the effort (1–10) and note what you actually did. That's what next week's analysis reads. Meal planning also takes training days into account for protein and carbohydrate.",
+              },
+            ]}
+          />
+        </PageSection>
+
+        <PageSection
           id="money"
           path="/money"
           name="Money"
@@ -489,7 +518,7 @@ export function GuideContentEn() {
             },
             {
               title: "Body fat target, set automatically",
-              body: "Taken from the athletic range for your sex. Your current reading then decides the direction — lose fat, build lean mass, or hold — and, if losing, roughly how many weeks it takes. Enter your own to override it.",
+              body: "Taken from the athletic range for your sex. Your current reading then decides the direction — lose fat, build lean mass, or hold — and, if losing, roughly how many weeks it takes. Enter your own on /training to override it.",
             },
             {
               title: "No crash diets",

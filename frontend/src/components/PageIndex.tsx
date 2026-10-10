@@ -28,6 +28,7 @@ export type PageKey =
   | "projects"
   | "calendar"
   | "meals"
+  | "training"
   | "money"
   | "discovery"
   | "search"
@@ -55,6 +56,7 @@ export const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[]
       { key: "calendar", href: "/calendar" },
       { key: "projects", href: "/projects" },
       { key: "meals", href: "/meals" },
+      { key: "training", href: "/training" },
       { key: "money", href: "/money" },
       { key: "discovery", href: "/discovery" },
     ],

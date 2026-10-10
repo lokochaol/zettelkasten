@@ -6,13 +6,14 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
 /** The screens the bar switches between, in the order they sit in it. */
-export type ShellView = "notes" | "projects" | "calendar" | "meals" | "money" | "discovery";
+export type ShellView = "notes" | "projects" | "calendar" | "meals" | "training" | "money" | "discovery";
 
 export const SHELL_VIEW_HREF: Record<ShellView, string> = {
   notes: "/zettelkasten",
   projects: "/projects",
   calendar: "/calendar",
   meals: "/meals",
+  training: "/training",
   money: "/money",
   discovery: "/discovery",
 };
@@ -60,6 +61,19 @@ function MealsIcon() {
       <path d="M2 7.5H14C14 11 11.3 13.5 8 13.5C4.7 13.5 2 11 2 7.5Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
       <path d="M6 5C6 4 5.4 3.6 5.4 2.8C5.4 2.3 5.7 2 6 1.7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
       <path d="M9.4 5C9.4 4 8.8 3.6 8.8 2.8C8.8 2.3 9.1 2 9.4 1.7" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+/** A dumbbell — the training the body goals are worked towards with. */
+function TrainingIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M5 8H11" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+      <rect x="2.6" y="4.6" width="2.4" height="6.8" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+      <rect x="11" y="4.6" width="2.4" height="6.8" rx="0.8" stroke="currentColor" strokeWidth="1.2" />
+      <path d="M1.3 6.6V9.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
+      <path d="M14.7 6.6V9.4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" />
     </svg>
   );
 }
@@ -121,7 +135,7 @@ function ActionBarButton({
 /**
  * A fixed, always-visible icon strip along the very left edge of the pane
  * area — not a HeaderMenu entry (which is a collapsed, tap-to-open overflow
- * list), and the one place where the six everyday screens are all reachable
+ * list), and the one place where the seven everyday screens are all reachable
  * without opening anything.
  *
  * It used to swap panes in place on the zettelkasten screen, which meant
@@ -143,6 +157,7 @@ export function AppSideBar({ active }: { active: ShellView }) {
     { view: "projects", label: t.nav.projectsLabel, icon: <ProjectsIcon /> },
     { view: "calendar", label: t.nav.calendarLabel, icon: <CalendarIcon /> },
     { view: "meals", label: t.nav.mealsLabel, icon: <MealsIcon /> },
+    { view: "training", label: t.nav.trainingLabel, icon: <TrainingIcon /> },
     { view: "money", label: t.nav.moneyLabel, icon: <MoneyIcon /> },
     { view: "discovery", label: t.nav.discoveryLabel, icon: <DiscoveryIcon /> },
   ];
