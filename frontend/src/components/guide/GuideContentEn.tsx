@@ -139,7 +139,7 @@ export function GuideContentEn() {
             {
               label: "Weekly",
               items: [
-                "Plan the week in /meals and shop once",
+                "Plan the week by chat in /meals, then shop from the to-buy list",
                 "Plan the week's training in /training (analysed from last week's log and the composition trend)",
                 "Ask for this week's advice in /money",
                 "Promote the Dash Off notes worth keeping (the rest clear themselves after a week)",
@@ -403,7 +403,7 @@ export function GuideContentEn() {
           id="meals"
           path="/meals"
           name="Meals"
-          lead="A week of meals and the list of what to buy for it. The AI plans within your nutrition targets, weekly budget and cooking time; the app then recalculates the result and tells you where it misses."
+          lead="A week of meals and the list of what to buy for it. The week is made by chat — say how you want it — and changed the same way, a day at a time. The AI plans within your nutrition targets, weekly budget and cooking time; the app then recalculates the result and tells you where it misses."
         >
           <Points
             items={[
@@ -413,7 +413,7 @@ export function GuideContentEn() {
               },
               {
                 title: "Where it misses",
-                body: "Each day's energy and protein, and the shopping estimate, are recalculated and flagged if they're off target. Regenerate, or adjust that one day by hand.",
+                body: "Each day's energy and protein, and the shopping estimate, are recalculated and flagged if they're off target. Ask the chat to change that day.",
               },
               {
                 title: "Actual food spending",
@@ -424,8 +424,8 @@ export function GuideContentEn() {
                 body: "Put the week's meals into your calendar at the meal times you've set.",
               },
               {
-                title: "Replan by chat",
-                body: "Write something like “they were out of chicken, so I bought pork” or “eating out on Thursday” and you get a proposal for the meals from today on that haven't been eaten. Nothing changes until you check the meal and inventory changes and press Apply — then the calendar is rewritten too.",
+                title: "Make and change it by chat",
+                body: "Ask “plan this week — I batch-cook on Monday and Thursday” for a whole week, or write “fish for dinner on the 14th”, “they were out of chicken, so I bought pork” or “eating out on Thursday” for a proposal covering the meals from today on that haven't been eaten. Tapping a day, an empty meal, or “Ask about this meal” in a recipe puts its date in the box. Nothing changes until you check the meal and inventory changes and press Apply — then the calendar is rewritten too.",
               },
               {
                 title: "To-buy list",
@@ -458,6 +458,10 @@ export function GuideContentEn() {
               {
                 title: "Analyse, then plan",
                 body: "“Plan this week” has the trainer read the composition trend and last week's sessions, effort and notes, write an analysis, and plan the week from it within your days, minutes, equipment and injuries. Replanning mid-week keeps the days already past as logged.",
+              },
+              {
+                title: "Talk to the trainer",
+                body: "Say “my knee hurts today”, “only 30 minutes on Wednesday” or “more upper body”, and the trainer proposes sessions to add, rewrite or turn into rest days; Apply changes the week. “Ask” on a session puts its day and title into the box.",
               },
               {
                 title: "Log it",

@@ -158,15 +158,10 @@ export async function logSession(ownerSub: string, sessionId: string, input: Ses
 
 /* ---------- generation ---------- */
 
-const SYSTEM_PROMPT = `あなたはパーソナルトレーナーです。目標の体組成に向けて、この人の1週間のトレーニングを計画します。毎週、体組成の変化と前の週の実施記録を読んで分析し、その分析を今週のメニューに反映させます。
-
-分析（analysis）で書くこと:
-- 体組成の変化の読み: 体重ではなく脂肪量と除脂肪量を分けて見る。1週間の値は水分でぶれるので、数週間の流れで判断する。データが足りなければそう書く。
-- 前の週の実施状況: 実施率、きつさ（RPE 1〜10）、本人のメモから、負荷が合っていたか。
-- 今週の調整: 上の2つから何を変えるか（負荷・量・頻度・種目・有酸素の割合）。変えない場合も理由を書く。
-- 4〜8文、日本語、具体的に。数字を使う。
-
-計画で守ること:
+/** What every plan the trainer writes must respect — shared by the weekly
+ * plan and the chat, so a change made in conversation follows the same
+ * rules as the plan it changes. */
+export const TRAINER_RULES = `計画で守ること:
 1. トレーニングする日は指定された日数まで。1日に複数のセッションは入れない。休養日を挟む。
 2. 1回の時間は指定の分数以内（ウォームアップを含む）。
 3. 使える場所・器具の範囲で組む。持っていない器具を前提にしない。
@@ -174,14 +169,10 @@ const SYSTEM_PROMPT = `あなたはパーソナルトレーナーです。目標
 5. 経験に合った強度にする。初心者はフォームの習得と段階的な漸進を優先する。
 6. 目標の方向に合わせる: 脂肪を減らす局面でも筋力トレーニングを主にして除脂肪量を守る（有酸素は補助）。除脂肪量を増やす局面は漸進的な過負荷を優先する。維持の局面は質と機能性を上げる。
 7. 漸進: 前の週にRPEが低すぎた種目は負荷か回数を上げ、高すぎた・できなかった種目は下げる。
-8. 本人の「目指したいこと」があれば、それに効く種目を入れる。
+8. 本人の「目指したいこと」があれば、それに効く種目を入れる。`;
 
-出力は次のJSONのみ。説明文・前置き・コードフェンスは書かない:
-{
-  "analysis": "分析",
-  "focus": "今週の狙いを1文で",
-  "sessions": [
-    {
+/** The shape of one session in the model's JSON, shared likewise. */
+export const SESSION_JSON = `{
       "dateKey": "YYYY-MM-DD",
       "title": "下半身と体幹",
       "kind": "STRENGTH",
@@ -190,7 +181,24 @@ const SYSTEM_PROMPT = `あなたはパーソナルトレーナーです。目標
       "exercises": [
         { "name": "ゴブレットスクワット", "sets": 3, "reps": "8〜10", "load": "16kg", "note": "膝とつま先の向きを揃える" }
       ]
-    }
+    }`;
+
+const SYSTEM_PROMPT = `あなたはパーソナルトレーナーです。目標の体組成に向けて、この人の1週間のトレーニングを計画します。毎週、体組成の変化と前の週の実施記録を読んで分析し、その分析を今週のメニューに反映させます。
+
+分析（analysis）で書くこと:
+- 体組成の変化の読み: 体重ではなく脂肪量と除脂肪量を分けて見る。1週間の値は水分でぶれるので、数週間の流れで判断する。データが足りなければそう書く。
+- 前の週の実施状況: 実施率、きつさ（RPE 1〜10）、本人のメモから、負荷が合っていたか。
+- 今週の調整: 上の2つから何を変えるか（負荷・量・頻度・種目・有酸素の割合）。変えない場合も理由を書く。
+- 4〜8文、日本語、具体的に。数字を使う。
+
+${TRAINER_RULES}
+
+出力は次のJSONのみ。説明文・前置き・コードフェンスは書かない:
+{
+  "analysis": "分析",
+  "focus": "今週の狙いを1文で",
+  "sessions": [
+    ${SESSION_JSON}
   ]
 }
 
@@ -265,14 +273,21 @@ const STATUS_LABEL: Record<TrainingStatus, string> = { PLANNED: "未記録", DON
 const EXPERIENCE_LABEL: Record<TrainingExperience, string> = { BEGINNER: "初心者", INTERMEDIATE: "中級", ADVANCED: "上級" };
 const fmt = (n: number | null | undefined, digits = 1) => (n === null || n === undefined ? "—" : n.toFixed(digits));
 
+export const sessionLine = (s: Pick<SessionView, "dateKey" | "title" | "kind" | "minutes" | "status" | "rpe" | "log" | "exercises">) =>
+  [
+    `  ${s.dateKey} ${s.title}（${KIND_LABEL[s.kind]} ${s.minutes}分）: ${STATUS_LABEL[s.status]}${s.rpe ? ` RPE${s.rpe}` : ""}`,
+    s.exercises.length > 0 ? `    種目: ${s.exercises.map((e) => `${e.name} ${e.sets ? `${e.sets}×` : ""}${e.reps} ${e.load}`.trim()).join(" / ")}` : "",
+    s.log ? `    本人のメモ: ${s.log}` : "",
+  ]
+    .filter(Boolean)
+    .join("\n");
+
 /**
- * Writes (or rewrites) the week's plan.
- *
- * Rewriting the current week mid-week keeps what already happened: days
- * before today stay as logged, and only today onward is planned again —
- * the past is evidence for the analysis, not something to overwrite.
+ * Everything the trainer reads about a week before writing or changing it:
+ * the person, the constraints, the composition and its trend, and the last
+ * few weeks as logged. Shared by the weekly plan and the chat.
  */
-export async function generateWeek(ownerSub: string, weekStartDateKey: string, todayKey: string): Promise<TrainingWeekView> {
+export async function trainerContext(ownerSub: string, weekStartDateKey: string, todayKey: string) {
   const [profile, targetsNow, preference, history, previousPlans, existing] = await Promise.all([
     getProfile(ownerSub),
     currentTargets(ownerSub, todayKey),
@@ -295,21 +310,8 @@ export async function generateWeek(ownerSub: string, weekStartDateKey: string, t
   const daysLeft = Math.max(0, preference.daysPerWeek - kept.filter((s) => s.status !== "SKIPPED").length);
 
   const composition = targetsNow?.composition ?? null;
-  const sessionLine = (s: Pick<SessionView, "dateKey" | "title" | "kind" | "minutes" | "status" | "rpe" | "log" | "exercises">) =>
-    [
-      `  ${s.dateKey} ${s.title}（${KIND_LABEL[s.kind]} ${s.minutes}分）: ${STATUS_LABEL[s.status]}${s.rpe ? ` RPE${s.rpe}` : ""}`,
-      s.exercises.length > 0 ? `    種目: ${s.exercises.map((e) => `${e.name} ${e.sets ? `${e.sets}×` : ""}${e.reps} ${e.load}`.trim()).join(" / ")}` : "",
-      s.log ? `    本人のメモ: ${s.log}` : "",
-    ]
-      .filter(Boolean)
-      .join("\n");
 
   const brief = [
-    `今日: ${todayKey}`,
-    `計画する週: ${dates[0]} 〜 ${dates[6]}`,
-    `計画してよい日: ${open.join(", ")}`,
-    `この週に入れてよいセッション数: ${daysLeft}（週${preference.daysPerWeek}日のうち、すでに実施した日を除く）`,
-    "",
     `本人: ${profile.sex === "MALE" ? "男性" : "女性"} ${ageFromBirthYear(profile.birthYear)}歳 身長${profile.heightCm}cm`,
     `経験: ${EXPERIENCE_LABEL[preference.experience]}`,
     `1回の時間: ${preference.minutesPerSession}分まで`,
@@ -348,6 +350,26 @@ export async function generateWeek(ownerSub: string, weekStartDateKey: string, t
           `週 ${p.weekStartDateKey}〜 狙い: ${p.focus || "—"}`,
           ...(p.sessions.length === 0 ? ["  （セッションなし）"] : p.sessions.map((s) => sessionLine(toSessionView(s)))),
         ])),
+  ].join("\n");
+  return { profile, preference, existing, dates, kept, open, daysLeft, brief };
+}
+
+/**
+ * Writes (or rewrites) the week's plan.
+ *
+ * Rewriting the current week mid-week keeps what already happened: days
+ * before today stay as logged, and only today onward is planned again —
+ * the past is evidence for the analysis, not something to overwrite.
+ */
+export async function generateWeek(ownerSub: string, weekStartDateKey: string, todayKey: string): Promise<TrainingWeekView> {
+  const { preference, existing, dates, kept, open, daysLeft, brief: context } = await trainerContext(ownerSub, weekStartDateKey, todayKey);
+  const brief = [
+    `今日: ${todayKey}`,
+    `計画する週: ${dates[0]} 〜 ${dates[6]}`,
+    `計画してよい日: ${open.join(", ")}`,
+    `この週に入れてよいセッション数: ${daysLeft}（週${preference.daysPerWeek}日のうち、すでに実施した日を除く）`,
+    "",
+    context,
     ...(kept.length > 0 ? ["", "この週のすでに過ぎた日（変更しない）:", ...kept.map(sessionLine)] : []),
   ].join("\n");
 

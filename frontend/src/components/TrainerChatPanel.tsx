@@ -2,55 +2,47 @@
 
 import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from "react";
 import {
-  applyMealChatProposalAction,
-  dismissMealChatProposalAction,
-  getMealChatAction,
-  sendMealChatAction,
-  type MealChatMessageView,
-  type MealWeekView,
-} from "@/app/meals/actions";
+  applyTrainerChatProposalAction,
+  dismissTrainerChatProposalAction,
+  getTrainerChatAction,
+  sendTrainerChatAction,
+  type TrainerChatMessageView,
+  type TrainingWeekView,
+} from "@/app/training/actions";
 import { formatDateKey } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { readDraft, removeDraft, writeDraft } from "@/lib/draftBackup";
-import type { Proposal } from "@/lib/mealChat";
-import type { InventoryItem, MealSlot } from "@/generated/prisma/client";
+import type { TrainingProposal } from "@/lib/trainingChat";
 
-/** Lets the grid start a message: tapping a day or a meal puts its date
- * into the box, ready to finish. */
-export interface MealChatHandle {
+/** Lets a session card start a message about itself. */
+export interface TrainerChatHandle {
   insert: (text: string) => void;
 }
 
 /**
- * Where the week's meals are made and changed — "plan this week, I cook on
- * Monday and Thursday", "fish on the 14th instead", "they were out of
- * chicken, so I bought pork" — each answered with a proposal that changes
- * nothing until it's applied. See src/lib/mealChat.ts.
+ * Talking the week over with the trainer — "my knee hurts today", "only 30
+ * minutes on Wednesday" — and getting back changes to the sessions that
+ * apply only when asked to. See src/lib/trainingChat.ts.
  *
- * Applying hands the whole updated week, inventory and conversation back to
- * the screen, so the plan above, the fridge list and the calendar all move
- * together. What's being typed is kept on the device (src/lib/draftBackup.ts)
- * — this is written standing in a shop, and a page that reloads mid-sentence
- * shouldn't take the sentence with it.
+ * What's being typed is kept on the device (src/lib/draftBackup.ts), the
+ * same as the meal chat: it's often typed at the gym, between sets.
  */
-export function MealChatPanel({
+export function TrainerChatPanel({
   ref,
   weekStartDateKey,
-  hasMeals,
+  hasSessions,
   todayKey,
   onApplied,
 }: {
-  ref?: Ref<MealChatHandle>;
+  ref?: Ref<TrainerChatHandle>;
   weekStartDateKey: string;
-  /** False for a week with nothing planned yet: the suggestions offer to
-   * plan it rather than to change it. */
-  hasMeals: boolean;
+  hasSessions: boolean;
   todayKey: string;
-  onApplied: (week: MealWeekView, inventory: InventoryItem[]) => void;
+  onApplied: (week: TrainingWeekView) => void;
 }) {
   const { t, locale } = useI18n();
-  const [messages, setMessages] = useState<MealChatMessageView[] | null>(null);
+  const [messages, setMessages] = useState<TrainerChatMessageView[] | null>(null);
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -58,12 +50,11 @@ export function MealChatPanel({
   const [busyId, setBusyId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  const draftKey = `trainer-chat:${weekStartDateKey}`;
 
   useImperativeHandle(ref, () => ({
     insert(fragment: string) {
       setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${fragment}` : fragment));
-      // After the text lands: focus with the caret at the end, and bring the
-      // box into view — the grid that called this may be a screen above.
       requestAnimationFrame(() => {
         const box = inputRef.current;
         if (!box) return;
@@ -73,11 +64,10 @@ export function MealChatPanel({
       });
     },
   }));
-  const draftKey = `meal-chat:${weekStartDateKey}`;
 
   useEffect(() => {
     let cancelled = false;
-    getMealChatAction(weekStartDateKey).then((m) => {
+    getTrainerChatAction(weekStartDateKey).then((m) => {
       if (cancelled) return;
       setMessages(m);
       const draft = readDraft(draftKey);
@@ -103,9 +93,8 @@ export function MealChatPanel({
     setError(null);
     setNotice(null);
     startSending(async () => {
-      const res = await sendMealChatAction(weekStartDateKey, message, todayKey);
+      const res = await sendTrainerChatAction(weekStartDateKey, message, todayKey);
       if ("error" in res) {
-        // The text stays in the box to send again.
         setError(res.error);
         return;
       }
@@ -117,21 +106,20 @@ export function MealChatPanel({
   async function apply(id: string) {
     setBusyId(id);
     setError(null);
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const res = await applyMealChatProposalAction(id, weekStartDateKey, todayKey, timeZone);
+    const res = await applyTrainerChatProposalAction(id, weekStartDateKey, todayKey);
     setBusyId(null);
     if ("error" in res) {
       setError(res.error);
       return;
     }
     setMessages(res.messages);
-    onApplied(res.week, res.inventory);
-    setNotice(res.calendarError ? `${t.meals.chatAppliedNote} ${res.calendarError}` : t.meals.chatAppliedNote);
+    onApplied(res.week);
+    setNotice(t.training.chatAppliedNote);
   }
 
   async function dismiss(id: string) {
     setBusyId(id);
-    const res = await dismissMealChatProposalAction(id, weekStartDateKey);
+    const res = await dismissTrainerChatProposalAction(id, weekStartDateKey);
     setBusyId(null);
     if ("error" in res) setError(res.error);
     else setMessages(res.messages);
@@ -140,8 +128,8 @@ export function MealChatPanel({
   return (
     <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
       <div className="flex flex-col gap-1">
-        <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.chatHeading}</p>
-        <p className="text-[11px] leading-relaxed text-ink-soft">{t.meals.chatIntro}</p>
+        <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.training.chatHeading}</p>
+        <p className="text-[11px] leading-relaxed text-ink-soft">{t.training.chatIntro}</p>
       </div>
 
       <div className="flex max-h-[28rem] flex-col gap-2.5 overflow-y-auto">
@@ -178,9 +166,8 @@ export function MealChatPanel({
       {notice && <p className="font-mono text-[10.5px] text-accent">{notice}</p>}
       {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
 
-      {/* Starting points, for typing on a phone: tap one, then fill in the 〇〇. */}
       <div className="flex flex-wrap gap-1.5">
-        {(hasMeals ? t.meals.chatSuggestions : t.meals.chatStartSuggestions).map((s) => (
+        {(hasSessions ? t.training.chatSuggestions : t.training.chatStartSuggestions).map((s) => (
           <button
             key={s}
             type="button"
@@ -197,16 +184,15 @@ export function MealChatPanel({
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            // Enter is a newline — on a Japanese keyboard it also confirms
-            // conversion, so sending on it would send half a sentence.
-            // Cmd/Ctrl+Enter sends on a computer; the button everywhere.
+            // Enter is a newline (it also confirms IME conversion);
+            // Cmd/Ctrl+Enter sends, as in the meal chat.
             if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !e.nativeEvent.isComposing) {
               e.preventDefault();
               send();
             }
           }}
           rows={2}
-          placeholder={t.meals.chatPlaceholder}
+          placeholder={t.training.chatPlaceholder}
           className="min-w-0 flex-1 resize-y rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] leading-relaxed text-ink focus:border-accent focus:outline-none"
         />
         <button
@@ -222,14 +208,8 @@ export function MealChatPanel({
   );
 }
 
-const SLOT_SHORT: Record<MealSlot, "slotBreakfast" | "slotLunch" | "slotDinner"> = {
-  BREAKFAST: "slotBreakfast",
-  LUNCH: "slotLunch",
-  DINNER: "slotDinner",
-};
-
-/** What a proposal would change, before and after, with the buttons to
- * apply or turn it down. */
+/** What a proposal would change — sessions by day, days taken off, a new
+ * aim — with the buttons to apply it or turn it down. */
 function ProposalCard({
   proposal,
   locale,
@@ -237,74 +217,53 @@ function ProposalCard({
   onApply,
   onDismiss,
 }: {
-  proposal: Proposal;
+  proposal: TrainingProposal;
   locale: string;
   state: "open" | "busy" | "applied" | "dismissed";
   onApply: () => void;
   onDismiss: () => void;
 }) {
   const { t } = useI18n();
-  const opSign = { add: "+", remove: "−", set: "=" } as const;
+  const day = (key: string) => formatDateKey(key, localeTag(locale as "ja" | "en"), { month: "numeric", day: "numeric", weekday: "short" });
   return (
     <div className={`flex flex-col gap-2.5 rounded-xl border p-3 ${state === "open" || state === "busy" ? "border-accent/50" : "border-line opacity-70"}`}>
-      {proposal.meals.length > 0 && (
-        // By day, with the day's totals: a whole week arrives in one card,
-        // and "does each day add up" is the question to answer before
-        // applying it. Each meal opens to its recipe.
-        <div className="flex flex-col gap-2">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">
-            {t.meals.chatMealsLabel} · {t.meals.chatMealCount(proposal.meals.length)}
-          </p>
-          {[...new Set(proposal.meals.map((m) => m.dateKey))].map((dateKey) => {
-            const dayMeals = proposal.meals.filter((m) => m.dateKey === dateKey);
-            const kcal = dayMeals.reduce((sum, m) => sum + m.kcal, 0);
-            const protein = dayMeals.reduce((sum, m) => sum + m.proteinG, 0);
-            return (
-              <div key={dateKey} className="flex flex-col gap-0.5">
-                <span className="flex items-baseline gap-2 font-mono text-[9.5px] text-ink-soft">
-                  <span className="font-semibold">
-                    {formatDateKey(dateKey, localeTag(locale as "ja" | "en"), { month: "numeric", day: "numeric", weekday: "short" })}
-                  </span>
-                  {dayMeals.length === 3 && (
-                    <span className="text-ink-faint">
-                      {kcal} kcal · P {Math.round(protein)}g
-                    </span>
-                  )}
-                </span>
-                {dayMeals.map((m) => (
-                  <details key={m.slot} className="group text-[11.5px]">
-                    <summary className="flex cursor-pointer list-none items-baseline gap-2">
-                      <span className="w-6 shrink-0 font-mono text-[9.5px] text-accent">{t.meals[SLOT_SHORT[m.slot]]}</span>
-                      <span className="min-w-0 flex-1 text-ink">
-                        {m.replaces && <span className="text-ink-faint line-through">{m.replaces}</span>}
-                        {m.replaces && " → "}
-                        <span className="font-semibold">{m.title}</span>
-                      </span>
-                      <span className="shrink-0 font-mono text-[9px] text-ink-faint">
-                        {m.kcal} kcal · {t.meals.prepMinutes(m.prepMinutes)}
-                      </span>
-                    </summary>
-                    <p className="mt-0.5 ml-8 text-[10.5px] leading-relaxed text-ink-soft">{m.recipe}</p>
-                  </details>
-                ))}
-              </div>
-            );
-          })}
-        </div>
+      {proposal.focus && (
+        <p className="text-[11.5px] text-ink">
+          <span className="mr-1.5 font-mono text-[9px] tracking-wider text-accent uppercase">{t.training.chatFocusLabel}</span>
+          {proposal.focus}
+        </p>
       )}
-      {proposal.inventory.length > 0 && (
-        <div className="flex flex-col gap-0.5">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{t.meals.chatStockLabel}</p>
-          {proposal.inventory.map((s, i) => (
-            <span key={i} className="text-[11.5px] text-ink">
-              <span className="mr-1.5 font-mono text-accent">{opSign[s.op]}</span>
-              {s.name}
-              {s.quantity && <span className="ml-1.5 font-mono text-[10px] text-ink-faint">{s.quantity}</span>}
-              {s.op !== "remove" && <span className="ml-1.5 font-mono text-[9.5px] text-ink-faint">{t.meals.location[s.location]}</span>}
+      {proposal.sessions.map((s) => (
+        <details key={s.dateKey} className="text-[11.5px]">
+          <summary className="flex cursor-pointer list-none flex-col gap-0.5">
+            <span className="flex items-baseline gap-2 font-mono text-[9.5px] text-ink-soft">
+              <span className="font-semibold">{day(s.dateKey)}</span>
+              <span className="text-ink-faint">
+                {t.training.kind[s.kind]} · {t.training.minutes(s.minutes)}
+              </span>
             </span>
-          ))}
-        </div>
-      )}
+            <span className="text-ink">
+              {s.replaces && <span className="text-ink-faint line-through">{s.replaces}</span>}
+              {s.replaces && " → "}
+              <span className="font-semibold">{s.title}</span>
+            </span>
+          </summary>
+          {s.notes && <p className="mt-1 text-[10.5px] leading-relaxed text-ink-soft">{s.notes}</p>}
+          <ul className="mt-1 flex flex-col gap-0.5">
+            {s.exercises.map((e, i) => (
+              <li key={i} className="text-[10.5px] text-ink-soft">
+                {e.name} <span className="font-mono text-ink-faint">{[e.sets ? `${e.sets} × ${e.reps}` : e.reps, e.load].filter(Boolean).join(" · ")}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ))}
+      {proposal.remove.map((r) => (
+        <p key={r.dateKey} className="text-[11.5px] text-ink">
+          <span className="mr-1.5 font-mono text-[9.5px] font-semibold text-ink-soft">{day(r.dateKey)}</span>
+          <span className="text-ink-faint line-through">{r.title}</span> → {t.training.chatRestDay}
+        </p>
+      ))}
 
       {state === "applied" ? (
         <p className="font-mono text-[10.5px] text-accent">{t.meals.chatApplied}</p>

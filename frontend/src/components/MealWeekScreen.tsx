@@ -1,9 +1,8 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   getMealWeekAction,
-  generateMealPlanAction,
   saveMealPreferenceAction,
   syncMealsToCalendarAction,
   getPurchaseListAction,
@@ -12,7 +11,7 @@ import {
   type PurchaseListView,
 } from "@/app/meals/actions";
 import { LoadingBlock } from "@/components/LoadingSpinner";
-import { MealChatPanel } from "@/components/MealChatPanel";
+import { MealChatPanel, type MealChatHandle } from "@/components/MealChatPanel";
 import { PurchaseListPanel } from "@/components/PurchaseListPanel";
 import { StockPanel } from "@/components/StockPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
@@ -31,7 +30,12 @@ function weeksFrom(todayKey: string, dateKey: string | undefined): number {
 }
 
 /**
- * A week of meals and the single shopping trip that supplies it.
+ * A week of meals, made in conversation, and what to buy for it.
+ *
+ * The week is built and changed through the chat under the grid: ask for
+ * the week, a day, a single dinner; apply what comes back. Empty slots and
+ * day headers in the grid start that conversation — tapping one puts its
+ * date into the message box.
  *
  * The plan is presented next to how far it misses the brief, never as
  * finished fact: the model is good at proposing meals and unreliable at
@@ -46,12 +50,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
   // list gets written before this week is over.
   const [weekOffset, setWeekOffset] = useState(() => weeksFrom(todayKey, initialWeek));
   const [data, setData] = useState<MealWeekView | null>(null);
-  // Only what this run added on top of the stored check (a cut-off reply).
-  // The rest is recomputed server-side on every read, so switching panes
-  // mid-generation no longer loses it.
-  const [runWarnings, setRunWarnings] = useState<string[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  const [generating, startGenerating] = useTransition();
+  const chatRef = useRef<MealChatHandle>(null);
   const [, startSaving] = useTransition();
   const [openRecipe, setOpenRecipe] = useState<string | null>(null);
   const [syncing, startSyncing] = useTransition();
@@ -75,35 +74,12 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
     getPurchaseListAction().then(setPurchase);
   }, []);
 
-  // Switching panes is safe — the request keeps running and the plan is
-  // saved — but closing the tab can cut it off mid-call, which costs the
-  // owner an API call and leaves no plan. Worth one browser prompt.
-  useEffect(() => {
-    if (!generating) return;
-    const warn = (e: BeforeUnloadEvent) => e.preventDefault();
-    window.addEventListener("beforeunload", warn);
-    return () => window.removeEventListener("beforeunload", warn);
-  }, [generating]);
-
   if (!data) return <LoadingBlock label={t.common.loading} />;
 
   const dates = Array.from({ length: 7 }, (_, i) => shiftDateKey(data.weekStartDateKey, i));
   const view = data.view;
-  const warnings = [...new Set([...runWarnings, ...(view?.warnings ?? [])])];
-
-  function generate() {
-    setError(null);
-    setRunWarnings([]);
-    startGenerating(async () => {
-      const res = await generateMealPlanAction(data!.weekStartDateKey, todayKey);
-      if ("error" in res) {
-        setError(res.error);
-        return;
-      }
-      setData((prev) => (prev ? { ...prev, view: res.view } : prev));
-      setRunWarnings(res.warnings);
-    });
-  }
+  const warnings = view?.warnings ?? [];
+  const dayLabel = (d: string) => formatDateKey(d, localeTag(locale), { month: "numeric", day: "numeric", weekday: "short" });
 
   function syncToCalendar() {
     setSyncMessage(null);
@@ -180,13 +156,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
               {syncing ? t.meals.syncing : t.meals.syncToCalendar}
             </button>
           )}
-          <button
-            onClick={generate}
-            disabled={generating}
-            className="btn-sheen rounded-full bg-accent px-4 py-2 font-mono text-xs font-semibold text-on-accent disabled:opacity-50"
-          >
-            {generating ? t.meals.generating : view ? t.meals.regenerate : t.meals.generate}
-          </button>
         </div>
       </div>
 
@@ -202,8 +171,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
           </span>
         </p>
       )}
-      {generating && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[10.5px] text-ink-soft">{t.meals.generatingNote}</p>}
-      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs whitespace-pre-line text-accent">{error}</p>}
       {syncMessage && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[11px] text-ink-soft">{syncMessage}</p>}
 
       {warnings.length > 0 && (
@@ -220,73 +187,79 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         </section>
       )}
 
-      {!view ? (
-        <p className="rounded-xl border border-line bg-surface p-6 text-center text-xs text-ink-soft">{t.meals.noPlan}</p>
-      ) : (
-        <section className="overflow-x-auto">
-          <div className="flex min-w-[900px] flex-col gap-2">
-            <div className="flex gap-2">
-              <div className="w-12 shrink-0" />
-              {dates.map((d) => (
-                <div key={d} className="flex-1">
-                  <p className="font-mono text-[10px] font-semibold text-ink-soft">
-                    {t.meals.weekdayNames[new Date(`${d}T00:00:00Z`).getUTCDay()]}{" "}
-                    {formatDateKey(d, localeTag(locale), { month: "numeric", day: "numeric" })}
-                  </p>
-                </div>
-              ))}
-            </div>
-            {SLOTS.map((slot) => (
-              <div key={slot} className="flex gap-2">
-                <div className="w-12 shrink-0 pt-2 font-mono text-[10px] font-semibold text-accent">{slotLabel(slot)}</div>
-                {dates.map((d) => {
-                  const meal = mealAt(d, slot);
-                  return (
-                    <button
-                      key={d}
-                      onClick={() => meal && setOpenRecipe(openRecipe === meal.id ? null : meal.id)}
-                      className="flex-1 rounded-lg border border-line bg-surface p-2 text-left transition-colors hover:border-accent"
-                    >
-                      {meal ? (
-                        <>
-                          <p className="text-[11px] leading-snug text-ink">{meal.title}</p>
-                          <p className="mt-0.5 flex flex-wrap items-center gap-1 font-mono text-[9px] text-ink-faint">
-                            {/* Cooked, reheated, or opened — the thing you
-                                actually want to know when reading a week. */}
-                            <span
-                              className={`rounded px-1 py-px ${
-                                meal.kind === "COOK" ? "bg-accent-soft text-accent" : "bg-surface-alt text-ink-soft"
-                              }`}
-                            >
-                              {kindLabel(meal.kind)}
-                            </span>
-                            {meal.kcal} kcal · {t.meals.prepMinutes(meal.prepMinutes)}
-                          </p>
-                        </>
-                      ) : (
-                        <p className="font-mono text-[9px] text-ink-faint">—</p>
-                      )}
-                    </button>
-                  );
-                })}
+      {!view && <p className="text-[11.5px] leading-relaxed text-ink-soft">{t.meals.noPlanChat}</p>}
+      <section className="overflow-x-auto">
+        <div className="flex min-w-[900px] flex-col gap-2">
+          <div className="flex gap-2">
+            <div className="w-12 shrink-0" />
+            {dates.map((d) => (
+              <div key={d} className="flex-1">
+                {/* A day header starts a message about that day. */}
+                <button
+                  onClick={() => chatRef.current?.insert(t.meals.chatAboutDay(dayLabel(d)))}
+                  disabled={d < todayKey}
+                  className="font-mono text-[10px] font-semibold text-ink-soft transition-colors enabled:hover:text-accent"
+                >
+                  {t.meals.weekdayNames[new Date(`${d}T00:00:00Z`).getUTCDay()]}{" "}
+                  {formatDateKey(d, localeTag(locale), { month: "numeric", day: "numeric" })}
+                </button>
               </div>
             ))}
-            <div className="flex gap-2">
-              <div className="w-12 shrink-0" />
+          </div>
+          {SLOTS.map((slot) => (
+            <div key={slot} className="flex gap-2">
+              <div className="w-12 shrink-0 pt-2 font-mono text-[10px] font-semibold text-accent">{slotLabel(slot)}</div>
               {dates.map((d) => {
-                const totals = totalsFor(d);
+                const meal = mealAt(d, slot);
                 return (
-                  <div key={d} className="flex-1">
-                    <p className="font-mono text-[9px] text-ink-faint">
-                      {totals ? t.meals.dayTotals(totals.kcal, Math.round(totals.proteinG), Math.round(totals.fiberG)) : "—"}
-                    </p>
-                  </div>
+                  <button
+                    key={d}
+                    onClick={() =>
+                      meal
+                        ? setOpenRecipe(openRecipe === meal.id ? null : meal.id)
+                        : d >= todayKey && chatRef.current?.insert(t.meals.chatAboutMeal(dayLabel(d), slotLabel(slot), ""))
+                    }
+                    className="flex-1 rounded-lg border border-line bg-surface p-2 text-left transition-colors hover:border-accent"
+                  >
+                    {meal ? (
+                      <>
+                        <p className="text-[11px] leading-snug text-ink">{meal.title}</p>
+                        <p className="mt-0.5 flex flex-wrap items-center gap-1 font-mono text-[9px] text-ink-faint">
+                          {/* Cooked, reheated, or opened — the thing you
+                              actually want to know when reading a week. */}
+                          <span
+                            className={`rounded px-1 py-px ${
+                              meal.kind === "COOK" ? "bg-accent-soft text-accent" : "bg-surface-alt text-ink-soft"
+                            }`}
+                          >
+                            {kindLabel(meal.kind)}
+                          </span>
+                          {meal.kcal} kcal · {t.meals.prepMinutes(meal.prepMinutes)}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="font-mono text-[9px] text-ink-faint">{d >= todayKey ? t.meals.emptySlot : "—"}</p>
+                    )}
+                  </button>
                 );
               })}
             </div>
+          ))}
+          <div className="flex gap-2">
+            <div className="w-12 shrink-0" />
+            {dates.map((d) => {
+              const totals = totalsFor(d);
+              return (
+                <div key={d} className="flex-1">
+                  <p className="font-mono text-[9px] text-ink-faint">
+                    {totals ? t.meals.dayTotals(totals.kcal, Math.round(totals.proteinG), Math.round(totals.fiberG)) : "—"}
+                  </p>
+                </div>
+              );
+            })}
           </div>
-        </section>
-      )}
+        </div>
+      </section>
 
       {openRecipe && view && (
         <section className="rounded-xl border border-accent/40 bg-surface p-4">
@@ -298,7 +271,15 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
                 <div className="mb-2 flex items-center gap-2">
                   <span className="font-mono text-[10px] text-accent">{slotLabel(meal.slot)}</span>
                   <h2 className="text-sm font-bold text-ink">{meal.title}</h2>
-                  <button onClick={() => setOpenRecipe(null)} className="ml-auto font-mono text-[10px] text-ink-soft">
+                  {meal.dateKey >= todayKey && meal.status === "PLANNED" && (
+                    <button
+                      onClick={() => chatRef.current?.insert(t.meals.chatAboutMeal(dayLabel(meal.dateKey), slotLabel(meal.slot), meal.title))}
+                      className="ml-auto rounded-full border border-line-strong px-2.5 py-1 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
+                    >
+                      {t.meals.chatAboutThis}
+                    </button>
+                  )}
+                  <button onClick={() => setOpenRecipe(null)} className={`${meal.dateKey >= todayKey && meal.status === "PLANNED" ? "" : "ml-auto "}font-mono text-[10px] text-ink-soft`}>
                     {t.common.close}
                   </button>
                 </div>
@@ -313,14 +294,35 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         </section>
       )}
 
+      {/* The flow, top to bottom: the meals above, made and changed here by
+          chat, then the to-buy list made from them — next to the inventory,
+          which is always shown because it's checked both while planning and
+          in the shop. Shown with no plan too: that's where a week begins. */}
+      <MealChatPanel
+        key={`chat:${data.weekStartDateKey}`}
+        ref={chatRef}
+        weekStartDateKey={data.weekStartDateKey}
+        hasMeals={(view?.meals.length ?? 0) > 0}
+        todayKey={todayKey}
+        onApplied={(week, items) => {
+          setData(week);
+          setInventory(items);
+          // Changed meals can leave the to-buy list behind; re-read it so
+          // it can say so.
+          getPurchaseListAction().then(setPurchase);
+        }}
+      />
+
       {view && (
         // What the plan was priced at when it was made, next to what the
         // week actually cost. Shown together because the gap is what makes
         // the next budget a real number rather than a wish.
         <div className="flex flex-col gap-0.5">
-          <p className={`font-mono text-[10.5px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
-            {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
-          </p>
+          {view.shoppingItems.length > 0 && (
+            <p className={`font-mono text-[10.5px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
+              {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
+            </p>
+          )}
           <p className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
             {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
           </p>
@@ -328,24 +330,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         </div>
       )}
 
-      {/* The flow, top to bottom: the meals above, adjusted here by chat,
-          then the to-buy list made from them — next to the inventory, which
-          is always shown because it's checked both while planning and in
-          the shop. */}
-      {view && (
-        <MealChatPanel
-          key={`chat:${data.weekStartDateKey}`}
-          weekStartDateKey={data.weekStartDateKey}
-          todayKey={todayKey}
-          onApplied={(week, items) => {
-            setData(week);
-            setInventory(items);
-            // Changed meals can leave the to-buy list behind; re-read it so
-            // it can say so.
-            getPurchaseListAction().then(setPurchase);
-          }}
-        />
-      )}
 
       <div className="@container">
         <div className="grid items-start gap-6 @[760px]:grid-cols-2">
