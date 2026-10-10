@@ -37,17 +37,27 @@ export async function generateMetadata(): Promise<Metadata> {
   // one: its whole job is to be served publicly in this page's <head>, on
   // every response, to anyone who asks. Committing it means the property
   // stays verified through a redeploy without depending on a value set by
-  // hand in the Vercel dashboard. GOOGLE_SITE_VERIFICATION still overrides
-  // it, for a different deployment of this codebase.
-  const googleSiteVerification =
-    process.env.GOOGLE_SITE_VERIFICATION?.trim() || "VcCqw2ebdpTBB-VKYGNXBIG8R5X4o3rhQQ0ImzCg_pk";
+  // hand in the Vercel dashboard.
+  //
+  // Search Console issues one token per property, and the site has had more
+  // than one address (word-log-two.vercel.app, then hibino.vercel.app), so
+  // GOOGLE_SITE_VERIFICATION adds tokens — comma-separated — next to the
+  // committed one rather than replacing it. Every token is served on every
+  // host; each property only looks for its own.
+  const googleSiteVerification = [
+    "VcCqw2ebdpTBB-VKYGNXBIG8R5X4o3rhQQ0ImzCg_pk",
+    ...(process.env.GOOGLE_SITE_VERIFICATION ?? "")
+      .split(",")
+      .map((token) => token.trim())
+      .filter(Boolean),
+  ];
 
   return {
     title,
     description,
     manifest: "/manifest.webmanifest",
     appleWebApp: { title },
-    ...(googleSiteVerification ? { verification: { google: googleSiteVerification } } : {}),
+    verification: { google: [...new Set(googleSiteVerification)] },
   };
 }
 
