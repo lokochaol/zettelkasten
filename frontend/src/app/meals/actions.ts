@@ -2,7 +2,6 @@
 
 import { revalidatePath } from "next/cache";
 import * as mealPlanning from "@/lib/mealPlanning";
-import * as coopOrder from "@/lib/coopOrder";
 import * as expenses from "@/lib/expenses";
 import * as inventory from "@/lib/inventory";
 import * as mealChat from "@/lib/mealChat";
@@ -287,78 +286,3 @@ export async function syncMealsToCalendarAction(
   }
 }
 
-/* ---------- Coop Deli order ---------- */
-
-export interface CoopWeekView {
-  weekStartDateKey: string;
-  /** The week ordering can still reach — everything nearer has either been
-   * bought or has passed its deadline. */
-  targetWeekStartDateKey: string;
-  order: coopOrder.CoopOrderView | null;
-  /** The list as text, ready to paste into eフレンズ or a notes app. Built
-   * on the server so the client doesn't re-implement the formatting. */
-  text: string;
-}
-
-export async function getCoopOrderAction(weekStartDateKey: string, todayKey: string): Promise<CoopWeekView> {
-  const ownerSub = await requireOwnerSub();
-  const preference = await mealPlanning.getPreference(ownerSub);
-  const order = await coopOrder.getOrder(ownerSub, weekStartDateKey, todayKey);
-  return {
-    weekStartDateKey,
-    targetWeekStartDateKey: coopOrder.targetWeekStart(
-      todayKey,
-      preference.weekStartWeekday,
-      preference.coopDeliveryWeekday,
-      preference.coopOrderLeadDays,
-    ),
-    order,
-    text: order ? coopOrder.orderText(order) : "",
-  };
-}
-
-/**
- * Proposes the order for a week. Nothing is submitted anywhere: eフレンズ
- * has no external ordering API, so this ends in a list the owner types in
- * themselves, and saying that plainly beats implying an integration that
- * cannot exist.
- */
-export async function proposeCoopOrderAction(
-  weekStartDateKey: string,
-  todayKey: string,
-): Promise<{ order: coopOrder.CoopOrderView; refined: boolean; text: string } | { error: string }> {
-  const ownerSub = await requireOwnerSub();
-  const locale = await getLocale();
-  const dict = getDictionary(locale);
-  try {
-    const { view, refined } = await coopOrder.proposeOrder(ownerSub, weekStartDateKey, todayKey);
-    revalidatePath("/meals");
-    return { order: view, refined, text: coopOrder.orderText(view) };
-  } catch (e) {
-    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
-    if (e instanceof AiJsonError) {
-      const byCode: Record<string, string> = {
-        authError: dict.meals.errorAuth,
-        rateLimitError: dict.meals.errorRateLimit,
-        invalidResponse: dict.meals.errorBadResponse,
-        truncated: dict.meals.errorTruncated,
-        apiError: dict.meals.errorApi,
-      };
-      console.error("coop order proposal failed", e.code, e.message);
-      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
-    }
-    throw e;
-  }
-}
-
-export async function toggleCoopItemAction(
-  itemId: string,
-  chosen: boolean,
-  weekStartDateKey: string,
-  todayKey: string,
-): Promise<CoopWeekView> {
-  const ownerSub = await requireOwnerSub();
-  await coopOrder.setItemChosen(ownerSub, itemId, chosen);
-  revalidatePath("/meals");
-  return getCoopOrderAction(weekStartDateKey, todayKey);
-}

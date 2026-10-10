@@ -43,8 +43,6 @@ export interface PreferenceInput {
   breakfastMinutes: number;
   lunchMinutes: number;
   dinnerMinutes: number;
-  coopDeliveryWeekday: number;
-  coopOrderLeadDays: number;
   cookSessionsPerWeek: number;
   readyMadeMealsPerWeek: number;
 }
@@ -69,14 +67,6 @@ export async function savePreference(ownerSub: string, input: PreferenceInput): 
   // it's a typo.
   if (!Number.isInteger(input.readyMadeMealsPerWeek) || input.readyMadeMealsPerWeek < 0 || input.readyMadeMealsPerWeek > 21) {
     throw new ValidationError("mealPreferenceInvalid", "Ready-made meals must be 0-21");
-  }
-  if (!Number.isInteger(input.coopDeliveryWeekday) || input.coopDeliveryWeekday < 0 || input.coopDeliveryWeekday > 6) {
-    throw new ValidationError("mealPreferenceInvalid", "Delivery weekday must be 0-6");
-  }
-  // An order that closes more than three weeks out isn't a deadline any
-  // more, and a same-day one isn't a weekly delivery.
-  if (!Number.isInteger(input.coopOrderLeadDays) || input.coopOrderLeadDays < 1 || input.coopOrderLeadDays > 21) {
-    throw new ValidationError("mealPreferenceInvalid", "Order lead time is out of range");
   }
   for (const minutes of [input.breakfastMinutes, input.lunchMinutes, input.dinnerMinutes]) {
     if (!Number.isInteger(minutes) || minutes < 0 || minutes > 1439) {

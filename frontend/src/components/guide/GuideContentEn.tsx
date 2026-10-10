@@ -73,7 +73,7 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning and the meal chat, the Coop Deli order proposal, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning and the meal chat, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
@@ -113,7 +113,7 @@ export function GuideContentEn() {
             },
             {
               title: "Meal preferences (/meals)",
-              body: "Weekly food budget, weekday cooking time, shopping day, the day the week starts, dislikes and allergies, how many days you cook. For Coop Deli, the delivery day and order deadline too.",
+              body: "Weekly food budget, weekday cooking time, shopping day, the day the week starts, dislikes and allergies, how many days you cook.",
             },
             {
               title: "Zotero (/settings, if you work with sources)",
@@ -140,7 +140,6 @@ export function GuideContentEn() {
               label: "Weekly",
               items: [
                 "Plan the week in /meals and shop once",
-                "Send the Coop Deli order before its deadline",
                 "Ask for this week's advice in /money",
                 "Promote the Dash Off notes worth keeping (the rest clear themselves after a week)",
               ],
@@ -403,7 +402,7 @@ export function GuideContentEn() {
           id="meals"
           path="/meals"
           name="Meals"
-          lead="A week of meals and one shopping trip that covers it. The AI plans within your nutrition targets, weekly budget and cooking time; the app then recalculates the result and tells you where it misses."
+          lead="A week of meals and the list of what to buy for it. The AI plans within your nutrition targets, weekly budget and cooking time; the app then recalculates the result and tells you where it misses."
         >
           <Points
             items={[
@@ -424,16 +423,12 @@ export function GuideContentEn() {
                 body: "Put the week's meals into your calendar at the meal times you've set.",
               },
               {
-                title: "Fridge inventory",
-                body: "Ticking a shopping item puts it into the inventory (fridge, freezer or pantry); unticking takes it out. On a phone the shopping list and the inventory are two tabs; on a wide screen they sit side by side. The next plan uses what's at home first.",
+                title: "To-buy list and inventory",
+                body: "Tick what you bought on the to-buy list and it goes into the inventory (fridge, freezer or pantry); untick to take it out. On a phone the two lists are tabs; on a wide screen they sit side by side. The next plan uses what's at home first.",
               },
               {
                 title: "Replan by chat",
                 body: "Write something like “they were out of chicken, so I bought pork” and you get a proposal for the meals from today on that haven't been eaten. Nothing changes until you check the meal, inventory and shopping changes and press Apply — then the calendar is rewritten too.",
-              },
-              {
-                title: "Coop Deli order proposal",
-                body: "The week's shopping list regrouped into what a weekly delivery brings, with things that won't keep split out as “buy in store”. Coop Deli has no ordering API, so nothing is ordered from here — copy it and place the order yourself. Only weeks whose deadline hasn't passed are offered.",
               },
             ]}
           />

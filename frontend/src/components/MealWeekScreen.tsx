@@ -9,7 +9,6 @@ import {
   listInventoryAction,
   type MealWeekView,
 } from "@/app/meals/actions";
-import { CoopOrderPanel } from "@/components/CoopOrderPanel";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { MealChatPanel } from "@/components/MealChatPanel";
 import { ShoppingStockPanel } from "@/components/ShoppingStockPanel";
@@ -40,8 +39,8 @@ function weeksFrom(todayKey: string, dateKey: string | undefined): number {
 export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being looked at before a reload. */ initialWeek?: string }) {
   const { t, locale } = useI18n();
   const todayKey = todayKeyValue();
-  // Weeks are navigable because ordering runs ahead of eating: the Coop
-  // list for a week has to be written a fortnight before anyone eats it.
+  // Weeks are navigable because planning runs ahead of eating: next week's
+  // list gets written before this week is over.
   const [weekOffset, setWeekOffset] = useState(() => weeksFrom(todayKey, initialWeek));
   const [data, setData] = useState<MealWeekView | null>(null);
   // Only what this run added on top of the stored check (a cut-off reply).
@@ -122,8 +121,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         breakfastMinutes: next.breakfastMinutes,
         lunchMinutes: next.lunchMinutes,
         dinnerMinutes: next.dinnerMinutes,
-        coopDeliveryWeekday: next.coopDeliveryWeekday,
-        coopOrderLeadDays: next.coopOrderLeadDays,
         cookSessionsPerWeek: next.cookSessionsPerWeek,
         readyMadeMealsPerWeek: next.readyMadeMealsPerWeek,
       });
@@ -352,8 +349,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         />
       )}
 
-      <CoopOrderPanel weekStartDateKey={data.weekStartDateKey} todayKey={todayKey} />
-
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
         <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft uppercase">{t.meals.prefHeading}</p>
         <div className="grid grid-cols-2 gap-3">
@@ -414,27 +409,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
                 </option>
               ))}
             </select>
-          </PrefField>
-          <PrefField label={t.meals.prefDeliveryDay}>
-            <select
-              defaultValue={data.preference.coopDeliveryWeekday}
-              onChange={(e) => savePreference({ coopDeliveryWeekday: Number(e.target.value) })}
-              className="w-full bg-transparent text-xs text-ink focus:outline-none"
-            >
-              {t.meals.weekdayNames.map((name, i) => (
-                <option key={name} value={i}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </PrefField>
-          <PrefField label={t.meals.prefOrderLeadDays}>
-            <input
-              defaultValue={data.preference.coopOrderLeadDays}
-              onBlur={(e) => savePreference({ coopOrderLeadDays: Number(e.target.value) })}
-              inputMode="numeric"
-              className="w-full bg-transparent text-xs text-ink focus:outline-none"
-            />
           </PrefField>
           <PrefField label={t.meals.prefAllergies}>
             <input

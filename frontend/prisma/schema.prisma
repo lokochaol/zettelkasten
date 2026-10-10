@@ -610,14 +610,6 @@ model MealPreference {
   /// allowed and so is twenty-one; the planner is told the number rather
   /// than a moral position about convenience food.
   readyMadeMealsPerWeek Int @default(5) @map("ready_made_meals_per_week")
-  /// 0 = Sunday. The weekday the Coop Deli van comes. Ordering is planned
-  /// backwards from this, not from the shopping trip: the delivery has to
-  /// land before the week it feeds begins.
-  coopDeliveryWeekday Int    @default(2) @map("coop_delivery_weekday")
-  /// How many days before delivery the order closes. A week for Coop Deli;
-  /// kept as a number because the deadline is the thing that actually
-  /// bites, and it differs by area.
-  coopOrderLeadDays Int      @default(7) @map("coop_order_lead_days")
   createdAt         DateTime @default(now()) @map("created_at")
   updatedAt         DateTime @updatedAt @map("updated_at")
 
@@ -797,59 +789,6 @@ model CategoryRule {
   @@unique([ownerSub, keyword])
   @@index([ownerSub])
   @@map("category_rule")
-}
-
-/// A proposed Coop Deli order for one week.
-///
-/// A proposal and nothing more: eフレンズ has no external ordering API, so
-/// nothing here is placed automatically. What the app can do honestly is
-/// work out what next-week-but-one needs, in generic ingredient names and
-/// estimated prices, and hand over a list to type in.
-model CoopOrder {
-  id               String   @id @default(uuid())
-  ownerSub         String   @map("owner_sub")
-  /// The week this delivery is meant to feed — the same key as the plan.
-  weekStartDateKey String   @map("week_start_date_key")
-  /// When the order closes, and when the van comes. Stored rather than
-  /// recomputed: the preference can change after an order is proposed, and
-  /// the deadline that was true when it was written is the useful one.
-  orderByDateKey   String   @map("order_by_date_key")
-  deliveryDateKey  String   @map("delivery_date_key")
-  /// Whether the list was consolidated into delivery-sized quantities, or
-  /// is a plain copy of the week's shopping list because no AI key was
-  /// configured. Shown, not hidden — the two are worth different trust.
-  refined          Boolean  @default(false)
-  note             String   @default("")
-  createdAt        DateTime @default(now()) @map("created_at")
-
-  items CoopOrderItem[]
-
-  @@unique([ownerSub, weekStartDateKey])
-  @@index([ownerSub, orderByDateKey])
-  @@map("coop_order")
-}
-
-model CoopOrderItem {
-  id           String    @id @default(uuid())
-  orderId      String    @map("order_id")
-  order        CoopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  category     String
-  /// A generic ingredient name, never a catalogue code: the app cannot see
-  /// the week's catalogue, and inventing product numbers would be a lie
-  /// that costs the owner a wrong delivery.
-  name         String
-  quantity     String
-  estimatedYen Int       @map("estimated_yen")
-  /// Fresh things a weekly delivery handles badly, and amounts too small to
-  /// be worth a delivery slot. Kept in the list rather than dropped, so the
-  /// owner knows they still need them.
-  localInstead Boolean   @default(false) @map("local_instead")
-  reason       String    @default("")
-  chosen       Boolean   @default(true)
-  sortOrder    Int       @map("sort_order")
-
-  @@index([orderId])
-  @@map("coop_order_item")
 }
 
 /// A block of time the owner put on the day themselves.

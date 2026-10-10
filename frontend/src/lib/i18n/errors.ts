@@ -48,10 +48,6 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.discoveryCandidateNotFound;
     case "mealPlanNotFound":
       return dict.mealPlanNotFound;
-    case "coopPlanMissing":
-      return dict.coopPlanMissing;
-    case "coopOrderNotFound":
-      return dict.coopOrderNotFound;
     case "inventoryInvalid":
       return dict.inventoryInvalid;
     case "inventoryNotFound":
