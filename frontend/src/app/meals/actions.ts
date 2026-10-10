@@ -97,6 +97,14 @@ export async function createPurchaseListAction(
   }
 }
 
+/** Puts a line the inventory seemed to cover back on the list. */
+export async function restoreExcludedPurchaseAction(name: string): Promise<PurchaseListView | null> {
+  const ownerSub = await requireOwnerSub();
+  const list = await purchaseList.restoreExcluded(ownerSub, name);
+  revalidatePath("/meals");
+  return list;
+}
+
 export async function clearPurchaseListAction(): Promise<void> {
   await purchaseList.clearPurchaseList(await requireOwnerSub());
   revalidatePath("/meals");

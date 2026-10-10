@@ -315,6 +315,9 @@ export interface Dictionary {
     purchaseStale: string;
     purchasePast: string;
     purchaseFinish: string;
+    purchaseExcludedHeading: (n: number) => string;
+    purchaseExcludedStock: (stock: string) => string;
+    purchaseExcludedRestore: string;
     stockHeading: string;
     stockBoughtNote: string;
     stockEmpty: string;
@@ -342,7 +345,6 @@ export interface Dictionary {
     noPlanChat: string;
     emptySlot: string;
     chatMealsLabel: string;
-    chatStockLabel: string;
     chatApply: string;
     chatApplying: string;
     chatApplied: string;

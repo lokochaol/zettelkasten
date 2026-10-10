@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import {
   clearPurchaseListAction,
   createPurchaseListAction,
+  restoreExcludedPurchaseAction,
   toggleShoppingItemAction,
   type PurchaseListView,
 } from "@/app/meals/actions";
@@ -175,6 +176,31 @@ export function PurchaseListPanel({
             ))}
         </div>
       ))}
+
+      {/* What the inventory already covers, set aside rather than dropped:
+          enough at home is the usual case, but "4 eggs, need 10" is the
+          owner's call, so each line can go back on the list. */}
+      {list.excluded.length > 0 && (
+        <details className="rounded-lg border border-line px-3 py-2">
+          <summary className="cursor-pointer font-mono text-[10px] text-ink-soft">{t.meals.purchaseExcludedHeading(list.excluded.length)}</summary>
+          <div className="mt-2 flex flex-col gap-1">
+            {list.excluded.map((line) => (
+              <div key={line.name} className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+                <span className="text-[12px] text-ink-soft">{line.name}</span>
+                <span className="font-mono text-[10px] text-ink-faint">{line.quantity}</span>
+                <span className="font-mono text-[10px] text-ink-faint">{t.meals.purchaseExcludedStock(line.stock)}</span>
+                <button
+                  type="button"
+                  onClick={() => void restoreExcludedPurchaseAction(line.name).then((next) => next && onListChange(next))}
+                  className="ml-auto rounded-full border border-line-strong px-2.5 py-0.5 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
+                >
+                  {t.meals.purchaseExcludedRestore}
+                </button>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
 
       <div className="flex flex-wrap items-end gap-2 border-t border-line pt-3">
         {controls}

@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { askForJson, AiJsonError } from "@/lib/aiJson";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
-import { inventoryBrief, listInventory } from "@/lib/inventory";
+import { inventoryBrief, listInventory, matchStock } from "@/lib/inventory";
+import type { Prisma } from "@/generated/prisma/client";
 import type { MealSlot, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
 /**
@@ -24,6 +25,16 @@ export const MAX_DAYS = 7;
  * asked to use, so the list groups the same way every time. */
 export const CATEGORIES = ["野菜・果物", "肉・魚", "卵・乳製品", "豆腐・大豆製品", "主食", "冷凍食品・惣菜", "調味料・乾物", "その他"];
 
+/** A line set aside because the inventory already has it. */
+export interface ExcludedLine {
+  category: string;
+  name: string;
+  quantity: string;
+  estimatedYen: number;
+  /** The inventory line it matched, as text ("卵 4個"). */
+  stock: string;
+}
+
 export interface PurchaseListView {
   id: string;
   fromDateKey: string;
@@ -34,6 +45,9 @@ export interface PurchaseListView {
   stale: boolean;
   items: ShoppingItem[];
   estimatedYen: number;
+  /** Asked for by the model but already in the inventory — see
+   * splitByStock. Restorable one by one. */
+  excluded: ExcludedLine[];
 }
 
 const SLOT_ORDER: Record<MealSlot, number> = { BREAKFAST: 0, LUNCH: 1, DINNER: 2 };
@@ -55,7 +69,7 @@ export function digestOf(meals: Pick<PlannedMeal, "dateKey" | "slot" | "kind" | 
 }
 
 function toView(
-  list: { id: string; fromDateKey: string; toDateKey: string; note: string; createdAt: Date; mealsDigest: string; items: ShoppingItem[] },
+  list: { id: string; fromDateKey: string; toDateKey: string; note: string; createdAt: Date; mealsDigest: string; excluded: unknown; items: ShoppingItem[] },
   currentDigest: string,
 ): PurchaseListView {
   return {
@@ -67,6 +81,7 @@ function toView(
     stale: list.mealsDigest !== currentDigest,
     items: list.items,
     estimatedYen: list.items.reduce((sum, i) => sum + i.estimatedYen, 0),
+    excluded: Array.isArray(list.excluded) ? (list.excluded as ExcludedLine[]) : [],
   };
 }
 
@@ -131,6 +146,56 @@ export function parseListReply(value: unknown): { items: Array<Pick<ShoppingItem
 }
 
 /**
+ * Splits the model's lines into what to buy and what the inventory already
+ * covers. The prompt already says "don't list what's at home", but a model
+ * follows that only most of the time, so it's enforced here too. The lines
+ * taken out are kept, not lost: a stock of 4 eggs against a week that needs
+ * 10 is the owner's call, and they can put the line back. Pure.
+ */
+export function splitByStock<T extends { name: string }>(
+  lines: T[],
+  stock: { name: string; quantity: string }[],
+): { keep: T[]; excluded: (T & { stock: string })[] } {
+  const keep: T[] = [];
+  const excluded: (T & { stock: string })[] = [];
+  for (const line of lines) {
+    const hit = matchStock(line.name, stock);
+    if (hit) excluded.push({ ...line, stock: `${hit.name}${hit.quantity ? ` ${hit.quantity}` : ""}` });
+    else keep.push(line);
+  }
+  return { keep, excluded };
+}
+
+/** Puts a set-aside line back on the list — the inventory had some, but not
+ * enough. Appended at the end of its category. */
+export async function restoreExcluded(ownerSub: string, name: string): Promise<PurchaseListView | null> {
+  const list = await prisma.purchaseList.findUnique({ where: { ownerSub }, include: { items: { orderBy: { sortOrder: "asc" } } } });
+  if (!list) return null;
+  const excluded = Array.isArray(list.excluded) ? (list.excluded as unknown as ExcludedLine[]) : [];
+  const line = excluded.find((e) => e.name === name);
+  if (line) {
+    // The list is kept in category order, so the line goes after the last
+    // item of its own (or an earlier) category, and everything after moves
+    // down one.
+    const rank = (c: string) => CATEGORIES.indexOf(c);
+    const at = list.items.filter((i) => rank(i.category) <= rank(line.category)).length;
+    await prisma.$transaction(async (tx) => {
+      for (const [i, item] of list.items.entries()) {
+        if (i >= at) await tx.shoppingItem.update({ where: { id: item.id }, data: { sortOrder: i + 1 } });
+      }
+      await tx.shoppingItem.create({
+        data: { listId: list.id, category: line.category, name: line.name, quantity: line.quantity, estimatedYen: line.estimatedYen, sortOrder: at },
+      });
+      await tx.purchaseList.update({
+        where: { id: list.id },
+        data: { excluded: excluded.filter((e) => e !== line) as unknown as Prisma.InputJsonValue },
+      });
+    }, { maxWait: 10_000, timeout: 30_000 });
+  }
+  return getPurchaseList(ownerSub);
+}
+
+/**
  * Makes the list for `days` days starting `fromDateKey`, replacing the
  * current one. Lines already ticked on the old list are in the inventory by
  * now, so the model, which is shown the inventory, doesn't ask for them
@@ -173,15 +238,26 @@ export async function createPurchaseList(ownerSub: string, fromDateKey: string, 
     .join("\n");
 
   const { value, truncated } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 8000);
-  const { items, note } = parseListReply(value);
-  if (items.length === 0) {
+  const parsed = parseListReply(value);
+  const { keep, excluded } = splitByStock(parsed.items, stock);
+  const items = keep.map((item, i) => ({ ...item, sortOrder: i }));
+  const note = parsed.note;
+  if (parsed.items.length === 0) {
     throw new AiJsonError(truncated ? "truncated" : "invalidResponse", "買い物リストが1行もありませんでした");
   }
 
   const list = await prisma.$transaction(async (tx) => {
     await tx.purchaseList.deleteMany({ where: { ownerSub } });
     return tx.purchaseList.create({
-      data: { ownerSub, fromDateKey, toDateKey, mealsDigest: digestOf(allMeals), note, items: { create: items } },
+      data: {
+        ownerSub,
+        fromDateKey,
+        toDateKey,
+        mealsDigest: digestOf(allMeals),
+        note,
+        excluded: excluded.map(({ category, name, quantity, estimatedYen, stock }) => ({ category, name, quantity, estimatedYen, stock })) as unknown as Prisma.InputJsonValue,
+        items: { create: items },
+      },
       include: { items: { orderBy: { sortOrder: "asc" } } },
     });
   });

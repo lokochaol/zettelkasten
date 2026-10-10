@@ -112,3 +112,33 @@ export function inventoryBrief(items: InventoryItem[]): string {
   const label: Record<StorageLocation, string> = { FRIDGE: "冷蔵", FREEZER: "冷凍", PANTRY: "常温" };
   return items.map((i) => `  [${label[i.location]}] ${i.name}${i.quantity ? ` ${i.quantity}` : ""}`).join("\n");
 }
+
+/** A food name reduced to what makes two spellings the same item: width
+ * and case folded, katakana read as hiragana, spaces and bracketed notes
+ * ("鶏むね肉（皮なし）") dropped. */
+export function normalizeFoodName(name: string): string {
+  return name
+    .normalize("NFKC")
+    .toLowerCase()
+    .replace(/[（(][^）)]*[）)]/g, "")
+    .replace(/\s+/g, "")
+    .replace(/[ァ-ヶ]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0x60));
+}
+
+/**
+ * The inventory line a shopping line is already covered by, if any: the
+ * same item by normalized name, or one name inside the other ("しょうゆ" /
+ * "減塩しょうゆ"). Containment needs two characters on the shorter side,
+ * so a one-character name like "米" only matches itself, never "米酢".
+ */
+export function matchStock<T extends { name: string }>(name: string, stock: T[]): T | null {
+  const a = normalizeFoodName(name);
+  if (!a) return null;
+  for (const item of stock) {
+    const b = normalizeFoodName(item.name);
+    if (!b) continue;
+    if (a === b) return item;
+    if (Math.min(a.length, b.length) >= 2 && (a.includes(b) || b.includes(a))) return item;
+  }
+  return null;
+}
