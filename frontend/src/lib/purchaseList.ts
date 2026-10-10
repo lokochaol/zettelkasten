@@ -101,7 +101,7 @@ export async function clearPurchaseList(ownerSub: string): Promise<void> {
 const SYSTEM_PROMPT = `あなたは管理栄養士で、買い物の段取りを担当します。指定された期間の献立を作るために、店で買う必要があるものだけを買い物リストにまとめます。
 
 守ること:
-1. 家にある食材（在庫）は買わない。在庫で足りない分だけを入れる。
+1. 家にある食材（在庫）は買わない。在庫と同じ食材（書き方が違っても同じもの。例: 鶏胸肉と鶏むね肉）は入れない。どうしても足りずに入れる場合は、その行の inStock に在庫の品名をそのまま書く。それ以外の行の inStock は空文字にする。
 2. 各料理の recipe に書かれた材料と分量から必要な量を合計し、店で買う単位（1パック、1袋、1本、300g など）に丸める。同じ食材は1行にまとめる。
 3. kind が BATCH の食事は作り置きを食べるだけなので、その料理の材料は買わない（元になる COOK の料理の分で買う）。元の料理が期間より前にすでに作ってある場合も買わない。
 4. kind が READY の食事（冷凍食品・惣菜）は、その商品自体を1行として入れる。
@@ -113,7 +113,7 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、買い物の段取りを
 出力は次のJSONのみ。説明文・前置き・コードフェンスは書かない:
 {
   "items": [
-    { "category": "肉・魚", "name": "鶏むね肉", "quantity": "2枚（約600g）", "estimatedYen": 600 }
+    { "category": "肉・魚", "name": "鶏むね肉", "quantity": "2枚（約600g）", "estimatedYen": 600, "inStock": "" }
   ],
   "note": ""
 }`;
@@ -126,7 +126,10 @@ const str = (v: unknown, max: number): string => (typeof v === "string" ? v.trim
 
 /** Reads the model's list, keeping only usable lines, grouped in shop order
  * (by category, then as the model listed them). Pure, for testing. */
-export function parseListReply(value: unknown): { items: Array<Pick<ShoppingItem, "category" | "name" | "quantity" | "estimatedYen" | "sortOrder">>; note: string } {
+export function parseListReply(value: unknown): {
+  items: Array<Pick<ShoppingItem, "category" | "name" | "quantity" | "estimatedYen" | "sortOrder"> & { inStock: string }>;
+  note: string;
+} {
   const raw = (value ?? {}) as { items?: unknown; note?: unknown };
   const rows = (Array.isArray(raw.items) ? raw.items : [])
     .map((r) => {
@@ -137,6 +140,7 @@ export function parseListReply(value: unknown): { items: Array<Pick<ShoppingItem
         name: str(item.name, 100),
         quantity: str(item.quantity, 100),
         estimatedYen: Math.round(num(item.estimatedYen)),
+        inStock: str(item.inStock, 100),
       };
     })
     .filter((i) => i.name);
@@ -152,14 +156,17 @@ export function parseListReply(value: unknown): { items: Array<Pick<ShoppingItem
  * taken out are kept, not lost: a stock of 4 eggs against a week that needs
  * 10 is the owner's call, and they can put the line back. Pure.
  */
-export function splitByStock<T extends { name: string }>(
+export function splitByStock<T extends { name: string; inStock?: string }>(
   lines: T[],
   stock: { name: string; quantity: string }[],
 ): { keep: T[]; excluded: (T & { stock: string })[] } {
   const keep: T[] = [];
   const excluded: (T & { stock: string })[] = [];
   for (const line of lines) {
-    const hit = matchStock(line.name, stock);
+    // By name first; failing that, the stock line the model said this one
+    // is — trusted only when it names a line the inventory really has, so a
+    // made-up "in stock" can't take something off the list.
+    const hit = matchStock(line.name, stock) ?? (line.inStock ? matchStock(line.inStock, stock) : null);
     if (hit) excluded.push({ ...line, stock: `${hit.name}${hit.quantity ? ` ${hit.quantity}` : ""}` });
     else keep.push(line);
   }
@@ -240,7 +247,13 @@ export async function createPurchaseList(ownerSub: string, fromDateKey: string, 
   const { value, truncated } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 8000);
   const parsed = parseListReply(value);
   const { keep, excluded } = splitByStock(parsed.items, stock);
-  const items = keep.map((item, i) => ({ ...item, sortOrder: i }));
+  const items = keep.map((item, i) => ({
+    category: item.category,
+    name: item.name,
+    quantity: item.quantity,
+    estimatedYen: item.estimatedYen,
+    sortOrder: i,
+  }));
   const note = parsed.note;
   if (parsed.items.length === 0) {
     throw new AiJsonError(truncated ? "truncated" : "invalidResponse", "買い物リストが1行もありませんでした");
