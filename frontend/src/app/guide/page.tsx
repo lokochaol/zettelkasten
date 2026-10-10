@@ -52,6 +52,17 @@ export default async function GuidePage() {
         </div>
 
         {locale === "ja" ? <GuideContentJa /> : <GuideContentEn />}
+
+        {/* Linked from here because this is the homepage Google's consent
+            screen points at, and the policy has to be one click away. */}
+        <nav className="flex gap-4 border-t border-line pt-4 font-mono text-[11px] text-ink-soft">
+          <Link href="/privacy" className="hover:text-accent">
+            {locale === "ja" ? "プライバシーポリシー" : "Privacy Policy"}
+          </Link>
+          <Link href="/terms" className="hover:text-accent">
+            {locale === "ja" ? "利用規約" : "Terms of Service"}
+          </Link>
+        </nav>
       </div>
     </main>
   );
