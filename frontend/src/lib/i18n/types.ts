@@ -244,11 +244,6 @@ export interface Dictionary {
   meals: {
     heading: string;
     weekRange: (start: string, end: string) => string;
-    generate: string;
-    regenerate: string;
-    generating: string;
-    generatingNote: string;
-    noPlan: string;
     slotBreakfast: string;
     slotLunch: string;
     slotDinner: string;
@@ -322,6 +317,13 @@ export interface Dictionary {
     chatSending: string;
     chatEmpty: string;
     chatSuggestions: string[];
+    chatStartSuggestions: string[];
+    chatMealCount: (n: number) => string;
+    chatAboutDay: (day: string) => string;
+    chatAboutMeal: (day: string, slot: string, title: string) => string;
+    chatAboutThis: string;
+    noPlanChat: string;
+    emptySlot: string;
     chatMealsLabel: string;
     chatStockLabel: string;
     chatApply: string;

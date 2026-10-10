@@ -55,45 +55,6 @@ export async function saveMealPreferenceAction(input: PreferenceInput): Promise<
 }
 
 /**
- * Runs the planner on the owner's own AI key. Every failure mode here is
- * something the owner can act on — no key configured, a key that was
- * rejected, a reply that wasn't usable — so they come back as messages
- * rather than exceptions.
- */
-export async function generateMealPlanAction(
-  weekStartDateKey: string,
-  todayKey: string,
-): Promise<{ view: MealPlanView; warnings: string[] } | { error: string }> {
-  const ownerSub = await requireOwnerSub();
-  const locale = await getLocale();
-  const dict = getDictionary(locale);
-  try {
-    const { view, warnings } = await mealPlanning.generatePlan(ownerSub, weekStartDateKey, todayKey);
-    revalidatePath("/meals");
-    revalidatePath("/calendar");
-    return { view, warnings };
-  } catch (e) {
-    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
-    if (e instanceof AiJsonError) {
-      const byCode: Record<string, string> = {
-        notConfigured: dict.meals.errorNoAiKey,
-        authError: dict.meals.errorAuth,
-        rateLimitError: dict.meals.errorRateLimit,
-        invalidResponse: dict.meals.errorBadResponse,
-        truncated: dict.meals.errorTruncated,
-        apiError: dict.meals.errorApi,
-      };
-      // The detail matters more than the category here: this app has one
-      // user, running it on their own key, and "couldn't read the reply"
-      // with nothing further is not something they can act on.
-      console.error("meal plan generation failed", e.code, e.message);
-      return { error: `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}` };
-    }
-    throw e;
-  }
-}
-
-/**
  * Ticks a shopping line, and with it puts the item into the inventory (or,
  * unticked, takes it back out — see inventory.setShoppingItemBought).
  * Returns the inventory as it now stands, so the list beside the shopping
@@ -212,9 +173,7 @@ function aiErrorMessage(dict: ReturnType<typeof getDictionary>, e: AiJsonError):
 
 export async function getMealChatAction(weekStartDateKey: string): Promise<MealChatMessageView[]> {
   const ownerSub = await requireOwnerSub();
-  const plan = await mealPlanning.getPlan(ownerSub, weekStartDateKey);
-  if (!plan) return [];
-  return (await mealChat.listMessages(ownerSub, plan.plan.id)).map(toView);
+  return (await mealChat.listMessages(ownerSub, weekStartDateKey)).map(toView);
 }
 
 export async function sendMealChatAction(
@@ -276,11 +235,10 @@ export async function applyMealChatProposalAction(
   }
   revalidatePath("/meals");
   revalidatePath("/calendar");
-  const plan = await mealPlanning.getPlan(ownerSub, weekStartDateKey);
   return {
     week: await getMealWeekAction(weekStartDateKey),
     inventory: await inventory.listInventory(ownerSub),
-    messages: plan ? (await mealChat.listMessages(ownerSub, plan.plan.id)).map(toView) : [],
+    messages: (await mealChat.listMessages(ownerSub, weekStartDateKey)).map(toView),
     calendarError,
   };
 }

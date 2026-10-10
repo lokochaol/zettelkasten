@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from "react";
 import {
   applyMealChatProposalAction,
   dismissMealChatProposalAction,
@@ -16,10 +16,17 @@ import { readDraft, removeDraft, writeDraft } from "@/lib/draftBackup";
 import type { Proposal } from "@/lib/mealChat";
 import type { InventoryItem, MealSlot } from "@/generated/prisma/client";
 
+/** Lets the grid start a message: tapping a day or a meal puts its date
+ * into the box, ready to finish. */
+export interface MealChatHandle {
+  insert: (text: string) => void;
+}
+
 /**
- * Talking the week through with the planner — "they were out of chicken,
- * so I bought pork" — and getting back a proposal for the rest of the week
- * that changes nothing until it's applied. See src/lib/mealChat.ts.
+ * Where the week's meals are made and changed — "plan this week, I cook on
+ * Monday and Thursday", "fish on the 14th instead", "they were out of
+ * chicken, so I bought pork" — each answered with a proposal that changes
+ * nothing until it's applied. See src/lib/mealChat.ts.
  *
  * Applying hands the whole updated week, inventory and conversation back to
  * the screen, so the plan above, the fridge list and the calendar all move
@@ -28,11 +35,17 @@ import type { InventoryItem, MealSlot } from "@/generated/prisma/client";
  * shouldn't take the sentence with it.
  */
 export function MealChatPanel({
+  ref,
   weekStartDateKey,
+  hasMeals,
   todayKey,
   onApplied,
 }: {
+  ref?: Ref<MealChatHandle>;
   weekStartDateKey: string;
+  /** False for a week with nothing planned yet: the suggestions offer to
+   * plan it rather than to change it. */
+  hasMeals: boolean;
   todayKey: string;
   onApplied: (week: MealWeekView, inventory: InventoryItem[]) => void;
 }) {
@@ -44,6 +57,22 @@ export function MealChatPanel({
   const [sending, startSending] = useTransition();
   const [busyId, setBusyId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  useImperativeHandle(ref, () => ({
+    insert(fragment: string) {
+      setText((prev) => (prev.trim() ? `${prev.trimEnd()}\n${fragment}` : fragment));
+      // After the text lands: focus with the caret at the end, and bring the
+      // box into view — the grid that called this may be a screen above.
+      requestAnimationFrame(() => {
+        const box = inputRef.current;
+        if (!box) return;
+        box.scrollIntoView({ block: "center", behavior: "smooth" });
+        box.focus();
+        box.setSelectionRange(box.value.length, box.value.length);
+      });
+    },
+  }));
   const draftKey = `meal-chat:${weekStartDateKey}`;
 
   useEffect(() => {
@@ -151,7 +180,7 @@ export function MealChatPanel({
 
       {/* Starting points, for typing on a phone: tap one, then fill in the 〇〇. */}
       <div className="flex flex-wrap gap-1.5">
-        {t.meals.chatSuggestions.map((s) => (
+        {(hasMeals ? t.meals.chatSuggestions : t.meals.chatStartSuggestions).map((s) => (
           <button
             key={s}
             type="button"
@@ -164,6 +193,7 @@ export function MealChatPanel({
       </div>
       <div className="flex items-end gap-2">
         <textarea
+          ref={inputRef}
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
@@ -218,23 +248,48 @@ function ProposalCard({
   return (
     <div className={`flex flex-col gap-2.5 rounded-xl border p-3 ${state === "open" || state === "busy" ? "border-accent/50" : "border-line opacity-70"}`}>
       {proposal.meals.length > 0 && (
-        <div className="flex flex-col gap-1">
-          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">{t.meals.chatMealsLabel}</p>
-          {proposal.meals.map((m) => (
-            <div key={`${m.dateKey}${m.slot}`} className="flex flex-col text-[11.5px]">
-              <span className="font-mono text-[9.5px] text-ink-faint">
-                {formatDateKey(m.dateKey, localeTag(locale as "ja" | "en"))} {t.meals[SLOT_SHORT[m.slot]]}
-              </span>
-              <span className="text-ink">
-                {m.replaces && <span className="text-ink-faint line-through">{m.replaces}</span>}
-                {m.replaces && " → "}
-                <span className="font-semibold">{m.title}</span>
-              </span>
-              <span className="font-mono text-[9.5px] text-ink-faint">
-                {m.kcal} kcal · P {Math.round(m.proteinG)}g · {t.meals.prepMinutes(m.prepMinutes)}
-              </span>
-            </div>
-          ))}
+        // By day, with the day's totals: a whole week arrives in one card,
+        // and "does each day add up" is the question to answer before
+        // applying it. Each meal opens to its recipe.
+        <div className="flex flex-col gap-2">
+          <p className="font-mono text-[9px] tracking-wider text-accent uppercase">
+            {t.meals.chatMealsLabel} · {t.meals.chatMealCount(proposal.meals.length)}
+          </p>
+          {[...new Set(proposal.meals.map((m) => m.dateKey))].map((dateKey) => {
+            const dayMeals = proposal.meals.filter((m) => m.dateKey === dateKey);
+            const kcal = dayMeals.reduce((sum, m) => sum + m.kcal, 0);
+            const protein = dayMeals.reduce((sum, m) => sum + m.proteinG, 0);
+            return (
+              <div key={dateKey} className="flex flex-col gap-0.5">
+                <span className="flex items-baseline gap-2 font-mono text-[9.5px] text-ink-soft">
+                  <span className="font-semibold">
+                    {formatDateKey(dateKey, localeTag(locale as "ja" | "en"), { month: "numeric", day: "numeric", weekday: "short" })}
+                  </span>
+                  {dayMeals.length === 3 && (
+                    <span className="text-ink-faint">
+                      {kcal} kcal · P {Math.round(protein)}g
+                    </span>
+                  )}
+                </span>
+                {dayMeals.map((m) => (
+                  <details key={m.slot} className="group text-[11.5px]">
+                    <summary className="flex cursor-pointer list-none items-baseline gap-2">
+                      <span className="w-6 shrink-0 font-mono text-[9.5px] text-accent">{t.meals[SLOT_SHORT[m.slot]]}</span>
+                      <span className="min-w-0 flex-1 text-ink">
+                        {m.replaces && <span className="text-ink-faint line-through">{m.replaces}</span>}
+                        {m.replaces && " → "}
+                        <span className="font-semibold">{m.title}</span>
+                      </span>
+                      <span className="shrink-0 font-mono text-[9px] text-ink-faint">
+                        {m.kcal} kcal · {t.meals.prepMinutes(m.prepMinutes)}
+                      </span>
+                    </summary>
+                    <p className="mt-0.5 ml-8 text-[10.5px] leading-relaxed text-ink-soft">{m.recipe}</p>
+                  </details>
+                ))}
+              </div>
+            );
+          })}
         </div>
       )}
       {proposal.inventory.length > 0 && (
