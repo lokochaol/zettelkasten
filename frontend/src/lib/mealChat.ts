@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { askForJson } from "@/lib/aiJson";
+import { progressReporter, type ChatProgress } from "@/lib/chatProgress";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
 import { currentTargets } from "@/lib/health";
@@ -37,6 +38,9 @@ const KINDS: MealKind[] = ["COOK", "BATCH", "READY"];
  * keep the thread; the plan and the stock are re-sent in full anyway. */
 const HISTORY_TURNS = 12;
 const MAX_MESSAGE_LENGTH = 2000;
+/** Prisma's default is 5 seconds — tight for a week of writes over the
+ * network to the hosted database. */
+const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 
 export interface ProposedMeal {
   dateKey: string;
@@ -184,6 +188,28 @@ slot は BREAKFAST / LUNCH / DINNER、kind は COOK（その日に作る）/ BAT
 
 const SLOT_LABEL: Record<MealSlot, string> = { BREAKFAST: "朝", LUNCH: "昼", DINNER: "夕" };
 
+/** A message as the screen gets it: plain values only, the proposal read
+ * out of its JSON column. */
+export interface MealChatMessageView {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  proposal: Proposal | null;
+  applied: boolean;
+  dismissed: boolean;
+}
+
+export function toMessageView(m: MealChatMessage): MealChatMessageView {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    proposal: (m.proposal as unknown as Proposal | null) ?? null,
+    applied: m.appliedAt !== null,
+    dismissed: m.dismissedAt !== null,
+  };
+}
+
 export async function listMessages(ownerSub: string, weekStartDateKey: string): Promise<MealChatMessage[]> {
   return prisma.mealChatMessage.findMany({ where: { ownerSub, weekStartDateKey }, orderBy: { createdAt: "asc" } });
 }
@@ -232,6 +258,9 @@ export async function sendMessage(
   weekStartDateKey: string,
   text: string,
   todayKey: string,
+  /** Reports where the request is and what the model has written so far
+   * (src/lib/chatProgress.ts); the reply is streamed when this is given. */
+  onProgress?: (p: ChatProgress) => void,
 ): Promise<MealChatMessage[]> {
   const content = text.trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!content) throw new ValidationError("mealChatInvalid", "message is empty");
@@ -258,6 +287,7 @@ export async function sendMessage(
   if (!targets) throw new ValidationError("healthProfileMissing", "Fill in the health profile first — there are no targets to plan against");
 
   const userMessage = await prisma.mealChatMessage.create({ data: { ownerSub, weekStartDateKey, role: "USER", content } });
+  onProgress?.({ stage: "context", reply: "", items: [] });
 
   const meals = plan?.meals ?? [];
   const changeable = changeableSlots(weekStartDateKey, meals, todayKey);
@@ -312,8 +342,9 @@ export async function sendMessage(
   let parsed: { reply: string; proposal: Proposal };
   try {
     // Room for a whole week of meals with recipes in one reply.
-    const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 20000);
+    const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 20000, undefined, onProgress && progressReporter(onProgress, "meals"));
     parsed = parseChatReply(value, changeable);
+    onProgress?.({ stage: "saving", reply: parsed.reply, items: [] });
   } catch (e) {
     await prisma.mealChatMessage.delete({ where: { id: userMessage.id } });
     throw e;
@@ -405,44 +436,55 @@ export async function applyProposal(
         })
       ).id;
     }
-    for (const m of meals) {
-      const data = {
-        title: m.title,
-        recipe: m.recipe,
-        kind: m.kind,
-        kcal: m.kcal,
-        proteinG: m.proteinG,
-        fatG: m.fatG,
-        carbG: m.carbG,
-        fiberG: m.fiberG,
-        saltG: m.saltG,
-        prepMinutes: m.prepMinutes,
-        status: "PLANNED" as const,
-        replacementNote: "",
-      };
-      await tx.plannedMeal.upsert({
-        where: { planId_dateKey_slot: { planId: planId!, dateKey: m.dateKey, slot: m.slot } },
-        create: { planId: planId!, dateKey: m.dateKey, slot: m.slot, ...data },
-        update: data,
+    // A whole week is 21 meals and a dozen stock changes. Written as a few
+    // bulk statements rather than one query per row: on the production
+    // database each query is a network round trip, and one at a time a full
+    // week ran past the transaction's time limit and was rolled back.
+    if (meals.length > 0) {
+      // Every target slot is empty or PLANNED (checked above), so clearing
+      // and re-creating is a replace. The calendar event id is carried over,
+      // so the next sync updates the existing event instead of adding one.
+      const eventIds = new Map((existing?.meals ?? []).map((m) => [`${m.dateKey}|${m.slot}`, m.googleEventId]));
+      await tx.plannedMeal.deleteMany({
+        where: { planId: planId!, OR: meals.map((m) => ({ dateKey: m.dateKey, slot: m.slot })) },
+      });
+      await tx.plannedMeal.createMany({
+        data: meals.map((m) => ({
+          planId: planId!,
+          dateKey: m.dateKey,
+          slot: m.slot,
+          title: m.title,
+          recipe: m.recipe,
+          kind: m.kind,
+          kcal: m.kcal,
+          proteinG: m.proteinG,
+          fatG: m.fatG,
+          carbG: m.carbG,
+          fiberG: m.fiberG,
+          saltG: m.saltG,
+          prepMinutes: m.prepMinutes,
+          googleEventId: eventIds.get(`${m.dateKey}|${m.slot}`) ?? null,
+        })),
       });
     }
 
     if (proposal.inventory.length > 0) {
       const stock = await tx.inventoryItem.findMany({ where: { ownerSub } });
+      const removeIds = new Set<string>();
+      const adds: { ownerSub: string; name: string; quantity: string; location: StorageLocation }[] = [];
       for (const s of proposal.inventory) {
-        const matches = stock.filter((i) => sameName(i.name, s.name));
-        if (s.op === "remove") {
-          if (matches.length > 0) await tx.inventoryItem.deleteMany({ where: { id: { in: matches.map((i) => i.id) } } });
-        } else if (s.op === "set" && matches.length > 0) {
+        const matches = stock.filter((i) => sameName(i.name, s.name) && !removeIds.has(i.id));
+        if (s.op === "remove") matches.forEach((i) => removeIds.add(i.id));
+        else if (s.op === "set" && matches.length > 0) {
           await tx.inventoryItem.update({ where: { id: matches[0].id }, data: { quantity: s.quantity, location: s.location } });
-        } else {
-          await tx.inventoryItem.create({ data: { ownerSub, name: s.name, quantity: s.quantity, location: s.location } });
-        }
+        } else adds.push({ ownerSub, name: s.name, quantity: s.quantity, location: s.location });
       }
+      if (removeIds.size > 0) await tx.inventoryItem.deleteMany({ where: { id: { in: [...removeIds] } } });
+      if (adds.length > 0) await tx.inventoryItem.createMany({ data: adds });
     }
 
     await tx.mealChatMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });
-  });
+  }, TRANSACTION_OPTIONS);
   return { calendarNeedsUpdate };
 }
 

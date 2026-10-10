@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { ChatThinking } from "@/components/ChatThinking";
+import { postChatStream } from "@/lib/chatStreamClient";
+import type { ChatProgress } from "@/lib/chatProgress";
 import {
   applyMealChatProposalAction,
   dismissMealChatProposalAction,
   getMealChatAction,
-  sendMealChatAction,
   type MealChatMessageView,
   type MealWeekView,
 } from "@/app/meals/actions";
@@ -54,7 +56,9 @@ export function MealChatPanel({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, startSending] = useTransition();
+  // The message on its way, shown at once with the live progress under it.
+  const [pending, setPending] = useState<{ text: string; startedAt: number; progress: ChatProgress | null } | null>(null);
+  const sending = pending !== null;
   const [busyId, setBusyId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -95,22 +99,29 @@ export function MealChatPanel({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages]);
+  }, [messages, pending]);
 
   function send() {
     const message = text.trim();
-    if (!message || sending) return;
+    if (!message || pending) return;
     setError(null);
     setNotice(null);
-    startSending(async () => {
-      const res = await sendMealChatAction(weekStartDateKey, message, todayKey);
+    setText("");
+    setPending({ text: message, startedAt: Date.now(), progress: null });
+    void postChatStream<MealChatMessageView>(
+      "/api/meals/chat",
+      { weekStartDateKey, text: message, todayKey },
+      (progress) => setPending((prev) => (prev ? { ...prev, progress } : prev)),
+      t.meals.chatStreamFailed,
+    ).then((res) => {
+      setPending(null);
       if ("error" in res) {
-        // The text stays in the box to send again.
+        // The text goes back in the box to send again.
+        setText((prev) => prev || message);
         setError(res.error);
         return;
       }
       setMessages(res.messages);
-      setText("");
     });
   }
 
@@ -118,8 +129,17 @@ export function MealChatPanel({
     setBusyId(id);
     setError(null);
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "UTC";
-    const res = await applyMealChatProposalAction(id, weekStartDateKey, todayKey, timeZone);
-    setBusyId(null);
+    let res: Awaited<ReturnType<typeof applyMealChatProposalAction>>;
+    try {
+      res = await applyMealChatProposalAction(id, weekStartDateKey, todayKey, timeZone);
+    } catch {
+      // The call itself failed (an expired login, a deploy, a server
+      // error) — say so rather than leaving the button spinning.
+      setError(t.meals.chatApplyFailed);
+      return;
+    } finally {
+      setBusyId(null);
+    }
     if ("error" in res) {
       setError(res.error);
       return;
@@ -131,8 +151,15 @@ export function MealChatPanel({
 
   async function dismiss(id: string) {
     setBusyId(id);
-    const res = await dismissMealChatProposalAction(id, weekStartDateKey);
-    setBusyId(null);
+    let res: Awaited<ReturnType<typeof dismissMealChatProposalAction>>;
+    try {
+      res = await dismissMealChatProposalAction(id, weekStartDateKey);
+    } catch {
+      setError(t.meals.chatApplyFailed);
+      return;
+    } finally {
+      setBusyId(null);
+    }
     if ("error" in res) setError(res.error);
     else setMessages(res.messages);
   }
@@ -145,7 +172,7 @@ export function MealChatPanel({
       </div>
 
       <div className="flex max-h-[28rem] flex-col gap-2.5 overflow-y-auto">
-        {messages?.length === 0 && <p className="text-[11px] text-ink-faint">{t.meals.chatEmpty}</p>}
+        {messages?.length === 0 && !pending && <p className="text-[11px] text-ink-faint">{t.meals.chatEmpty}</p>}
         {messages?.map((m) =>
           m.role === "USER" ? (
             <p
@@ -171,7 +198,21 @@ export function MealChatPanel({
             </div>
           ),
         )}
-        {sending && <p className="self-start font-mono text-[10.5px] text-ink-faint">{t.meals.chatSending}</p>}
+        {pending && (
+          <>
+            <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-accent px-3 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-on-accent opacity-80">
+              {pending.text}
+            </p>
+            <ChatThinking
+              progress={pending.progress}
+              startedAt={pending.startedAt}
+              stageLabel={t.meals.chatStage}
+              itemsHeading={t.meals.chatItemsHeading}
+              elapsedLabel={t.meals.chatElapsed}
+              itemLabel={(item) => `${formatDateKey(item.dateKey, localeTag(locale), { month: "numeric", day: "numeric", weekday: "short" })} ${item.slot && item.slot in SLOT_SHORT ? t.meals[SLOT_SHORT[item.slot as MealSlot]] : ""} ${item.title}`}
+            />
+          </>
+        )}
         <div ref={endRef} />
       </div>
 

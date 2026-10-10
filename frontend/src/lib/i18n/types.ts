@@ -245,6 +245,8 @@ export interface Dictionary {
     chatPlaceholder: string;
     chatSuggestions: string[];
     chatStartSuggestions: string[];
+    chatStage: Record<"context" | "thinking" | "writing" | "saving", string>;
+    chatItemsHeading: (n: number) => string;
     chatAppliedNote: string;
     chatFocusLabel: string;
     chatRestDay: string;
@@ -327,6 +329,11 @@ export interface Dictionary {
     chatSending: string;
     chatEmpty: string;
     chatSuggestions: string[];
+    chatStage: Record<"context" | "thinking" | "writing" | "saving", string>;
+    chatItemsHeading: (n: number) => string;
+    chatElapsed: (seconds: number) => string;
+    chatStreamFailed: string;
+    chatApplyFailed: string;
     chatStartSuggestions: string[];
     chatMealCount: (n: number) => string;
     chatAboutDay: (day: string) => string;

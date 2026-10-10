@@ -8,8 +8,7 @@ import { AiJsonError } from "@/lib/aiJson";
 import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
-import { getDictionary } from "@/lib/i18n/dictionary";
-import { translateDomainError } from "@/lib/i18n/errors";
+import { translateAiError, translateDomainError } from "@/lib/i18n/errors";
 import type { BiologicalSex } from "@/generated/prisma/client";
 
 export type SessionView = training.SessionView;
@@ -82,25 +81,12 @@ export async function saveTrainingPreferenceAction(
   }
 }
 
-function aiError(dict: ReturnType<typeof getDictionary>, e: AiJsonError): string {
-  if (e.code === "notConfigured") return dict.meals.errorNoAiKey;
-  const byCode: Record<string, string> = {
-    authError: dict.meals.errorAuth,
-    rateLimitError: dict.meals.errorRateLimit,
-    invalidResponse: dict.meals.errorBadResponse,
-    truncated: dict.meals.errorTruncated,
-    apiError: dict.meals.errorApi,
-  };
-  return `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}`;
-}
-
 export async function generateTrainingWeekAction(
   weekStartDateKey: string,
   todayKey: string,
 ): Promise<{ week: training.TrainingWeekView } | { error: string }> {
   const ownerSub = await requireOwnerSub();
   const locale = await getLocale();
-  const dict = getDictionary(locale);
   try {
     const week = await training.generateWeek(ownerSub, weekStartDateKey, todayKey);
     revalidatePath("/training");
@@ -110,7 +96,7 @@ export async function generateTrainingWeekAction(
     if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
     if (e instanceof AiJsonError) {
       console.error("training plan failed", e.code, e.message);
-      return { error: aiError(dict, e) };
+      return { error: translateAiError(locale, e) };
     }
     throw e;
   }
@@ -133,48 +119,12 @@ export async function logTrainingSessionAction(
 
 /* ---------- trainer chat ---------- */
 
-export interface TrainerChatMessageView {
-  id: string;
-  role: "USER" | "ASSISTANT";
-  content: string;
-  proposal: trainingChat.TrainingProposal | null;
-  applied: boolean;
-  dismissed: boolean;
-}
-
-function toChatView(m: trainingChat.TrainingChatMessage): TrainerChatMessageView {
-  return {
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    proposal: (m.proposal as unknown as trainingChat.TrainingProposal | null) ?? null,
-    applied: m.appliedAt !== null,
-    dismissed: m.dismissedAt !== null,
-  };
-}
+export type TrainerChatMessageView = trainingChat.TrainerChatMessageView;
+const toChatView = trainingChat.toMessageView;
 
 export async function getTrainerChatAction(weekStartDateKey: string): Promise<TrainerChatMessageView[]> {
   const ownerSub = await requireOwnerSub();
   return (await trainingChat.listMessages(ownerSub, weekStartDateKey)).map(toChatView);
-}
-
-export async function sendTrainerChatAction(
-  weekStartDateKey: string,
-  text: string,
-  todayKey: string,
-): Promise<{ messages: TrainerChatMessageView[] } | { error: string }> {
-  const ownerSub = await requireOwnerSub();
-  const locale = await getLocale();
-  try {
-    return { messages: (await trainingChat.sendMessage(ownerSub, weekStartDateKey, text, todayKey)).map(toChatView) };
-  } catch (e) {
-    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
-    if (e instanceof AiJsonError) {
-      console.error("trainer chat failed", e.code, e.message);
-      return { error: aiError(getDictionary(locale), e) };
-    }
-    throw e;
-  }
 }
 
 export async function applyTrainerChatProposalAction(
