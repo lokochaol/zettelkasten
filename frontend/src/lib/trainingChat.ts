@@ -1,6 +1,7 @@
 import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { askForJson } from "@/lib/aiJson";
+import { progressReporter, type ChatProgress } from "@/lib/chatProgress";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
 import { SESSION_JSON, TRAINER_RULES, getWeek, parsePlanReply, sessionLine, trainerContext, type ParsedSession } from "@/lib/training";
@@ -115,6 +116,26 @@ ${TRAINER_RULES}
 
 kind は STRENGTH（筋力）/ CARDIO（有酸素）/ MOBILITY（柔軟・回復）のいずれか。`;
 
+export interface TrainerChatMessageView {
+  id: string;
+  role: "USER" | "ASSISTANT";
+  content: string;
+  proposal: TrainingProposal | null;
+  applied: boolean;
+  dismissed: boolean;
+}
+
+export function toMessageView(m: TrainingChatMessage): TrainerChatMessageView {
+  return {
+    id: m.id,
+    role: m.role,
+    content: m.content,
+    proposal: (m.proposal as unknown as TrainingProposal | null) ?? null,
+    applied: m.appliedAt !== null,
+    dismissed: m.dismissedAt !== null,
+  };
+}
+
 export async function listMessages(ownerSub: string, weekStartDateKey: string): Promise<TrainingChatMessage[]> {
   return prisma.trainingChatMessage.findMany({ where: { ownerSub, weekStartDateKey }, orderBy: { createdAt: "asc" } });
 }
@@ -124,7 +145,14 @@ export async function listMessages(ownerSub: string, weekStartDateKey: string): 
  * unapplied). On an AI failure the owner's message is taken back out, so the
  * thread doesn't fill with unanswered questions; the screen keeps the text.
  */
-export async function sendMessage(ownerSub: string, weekStartDateKey: string, text: string, todayKey: string): Promise<TrainingChatMessage[]> {
+export async function sendMessage(
+  ownerSub: string,
+  weekStartDateKey: string,
+  text: string,
+  todayKey: string,
+  /** Progress while the reply streams, as in the meal chat. */
+  onProgress?: (p: ChatProgress) => void,
+): Promise<TrainingChatMessage[]> {
   const content = text.trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!content) throw new ValidationError("mealChatInvalid", "message is empty");
   const ctx = await trainerContext(ownerSub, weekStartDateKey, todayKey);
@@ -135,6 +163,7 @@ export async function sendMessage(ownerSub: string, weekStartDateKey: string, te
   });
   const changeable = changeableDays(ctx.dates, ctx.existing.sessions, todayKey);
   const userMessage = await prisma.trainingChatMessage.create({ data: { ownerSub, weekStartDateKey, role: "USER", content } });
+  onProgress?.({ stage: "context", reply: "", items: [] });
 
   const free = [...changeable].filter(([, title]) => title === "").map(([d]) => d);
   const brief = [
@@ -161,8 +190,9 @@ export async function sendMessage(ownerSub: string, weekStartDateKey: string, te
 
   let parsed: { reply: string; proposal: TrainingProposal };
   try {
-    const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 10000);
+    const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 10000, undefined, onProgress && progressReporter(onProgress, "sessions"));
     parsed = parseTrainerReply(value, changeable, 7, ctx.preference.minutesPerSession);
+    onProgress?.({ stage: "saving", reply: parsed.reply, items: [] });
   } catch (e) {
     await prisma.trainingChatMessage.delete({ where: { id: userMessage.id } });
     throw e;
@@ -237,7 +267,7 @@ export async function applyProposal(ownerSub: string, messageId: string, todayKe
       });
     }
     await tx.trainingChatMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });
-  });
+  }, { maxWait: 10_000, timeout: 30_000 });
 }
 
 export async function dismissProposal(ownerSub: string, messageId: string): Promise<void> {

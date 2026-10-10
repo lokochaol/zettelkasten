@@ -18,7 +18,7 @@ import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
-import { translateDomainError } from "@/lib/i18n/errors";
+import { translateAiError, translateDomainError } from "@/lib/i18n/errors";
 
 export interface MealWeekView {
   weekStartDateKey: string;
@@ -91,7 +91,7 @@ export async function createPurchaseListAction(
     if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
     if (e instanceof AiJsonError) {
       console.error("purchase list failed", e.code, e.message);
-      return { error: aiErrorMessage(getDictionary(locale), e) };
+      return { error: translateAiError(locale, e) };
     }
     throw e;
   }
@@ -136,64 +136,12 @@ export async function removeInventoryItemAction(id: string): Promise<InventoryRe
 
 /* ---------- meal chat ---------- */
 
-/** A chat message as the screen gets it: plain values only, the proposal
- * already read out of its JSON column. */
-export interface MealChatMessageView {
-  id: string;
-  role: "USER" | "ASSISTANT";
-  content: string;
-  proposal: mealChat.Proposal | null;
-  applied: boolean;
-  dismissed: boolean;
-}
-
-function toView(m: mealChat.MealChatMessage): MealChatMessageView {
-  return {
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    proposal: (m.proposal as unknown as mealChat.Proposal | null) ?? null,
-    applied: m.appliedAt !== null,
-    dismissed: m.dismissedAt !== null,
-  };
-}
-
-function aiErrorMessage(dict: ReturnType<typeof getDictionary>, e: AiJsonError): string {
-  const byCode: Record<string, string> = {
-    notConfigured: dict.meals.errorNoAiKey,
-    authError: dict.meals.errorAuth,
-    rateLimitError: dict.meals.errorRateLimit,
-    invalidResponse: dict.meals.errorBadResponse,
-    truncated: dict.meals.errorTruncated,
-    apiError: dict.meals.errorApi,
-  };
-  if (e.code === "notConfigured") return byCode.notConfigured;
-  return `${byCode[e.code] ?? dict.meals.errorApi}${dict.meals.errorDetail(e.message)}`;
-}
+export type MealChatMessageView = mealChat.MealChatMessageView;
+const toView = mealChat.toMessageView;
 
 export async function getMealChatAction(weekStartDateKey: string): Promise<MealChatMessageView[]> {
   const ownerSub = await requireOwnerSub();
   return (await mealChat.listMessages(ownerSub, weekStartDateKey)).map(toView);
-}
-
-export async function sendMealChatAction(
-  weekStartDateKey: string,
-  text: string,
-  todayKey: string,
-): Promise<{ messages: MealChatMessageView[] } | { error: string }> {
-  const ownerSub = await requireOwnerSub();
-  const locale = await getLocale();
-  try {
-    const messages = await mealChat.sendMessage(ownerSub, weekStartDateKey, text, todayKey);
-    return { messages: messages.map(toView) };
-  } catch (e) {
-    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
-    if (e instanceof AiJsonError) {
-      console.error("meal chat failed", e.code, e.message);
-      return { error: aiErrorMessage(getDictionary(locale), e) };
-    }
-    throw e;
-  }
 }
 
 /**

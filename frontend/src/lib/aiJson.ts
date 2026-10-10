@@ -313,6 +313,184 @@ async function callGoogle(
   return { text, truncated: cutOff };
 }
 
+/* ---------- streaming ---------- */
+
+/**
+ * What a streaming call reports while it runs: the model is reasoning
+ * (no answer text yet), or this is the answer so far. The chats turn these
+ * into the progress the owner watches instead of a frozen button.
+ */
+export type AiProgress = { kind: "thinking" } | { kind: "text"; text: string };
+
+/** The `data:` payloads of a server-sent-events response, one per event. */
+async function* sseData(res: Response): AsyncGenerator<string> {
+  if (!res.body) return;
+  const reader = res.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  for (;;) {
+    const { value, done } = await reader.read();
+    if (done) break;
+    buffer = (buffer + decoder.decode(value, { stream: true })).replace(/\r\n/g, "\n");
+    let end: number;
+    while ((end = buffer.indexOf("\n\n")) !== -1) {
+      const block = buffer.slice(0, end);
+      buffer = buffer.slice(end + 2);
+      const data = block
+        .split("\n")
+        .filter((line) => line.startsWith("data:"))
+        .map((line) => line.slice(5).trimStart())
+        .join("\n");
+      if (data && data !== "[DONE]") yield data;
+    }
+  }
+}
+
+function parseEvent(data: string): Record<string, unknown> | null {
+  try {
+    return JSON.parse(data) as Record<string, unknown>;
+  } catch {
+    return null;
+  }
+}
+
+/** The request bodies below are the non-streaming ones plus the provider's
+ * own "stream" switch; the reply is assembled from the deltas. */
+async function streamAnthropic(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  onProgress: (p: AiProgress) => void,
+): Promise<ProviderReply> {
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "x-api-key": apiKey, "anthropic-version": "2023-06-01", "content-type": "application/json" },
+    body: JSON.stringify({
+      model: ANTHROPIC_MODEL,
+      max_tokens: maxTokens,
+      system,
+      messages: [{ role: "user", content: user }],
+      stream: true,
+      ...(tuned ? { output_config: { effort: "low" } } : {}),
+    }),
+  });
+  if (!res.ok) throw await apiError("Anthropic", res);
+  let text = "";
+  let stopReason = "";
+  for await (const data of sseData(res)) {
+    const event = parseEvent(data);
+    if (!event) continue;
+    if (event.type === "content_block_delta") {
+      const delta = event.delta as { type?: string; text?: string };
+      if (delta.type === "text_delta" && delta.text) {
+        text += delta.text;
+        onProgress({ kind: "text", text });
+      } else if (delta.type === "thinking_delta") {
+        onProgress({ kind: "thinking" });
+      }
+    } else if (event.type === "message_delta") {
+      stopReason = (event.delta as { stop_reason?: string }).stop_reason ?? stopReason;
+    } else if (event.type === "error") {
+      throw new AiJsonError("apiError", `Anthropic stream error: ${snippet(JSON.stringify(event.error ?? event))}`);
+    }
+  }
+  if (!text) throw emptyReply(stopReason === "max_tokens", `stop_reason=${stopReason || "不明"}`);
+  return { text, truncated: stopReason === "max_tokens" };
+}
+
+async function streamOpenAi(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  onProgress: (p: AiProgress) => void,
+): Promise<ProviderReply> {
+  const res = await fetch("https://api.openai.com/v1/responses", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${apiKey}`, "content-type": "application/json" },
+    body: JSON.stringify({
+      model: OPENAI_MODEL,
+      max_output_tokens: maxTokens,
+      instructions: system,
+      input: user,
+      stream: true,
+      ...(tuned ? { reasoning: { effort: "low" } } : {}),
+    }),
+  });
+  if (!res.ok) throw await apiError("OpenAI", res);
+  let text = "";
+  let status = "";
+  let reason = "";
+  for await (const data of sseData(res)) {
+    const event = parseEvent(data);
+    if (!event) continue;
+    const type = String(event.type ?? "");
+    if (type === "response.output_text.delta" && typeof event.delta === "string") {
+      text += event.delta;
+      onProgress({ kind: "text", text });
+    } else if (type.startsWith("response.reasoning")) {
+      onProgress({ kind: "thinking" });
+    } else if (type === "response.completed" || type === "response.incomplete" || type === "response.failed") {
+      const response = (event.response ?? {}) as { status?: string; incomplete_details?: { reason?: string } };
+      status = response.status ?? status;
+      reason = response.incomplete_details?.reason ?? reason;
+    } else if (type === "error") {
+      throw new AiJsonError("apiError", `OpenAI stream error: ${snippet(JSON.stringify(event))}`);
+    }
+  }
+  const cutOff = status === "incomplete" || reason === "max_output_tokens";
+  if (!text) throw emptyReply(cutOff, `status=${status || "不明"} reason=${reason || "なし"}`);
+  return { text, truncated: cutOff };
+}
+
+async function streamGoogle(
+  apiKey: string,
+  system: string,
+  user: string,
+  maxTokens: number,
+  tuned: boolean,
+  onProgress: (p: AiProgress) => void,
+): Promise<ProviderReply> {
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/${GOOGLE_MODEL}:streamGenerateContent?alt=sse&key=${apiKey}`,
+    {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({
+        systemInstruction: { parts: [{ text: system }] },
+        contents: [{ role: "user", parts: [{ text: user }] }],
+        generationConfig: {
+          maxOutputTokens: maxTokens,
+          responseMimeType: "application/json",
+          ...(tuned ? { thinkingConfig: { thinkingBudget: 2048 } } : {}),
+        },
+      }),
+    },
+  );
+  if (!res.ok) throw await apiError("Google", res);
+  let text = "";
+  let finishReason = "";
+  for await (const data of sseData(res)) {
+    const event = parseEvent(data) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string; thought?: boolean }> }; finishReason?: string }> } | null;
+    const candidate = event?.candidates?.[0];
+    if (!candidate) continue;
+    for (const part of candidate.content?.parts ?? []) {
+      if (part.thought) onProgress({ kind: "thinking" });
+      else if (part.text) {
+        text += part.text;
+        onProgress({ kind: "text", text });
+      }
+    }
+    finishReason = candidate.finishReason ?? finishReason;
+  }
+  const cutOff = finishReason === "MAX_TOKENS";
+  if (!text) throw emptyReply(cutOff, `finishReason=${finishReason || "不明"}`);
+  return { text, truncated: cutOff };
+}
+
 /**
  * Runs the prompt on whichever provider the owner configured.
  *
@@ -322,9 +500,8 @@ async function callGoogle(
  * caller decides whether a partial answer is worth showing.
  *
  * The default ceiling is the largest that comfortably fits a non-streaming
- * request without risking an HTTP timeout. Asking for much more than this
- * needs streaming, which is a bigger change than this app has needed so
- * far — so callers that want more output should ask for less text instead.
+ * request without risking an HTTP timeout. With `onProgress` the reply is
+ * streamed instead, which also keeps a long answer from timing out.
  *
  * `attachment` sends a file with the prompt (see AiAttachment).
  */
@@ -334,11 +511,24 @@ export async function askForJson(
   user: string,
   maxTokens = 16000,
   attachment?: AiAttachment,
+  /** Streams the reply and reports it as it arrives (see AiProgress).
+   * Text-only prompts; an attachment always takes the plain request. */
+  onProgress?: (p: AiProgress) => void,
 ): Promise<LooseParse> {
   const credential = await aiCredentials.get(ownerSub);
   if (!credential) throw new AiJsonError("notConfigured", "No AI provider configured");
 
   const call = (tuned: boolean): Promise<ProviderReply> => {
+    if (onProgress && !attachment) {
+      switch (credential.provider) {
+        case AiProvider.ANTHROPIC:
+          return streamAnthropic(credential.apiKey, system, user, maxTokens, tuned, onProgress);
+        case AiProvider.OPENAI:
+          return streamOpenAi(credential.apiKey, system, user, maxTokens, tuned, onProgress);
+        case AiProvider.GOOGLE:
+          return streamGoogle(credential.apiKey, system, user, maxTokens, tuned, onProgress);
+      }
+    }
     switch (credential.provider) {
       case AiProvider.ANTHROPIC:
         return callAnthropic(credential.apiKey, system, user, maxTokens, tuned, attachment);

@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useImperativeHandle, useRef, useState, useTransition, type Ref } from "react";
+import { useEffect, useImperativeHandle, useRef, useState, type Ref } from "react";
+import { ChatThinking } from "@/components/ChatThinking";
+import { postChatStream } from "@/lib/chatStreamClient";
+import type { ChatProgress } from "@/lib/chatProgress";
 import {
   applyTrainerChatProposalAction,
   dismissTrainerChatProposalAction,
   getTrainerChatAction,
-  sendTrainerChatAction,
   type TrainerChatMessageView,
   type TrainingWeekView,
 } from "@/app/training/actions";
@@ -46,7 +48,9 @@ export function TrainerChatPanel({
   const [text, setText] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
-  const [sending, startSending] = useTransition();
+  // The message on its way, shown at once with the live progress under it.
+  const [pending, setPending] = useState<{ text: string; startedAt: number; progress: ChatProgress | null } | null>(null);
+  const sending = pending !== null;
   const [busyId, setBusyId] = useState<string | null>(null);
   const endRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -85,29 +89,44 @@ export function TrainerChatPanel({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: "nearest" });
-  }, [messages]);
+  }, [messages, pending]);
 
   function send() {
     const message = text.trim();
-    if (!message || sending) return;
+    if (!message || pending) return;
     setError(null);
     setNotice(null);
-    startSending(async () => {
-      const res = await sendTrainerChatAction(weekStartDateKey, message, todayKey);
+    setText("");
+    setPending({ text: message, startedAt: Date.now(), progress: null });
+    void postChatStream<TrainerChatMessageView>(
+      "/api/training/chat",
+      { weekStartDateKey, text: message, todayKey },
+      (progress) => setPending((prev) => (prev ? { ...prev, progress } : prev)),
+      t.meals.chatStreamFailed,
+    ).then((res) => {
+      setPending(null);
       if ("error" in res) {
+        // The text goes back in the box to send again.
+        setText((prev) => prev || message);
         setError(res.error);
         return;
       }
       setMessages(res.messages);
-      setText("");
     });
   }
 
   async function apply(id: string) {
     setBusyId(id);
     setError(null);
-    const res = await applyTrainerChatProposalAction(id, weekStartDateKey, todayKey);
-    setBusyId(null);
+    let res: Awaited<ReturnType<typeof applyTrainerChatProposalAction>>;
+    try {
+      res = await applyTrainerChatProposalAction(id, weekStartDateKey, todayKey);
+    } catch {
+      setError(t.meals.chatApplyFailed);
+      return;
+    } finally {
+      setBusyId(null);
+    }
     if ("error" in res) {
       setError(res.error);
       return;
@@ -119,8 +138,15 @@ export function TrainerChatPanel({
 
   async function dismiss(id: string) {
     setBusyId(id);
-    const res = await dismissTrainerChatProposalAction(id, weekStartDateKey);
-    setBusyId(null);
+    let res: Awaited<ReturnType<typeof dismissTrainerChatProposalAction>>;
+    try {
+      res = await dismissTrainerChatProposalAction(id, weekStartDateKey);
+    } catch {
+      setError(t.meals.chatApplyFailed);
+      return;
+    } finally {
+      setBusyId(null);
+    }
     if ("error" in res) setError(res.error);
     else setMessages(res.messages);
   }
@@ -133,7 +159,7 @@ export function TrainerChatPanel({
       </div>
 
       <div className="flex max-h-[28rem] flex-col gap-2.5 overflow-y-auto">
-        {messages?.length === 0 && <p className="text-[11px] text-ink-faint">{t.meals.chatEmpty}</p>}
+        {messages?.length === 0 && !pending && <p className="text-[11px] text-ink-faint">{t.meals.chatEmpty}</p>}
         {messages?.map((m) =>
           m.role === "USER" ? (
             <p
@@ -159,7 +185,21 @@ export function TrainerChatPanel({
             </div>
           ),
         )}
-        {sending && <p className="self-start font-mono text-[10.5px] text-ink-faint">{t.meals.chatSending}</p>}
+        {pending && (
+          <>
+            <p className="max-w-[85%] self-end rounded-2xl rounded-br-md bg-accent px-3 py-2 text-[12px] leading-relaxed whitespace-pre-wrap text-on-accent opacity-80">
+              {pending.text}
+            </p>
+            <ChatThinking
+              progress={pending.progress}
+              startedAt={pending.startedAt}
+              stageLabel={t.training.chatStage}
+              itemsHeading={t.training.chatItemsHeading}
+              elapsedLabel={t.meals.chatElapsed}
+              itemLabel={(item) => `${formatDateKey(item.dateKey, localeTag(locale), { month: "numeric", day: "numeric", weekday: "short" })} ${item.title}`}
+            />
+          </>
+        )}
         <div ref={endRef} />
       </div>
 

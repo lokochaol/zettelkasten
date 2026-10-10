@@ -3,6 +3,7 @@ import type { DomainError } from "@/lib/errors";
 import type { ZoteroApiError } from "@/lib/zotero";
 import type { DiscoveryErrorCode } from "@/lib/discovery";
 import type { Locale } from "@/lib/i18n/types";
+import type { AiJsonError } from "@/lib/aiJson";
 
 /**
  * Translates a DomainError's stable `code` (+ params) into user-facing text
@@ -121,4 +122,21 @@ export function translateZoteroError(locale: Locale, error: ZoteroApiError): str
     default:
       return error.message;
   }
+}
+
+/** What to tell the owner when their AI provider couldn't produce a usable
+ * answer — shared by every feature that runs on their key. The provider's
+ * own detail is kept: one user, their own key, and "couldn't read the
+ * reply" with nothing further isn't something they can act on. */
+export function translateAiError(locale: Locale, e: AiJsonError): string {
+  const meals = getDictionary(locale).meals;
+  if (e.code === "notConfigured") return meals.errorNoAiKey;
+  const byCode: Record<string, string> = {
+    authError: meals.errorAuth,
+    rateLimitError: meals.errorRateLimit,
+    invalidResponse: meals.errorBadResponse,
+    truncated: meals.errorTruncated,
+    apiError: meals.errorApi,
+  };
+  return `${byCode[e.code] ?? meals.errorApi}${meals.errorDetail(e.message)}`;
 }
