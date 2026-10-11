@@ -11,12 +11,12 @@ export function CalendarViewSwitch({ view }: { view: "today" | "timeline" }) {
   const { t } = useI18n();
 
   return (
-    <div className="flex gap-1.5 rounded-full border border-line-strong bg-surface p-1">
+    <div className="flex shrink-0 gap-1.5 rounded-full border border-line-strong bg-surface p-1">
       {(["today", "timeline"] as const).map((v) => (
         <button
           key={v}
           onClick={() => router.push(`/calendar?view=${v}`)}
-          className={`rounded-full px-3 py-1.5 font-mono text-[10.5px] transition-colors ${
+          className={`rounded-full px-3 py-1.5 font-mono whitespace-nowrap text-[10.5px] transition-colors ${
             view === v ? "bg-accent text-on-accent" : "text-ink-soft hover:text-accent"
           }`}
         >

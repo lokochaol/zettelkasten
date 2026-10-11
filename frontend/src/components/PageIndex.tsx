@@ -26,6 +26,7 @@ export type PageKey =
   | "zettelkasten"
   | "literature"
   | "projects"
+  | "goals"
   | "calendar"
   | "meals"
   | "training"
@@ -53,6 +54,7 @@ export const GROUPS: { titleKey: "write" | "plan" | "find"; entries: Entry[] }[]
   {
     titleKey: "plan",
     entries: [
+      { key: "goals", href: "/goals" },
       { key: "calendar", href: "/calendar" },
       { key: "projects", href: "/projects" },
       { key: "meals", href: "/meals" },

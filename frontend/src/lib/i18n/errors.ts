@@ -61,6 +61,14 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.trainingSessionNotFound;
     case "trainingWeekPast":
       return dict.trainingWeekPast;
+    case "goalInvalid":
+      return dict.goalInvalid;
+    case "goalNotFound":
+      return dict.goalNotFound;
+    case "goalImportEmpty":
+      return dict.goalImportEmpty;
+    case "goalImportTooLong":
+      return dict.goalImportTooLong;
     case "purchaseListInvalid":
       return dict.purchaseListInvalid;
     case "purchaseListNoMeals":

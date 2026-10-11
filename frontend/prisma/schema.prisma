@@ -1133,3 +1133,112 @@ model TrainingChatMessage {
   @@index([ownerSub, weekStartDateKey, createdAt])
   @@map("training_chat_message")
 }
+
+/// What the goals stand on — the owner's 指針, いまある幸せ, これだけあれば,
+/// 障害プランニング and anything kept from earlier years. Markdown each, one
+/// row per owner: these are read as a whole and rewritten rarely.
+model GoalCompass {
+  ownerSub   String   @id @map("owner_sub")
+  /// 前提となる生き方の指針.
+  principles String   @default("")
+  /// いまある幸せ.
+  happiness  String   @default("")
+  /// これだけあれば他に何もいらない.
+  essentials String   @default("")
+  /// 障害プランニング — "if this gets in the way, then do that".
+  obstacles  String   @default("")
+  /// Earlier years' goals and reflections, kept to look back on.
+  archive    String   @default("")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  @@map("goal_compass")
+}
+
+enum GoalStatus {
+  ACTIVE
+  ARCHIVED
+
+  @@map("goal_status")
+}
+
+/// A 🚩 — an outcome worked towards, with the steps towards it at a few
+/// horizons (GoalMilestone). Reviewed now and then; each review keeps the
+/// version it replaced (GoalRevision).
+model Goal {
+  id                String     @id @default(uuid())
+  ownerSub          String     @map("owner_sub")
+  title             String
+  /// What reaching it means, and why — markdown.
+  statement         String     @default("")
+  /// The day it was last looked at and rewritten ("2026.6.18").
+  reviewedOnDateKey String?    @map("reviewed_on_date_key")
+  status            GoalStatus @default(ACTIVE)
+  sortOrder         Int        @default(0) @map("sort_order")
+  createdAt         DateTime   @default(now()) @map("created_at")
+  updatedAt         DateTime   @updatedAt @map("updated_at")
+
+  milestones GoalMilestone[]
+  revisions  GoalRevision[]
+
+  @@index([ownerSub, status, sortOrder])
+  @@map("goal")
+}
+
+/// One horizon of a goal — "~2週間後", "1年後", "毎日の活動" — with what is
+/// to be true by then. The label is free text because horizons are the
+/// owner's own; the date is there when the horizon has one, and is what
+/// the calendar uses to say a step is coming up.
+model GoalMilestone {
+  id         String    @id @default(uuid())
+  goalId     String    @map("goal_id")
+  goal       Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  label      String    @default("")
+  dueDateKey String?   @map("due_date_key")
+  /// The steps themselves and their notes — markdown.
+  body       String    @default("")
+  doneAt     DateTime? @map("done_at")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+  updatedAt  DateTime  @updatedAt @map("updated_at")
+
+  @@index([goalId, sortOrder])
+  @@map("goal_milestone")
+}
+
+/// The goal as it stood before a review: { title, statement,
+/// reviewedOnDateKey, milestones: [{ label, dueDateKey, body, done }] }.
+/// Read whole, never queried into, so JSON.
+model GoalRevision {
+  id        String   @id @default(uuid())
+  goalId    String   @map("goal_id")
+  goal      Goal     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  /// The day of the review that replaced it.
+  dateKey   String   @map("date_key")
+  snapshot  Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([goalId, createdAt])
+  @@map("goal_revision")
+}
+
+/// 日々のタスクと意識する目標 — for a stretch of days ("7/1まで"), which
+/// goals a weekday, a day off and the spare moments go to. Each slot is
+/// [{ goalId, note }] (goalId null for a line that isn't any one goal's),
+/// a list read and written whole.
+model GoalFocusPeriod {
+  id          String   @id @default(uuid())
+  ownerSub    String   @map("owner_sub")
+  label       String   @default("")
+  /// Inclusive bounds; either may be open.
+  fromDateKey String?  @map("from_date_key")
+  toDateKey   String?  @map("to_date_key")
+  weekday     Json     @default("[]")
+  holiday     Json     @default("[]")
+  spare       Json     @default("[]")
+  sortOrder   Int      @default(0) @map("sort_order")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerSub, sortOrder])
+  @@map("goal_focus_period")
+}

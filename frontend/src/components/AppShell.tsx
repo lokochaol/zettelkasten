@@ -18,6 +18,7 @@ import { usePaneScrollMemory } from "@/lib/viewState";
  * the index's page keys are two vocabularies for the same seven screens, and
  * this is the one place they have to meet. */
 const PAGE_KEY: Record<ShellView, PageKey> = {
+  goals: "goals",
   notes: "zettelkasten",
   projects: "projects",
   calendar: "calendar",

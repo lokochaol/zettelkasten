@@ -2,6 +2,8 @@ import Link from "next/link";
 import { NewDayReload } from "@/components/NewDayReload";
 import { requireSession } from "@/lib/session";
 import * as projectTaskNotes from "@/lib/projectTaskNotes";
+import * as goals from "@/lib/goals";
+import { TodayGoalsStrip } from "@/components/TodayGoalsStrip";
 import { CalendarViewSwitch } from "@/components/CalendarViewSwitch";
 import { CalendarMonthNav } from "@/components/CalendarMonthNav";
 import { CalendarTodayView } from "@/components/CalendarTodayView";
@@ -54,6 +56,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
 
   const todayNotes =
     !selectedDate && topView === "today" ? await projectTaskNotes.listAllProjectsTodayNotes(ownerSub, todayKey) : [];
+  const focus = !selectedDate && topView === "today" ? await goals.todayFocus(ownerSub, todayKey) : null;
   const timelineMarks =
     !selectedDate && topView === "timeline"
       ? await projectTaskNotes.listTimelineMarks(ownerSub, viewedYear, viewedMonth, todayKey)
@@ -83,6 +86,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
             initialNotes={todayNotes}
             initialNotesDateKey={todayKey}
             headerRight={<CalendarViewSwitch view={topView} />}
+            todayAside={focus && <TodayGoalsStrip focus={focus} />}
           />
         ) : (
           <>

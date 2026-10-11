@@ -53,7 +53,11 @@ export type DomainErrorCode =
   | "discoveryCandidateNotFound"
   | "projectNotFound"
   | "projectNameRequired"
-  | "projectGoalInvalid";
+  | "projectGoalInvalid"
+  | "goalInvalid"
+  | "goalNotFound"
+  | "goalImportEmpty"
+  | "goalImportTooLong";
 
 export class DomainError extends Error {
   code: DomainErrorCode;

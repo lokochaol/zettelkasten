@@ -6,9 +6,10 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 
 /** The screens the bar switches between, in the order they sit in it. */
-export type ShellView = "notes" | "projects" | "calendar" | "meals" | "training" | "money" | "discovery";
+export type ShellView = "goals" | "notes" | "projects" | "calendar" | "meals" | "training" | "money" | "discovery";
 
 export const SHELL_VIEW_HREF: Record<ShellView, string> = {
+  goals: "/goals",
   notes: "/zettelkasten",
   projects: "/projects",
   calendar: "/calendar",
@@ -21,6 +22,16 @@ export const SHELL_VIEW_HREF: Record<ShellView, string> = {
 /** Simple line-icon glyphs — no emoji, so they read consistently with the
  * rest of the HUD's monochrome/mono-label visual language across themes
  * (currentColor picks up the button's own text color). */
+/** A flag on a pole — the 🚩 the days are lived towards. */
+function GoalsIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M3.5 14.5V1.8" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" />
+      <path d="M3.5 2.4H12.6L10.6 5.3L12.6 8.2H3.5" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function NotesIcon() {
   return (
     <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
@@ -135,7 +146,7 @@ function ActionBarButton({
 /**
  * A fixed, always-visible icon strip along the very left edge of the pane
  * area — not a HeaderMenu entry (which is a collapsed, tap-to-open overflow
- * list), and the one place where the seven everyday screens are all reachable
+ * list), and the one place where the everyday screens are all reachable
  * without opening anything.
  *
  * It used to swap panes in place on the zettelkasten screen, which meant
@@ -153,6 +164,7 @@ export function AppSideBar({ active }: { active: ShellView }) {
   // buffer gets a 保存 / 破棄 prompt before the navigation happens.
   const go = (view: ShellView) => guard(() => router.push(SHELL_VIEW_HREF[view]));
   const entries: { view: ShellView; label: string; icon: ReactNode }[] = [
+    { view: "goals", label: t.nav.goalsLabel, icon: <GoalsIcon /> },
     { view: "notes", label: t.brand.zettelkasten, icon: <NotesIcon /> },
     { view: "projects", label: t.nav.projectsLabel, icon: <ProjectsIcon /> },
     { view: "calendar", label: t.nav.calendarLabel, icon: <CalendarIcon /> },

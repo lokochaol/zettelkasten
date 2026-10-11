@@ -31,6 +31,7 @@ export function CalendarTodaySection({
   initialNotesDateKey,
   onOpenProject,
   headerRight,
+  todayAside,
 }: {
   /** Seeds the cache so the standalone /calendar page's SSR-fetched data
    * doesn't get re-fetched on mount. Omit to always fetch client-side (the
@@ -47,6 +48,9 @@ export function CalendarTodaySection({
    * callers place their ③今日／④タイムライン view-switch pills here so the
    * row layout matches the timeline view's own header exactly. */
   headerRight?: ReactNode;
+  /** Shown under the header while the day on screen is today — the goals
+   * today is for (TodayGoalsStrip). */
+  todayAside?: ReactNode;
 }) {
   const { t, locale } = useI18n();
   const { guard } = useUnsavedChanges();
@@ -107,7 +111,7 @@ export function CalendarTodaySection({
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <button
             onClick={() => goToDay((k) => shiftDateKey(k, -1))}
@@ -142,6 +146,8 @@ export function CalendarTodaySection({
         </div>
         {headerRight}
       </div>
+
+      {isToday && todayAside}
 
       {/* The schedule sits above the day's project notes — it's what the
           day looks like from the outside (calendar) plus what's still open
