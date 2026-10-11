@@ -37,7 +37,7 @@ export function GuideContentEn() {
             { id: "setup", label: "Setting up" },
             { id: "rhythm", label: "Daily, weekly, monthly" },
             { id: "write", label: "Write — Dash Off, Zettelkasten, literature" },
-            { id: "plan", label: "Plan and record — calendar, projects, meals, training, money" },
+            { id: "plan", label: "Plan and record — goals, calendar, projects, meals, training, money" },
             { id: "body", label: "Body and nutrition targets" },
             { id: "find", label: "Find and adjust — discovery, search, settings" },
           ]}
@@ -57,10 +57,10 @@ export function GuideContentEn() {
               ),
             },
             {
-              title: "The seven everyday screens share an icon bar",
+              title: "The everyday screens share an icon bar",
               body: (
                 <>
-                  <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/training</Code>{" "}
+                  <Code>/goals</Code> <Code>/zettelkasten</Code> <Code>/projects</Code> <Code>/calendar</Code> <Code>/meals</Code> <Code>/training</Code>{" "}
                   <Code>/money</Code> <Code>/discovery</Code> sit in one frame with an icon bar down the left that never goes away. Today&rsquo;s schedule,
                   what&rsquo;s left to do, what there is to eat and what it costs get looked at in one sitting, so switching between them is a
                   glance.
@@ -73,7 +73,7 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — meal planning, the meal chat and the to-buy list, the training analysis and plan, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — importing a goals page, meal planning, the meal chat and the to-buy list, the training analysis and plan, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
@@ -129,7 +129,7 @@ export function GuideContentEn() {
             {
               label: "Daily",
               items: [
-                "Open /calendar for the day's shape and open tasks",
+                "Open /calendar for today's goals, the day's shape and open tasks",
                 "Write whatever comes to mind in /dash-off",
                 "Keep the day's task note, marking finished tasks x",
                 "Log each meal as eaten, skipped or something else",
@@ -151,6 +151,7 @@ export function GuideContentEn() {
                 "The month's budget is made the first time you open it — check it",
                 "Import card statements (CSV or PDF)",
                 "Look at the year ahead for months that get tight",
+                "Review the goals and their steps on /goals, and update what each kind of day goes to",
               ],
             },
           ]}
@@ -317,6 +318,38 @@ export function GuideContentEn() {
         title="Plan and record"
         intro="How today goes, what to eat this week, what there is to spend this month. Decide, then keep a record of what actually happened."
       >
+        <PageSection
+          id="goals"
+          path="/goals"
+          name="Goals"
+          lead="Where the goals and the steps towards them are written down. Decide which goals weekdays, days off and spare moments go to for each stretch of days, and that day's share shows at the top of the calendar's Today — in view every day."
+        >
+          <Points
+            items={[
+              {
+                title: "Goals and steps",
+                body: "Each goal has what it means (and why) and steps at horizons like \"in 2 weeks\", \"in a year\" or \"every day\". Each step is a note of its own, nested lists and all. Preset horizons get a date counted from the review date; steps due within 14 days, or overdue, also show on the calendar's Today.",
+              },
+              {
+                title: "Review",
+                body: "Review keeps the goal as it stands under Earlier versions and makes today its review date; then rewrite it, and last year's plan stays there to compare. Archive goals that are done or set aside.",
+              },
+              {
+                title: "Days",
+                body: "For periods like \"until July\" and \"from July\", choose the goals (and a note, e.g. IELTS) for weekdays, days off and spare moments. The period covering today is highlighted and shows on the calendar. Saturday and Sunday count as days off.",
+              },
+              {
+                title: "Compass",
+                body: "Principles, what you already have, all you need, obstacle planning (if this, then that), and looking back on earlier years.",
+              },
+              {
+                title: "Import a page",
+                body: "Paste a goals page from Notion or elsewhere and the AI sorts it into compass, goals with steps, and periods. You check it before it's written, and nothing already here is replaced.",
+              },
+            ]}
+          />
+        </PageSection>
+
         <PageSection
           id="calendar"
           path="/calendar"

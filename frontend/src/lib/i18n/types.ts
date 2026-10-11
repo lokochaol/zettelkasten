@@ -31,6 +31,7 @@ export interface Dictionary {
       | "zettelkasten"
       | "literature"
       | "projects"
+      | "goals"
       | "calendar"
       | "meals"
       | "training"
@@ -79,6 +80,7 @@ export interface Dictionary {
     calendarLabel: string;
     mealsLabel: string;
     trainingLabel: string;
+    goalsLabel: string;
     moneyLabel: string;
   };
   confirmDialog: {
@@ -202,6 +204,69 @@ export interface Dictionary {
     monthPlanHeading: string;
     monthPlanLeft: (yen: number) => string;
     dashboardHeading: string;
+  };
+  goals: {
+    tab: Record<"goals" | "days" | "compass", string>;
+    empty: string;
+    newGoalPlaceholder: string;
+    newGoal: string;
+    archivedHeading: (n: number) => string;
+    collapse: string;
+    expand: string;
+    titleLabel: string;
+    stepsDone: (done: number, total: number) => string;
+    reviewedOn: string;
+    review: string;
+    reviewConfirmTitle: string;
+    reviewConfirmBody: string;
+    moveUp: string;
+    moveDown: string;
+    archive: string;
+    unarchive: string;
+    deleteConfirmTitle: (title: string) => string;
+    deleteConfirmBody: string;
+    statementLabel: string;
+    addStep: string;
+    customStepPlaceholder: string;
+    stepDone: string;
+    stepLabel: string;
+    stepLabelPlaceholder: string;
+    stepDue: string;
+    revisionsHeading: (n: number) => string;
+    revisionUntil: (date: string) => string;
+    daysIntro: string;
+    addPeriod: string;
+    periodLabel: string;
+    periodLabelPlaceholder: string;
+    periodUntitled: string;
+    periodCurrent: string;
+    periodFrom: string;
+    periodTo: string;
+    periodOpenHint: string;
+    periodDeleteConfirm: string;
+    slot: Record<"weekday" | "holiday" | "spare", string>;
+    lineGoal: string;
+    lineNoGoal: string;
+    lineArchivedGoal: string;
+    lineNote: string;
+    lineNotePlaceholder: string;
+    compass: Record<"principles" | "happiness" | "essentials" | "obstacles" | "archive", { title: string; hint: string }>;
+    importOpen: string;
+    importHeading: string;
+    importIntro: string;
+    importPlaceholder: string;
+    importRead: string;
+    importReading: string;
+    importStage: Record<"context" | "thinking" | "writing" | "saving", string>;
+    importItemsHeading: (n: number) => string;
+    importApplyNote: string;
+    importApply: string;
+    importApplying: string;
+    importDone: (goals: number, periods: number) => string;
+    importFailed: string;
+    todayHeading: string;
+    todayOpen: string;
+    todayOverdue: (date: string) => string;
   };
   training: {
     heading: string;
@@ -793,6 +858,10 @@ export interface Dictionary {
     trainingSessionInvalid: string;
     trainingSessionNotFound: string;
     trainingWeekPast: string;
+    goalInvalid: string;
+    goalNotFound: string;
+    goalImportEmpty: string;
+    goalImportTooLong: string;
     purchaseListInvalid: string;
     purchaseListNoMeals: string;
     mealChatInvalid: string;
