@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NewDayReload } from "@/components/NewDayReload";
 import { notFound } from "next/navigation";
 import * as projects from "@/lib/projects";
 import * as projectTaskNotes from "@/lib/projectTaskNotes";
@@ -37,6 +38,8 @@ export default async function ProjectDetailPage(props: PageProps<"/projects/[id]
   // One "today" for the page: the strip of days and the note shown beside
   // it have to agree about which day that is.
   const todayKey = await getTodayKey();
+  // Same as the calendar: a new day starts with yesterday's open tasks.
+  await projectTaskNotes.carryForward(ownerSub, todayKey);
   const [linkedNotes, days] = await Promise.all([
     projects.listLinkedNotes(ownerSub, id),
     projectTaskNotes.listRecentDays(ownerSub, id, DAY_STRIP_SIZE, todayKey),
@@ -48,6 +51,7 @@ export default async function ProjectDetailPage(props: PageProps<"/projects/[id]
 
   return (
     <main className="flex min-h-screen flex-col items-center bg-bg px-6 py-16">
+      <NewDayReload renderedDateKey={todayKey} />
       <div className="flex w-full max-w-[720px] flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
           <Link

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { NewDayReload } from "@/components/NewDayReload";
 import { requireSession } from "@/lib/session";
 import * as projectTaskNotes from "@/lib/projectTaskNotes";
 import { CalendarViewSwitch } from "@/components/CalendarViewSwitch";
@@ -23,6 +24,9 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const selectedDate = searchParams.view === "day" && typeof searchParams.date === "string" ? searchParams.date : null;
   const todayKey = await getTodayKey();
   const today = new Date(`${todayKey}T00:00:00.000Z`);
+  // The first look at a new day brings yesterday's unfinished tasks into
+  // it, before anything below reads today's notes.
+  await projectTaskNotes.carryForward(ownerSub, todayKey);
 
   const currentYear = today.getUTCFullYear();
   const currentMonth = today.getUTCMonth() + 1;
@@ -59,6 +63,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
 
   return (
     <AppShell view="calendar" userEmail={session.user?.email ?? dict.common.unknownEmail}>
+      <NewDayReload renderedDateKey={todayKey} />
       <div className="flex w-full flex-col gap-8">
         {selectedDate ? (
           <>

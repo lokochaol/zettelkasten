@@ -33,11 +33,15 @@ interface UnsavedChangesApi {
    * so callers can treat this as "leave, if the owner agrees".
    */
   guard: (proceed: () => void) => void;
+  /** Whether any registered editor has unsaved changes right now — for
+   * things that would rather wait than ask (see NewDayReload). */
+  hasUnsaved: () => boolean;
 }
 
 const noop: UnsavedChangesApi = {
   register: () => () => {},
   guard: (proceed) => proceed(),
+  hasUnsaved: () => false,
 };
 
 const UnsavedChangesContext = createContext<UnsavedChangesApi>(noop);
@@ -130,7 +134,8 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
     leave(proceed);
   }
 
-  const api = useMemo(() => ({ register, guard }), [register, guard]);
+  const hasUnsaved = useCallback(() => dirtyEditors().length > 0, [dirtyEditors]);
+  const api = useMemo(() => ({ register, guard, hasUnsaved }), [register, guard, hasUnsaved]);
 
   return (
     <UnsavedChangesContext.Provider value={api}>
