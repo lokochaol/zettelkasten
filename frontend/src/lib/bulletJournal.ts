@@ -108,3 +108,55 @@ export function openTasks(content: string): OpenTask[] {
       return { ...entry, displayDepth };
     });
 }
+
+/** One level of nesting in a carried-over line whose parent stayed behind
+ * — the same four spaces the editor's indent button inserts. */
+const CARRY_INDENT = "    ";
+
+/**
+ * The lines of one day's note that move on to the next day, ready to
+ * append to it.
+ *
+ * Every entry with a signifier comes along except a finished one ("x");
+ * plain lines with no signifier are left behind — they're notes about that
+ * day, not things still to do. A ">" entry was moved to the next day by
+ * hand, so it arrives there as an ordinary task ("-"). A line already in
+ * `existing` (the next day's note as it stands) isn't added again, so
+ * carrying over never repeats something written there already.
+ *
+ * Lines are copied as they were typed. Only when a line's parent stayed
+ * behind (a finished task with an unfinished subtask) is it re-indented,
+ * one level per ancestor that did come along, so it doesn't hang under
+ * whatever happens to sit above it in the new day.
+ */
+export function carryOverLines(content: string, existing: string): string[] {
+  const lines = content.split("\n");
+  const already = new Set(existing.split("\n").map((l) => l.trim()).filter(Boolean));
+  // Open ancestors: their depth, and whether they came along.
+  const ancestors: { depth: number; kept: boolean }[] = [];
+  const out: string[] = [];
+  for (const entry of parseEntries(content)) {
+    while (ancestors.length > 0 && ancestors[ancestors.length - 1].depth >= entry.depth) ancestors.pop();
+    const keep = entry.glyph !== "x";
+    if (keep) {
+      let line = lines[entry.line];
+      if (entry.glyph === ">") line = line.replace(/^(\s*[*!]*\s*)>/, "$1-");
+      if (ancestors.some((a) => !a.kept)) {
+        line = CARRY_INDENT.repeat(ancestors.filter((a) => a.kept).length) + line.trimStart();
+      }
+      if (!already.has(line.trim())) {
+        out.push(line.replace(/\s+$/, ""));
+        already.add(line.trim());
+      }
+    }
+    ancestors.push({ depth: entry.depth, kept: keep });
+  }
+  return out;
+}
+
+/** `existing` with `lines` added at the end, on lines of their own. */
+export function appendLines(existing: string, lines: string[]): string {
+  if (lines.length === 0) return existing;
+  const base = existing.replace(/\s+$/, "");
+  return base ? `${base}\n${lines.join("\n")}` : lines.join("\n");
+}

@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/db";
 import * as projects from "@/lib/projects";
 import { shiftDateKey } from "@/lib/dateKey";
+import { appendLines, carryOverLines } from "@/lib/bulletJournal";
 
 /**
  * A ProjectTaskNote's date is always handled as a plain "YYYY-MM-DD" string
@@ -49,6 +50,64 @@ export async function upsertContent(
     update: { content },
   });
   return { projectId, date: dateKey, content: row.content };
+}
+
+/** A day older than this isn't carried into today: the note is from a
+ * stretch the owner wasn't using the app, and its tasks are better read
+ * there than dropped into today unasked. */
+const CARRY_WINDOW_DAYS = 7;
+
+/**
+ * Brings each active project's unfinished entries from its last note into
+ * today's (see bulletJournal.carryOverLines for which lines).
+ *
+ * Run when today's notes are first read rather than by a midnight job: the
+ * day turns over in the owner's time zone, which only their request knows,
+ * and a day with no visit has nothing to carry into yet. The source is the
+ * most recent earlier note — usually yesterday, or the last day written on
+ * after a gap — and it's carried once: it's marked before today's note is
+ * touched, in the same transaction, so two pages opening at once can't both
+ * append. Today's note is only ever added to, never rewritten.
+ */
+export async function carryForward(ownerSub: string, todayKey: string): Promise<void> {
+  const activeProjects = await projects.listActive(ownerSub);
+  if (activeProjects.length === 0) return;
+  const today = toDate(todayKey);
+  const windowStart = toDate(shiftDateKey(todayKey, -CARRY_WINDOW_DAYS));
+
+  for (const project of activeProjects) {
+    const source = await prisma.projectTaskNote.findFirst({
+      where: { projectId: project.id, date: { lt: today } },
+      orderBy: { date: "desc" },
+    });
+    if (!source || source.carriedForwardAt) continue;
+
+    await prisma.$transaction(async (tx) => {
+      // Every earlier day counts as handled from here on, the source and
+      // anything before it, so an older note can't surface later as "the
+      // latest one not yet carried".
+      const claimed = await tx.projectTaskNote.updateMany({
+        where: { id: source.id, carriedForwardAt: null },
+        data: { carriedForwardAt: new Date() },
+      });
+      if (claimed.count === 0) return; // another request got here first
+      await tx.projectTaskNote.updateMany({
+        where: { projectId: project.id, date: { lt: source.date }, carriedForwardAt: null },
+        data: { carriedForwardAt: new Date() },
+      });
+      if (source.date < windowStart) return;
+
+      const target = await tx.projectTaskNote.findUnique({ where: { projectId_date: { projectId: project.id, date: today } } });
+      const lines = carryOverLines(source.content, target?.content ?? "");
+      if (lines.length === 0) return;
+      const content = appendLines(target?.content ?? "", lines);
+      await tx.projectTaskNote.upsert({
+        where: { projectId_date: { projectId: project.id, date: today } },
+        create: { projectId: project.id, date: today, content },
+        update: { content },
+      });
+    });
+  }
 }
 
 export interface DayStripEntry {

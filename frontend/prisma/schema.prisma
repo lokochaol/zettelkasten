@@ -189,6 +189,10 @@ model ProjectTaskNote {
   project   Project  @relation(fields: [projectId], references: [id], onDelete: Cascade)
   date      DateTime @db.Date
   content   String   @default("")
+  /// When this day's unfinished entries were copied on to a later day
+  /// (src/lib/projectTaskNotes.ts#carryForward). Set once, so a day is
+  /// carried over at most once however many times the next day is opened.
+  carriedForwardAt DateTime? @map("carried_forward_at")
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
