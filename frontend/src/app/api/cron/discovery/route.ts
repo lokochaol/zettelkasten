@@ -1,7 +1,5 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as discovery from "@/lib/discovery";
-import { getDictionary } from "@/lib/i18n/dictionary";
-import { DEFAULT_LOCALE } from "@/lib/i18n/types";
 
 /**
  * The scheduled half of the "Discovery Rails" batch — see
@@ -45,10 +43,7 @@ export async function GET(request: NextRequest) {
     if (!discovery.isDueAtHour(schedule, hour)) continue;
 
     ownersRun++;
-    // No browser here to say which language the owner reads, so the
-    // notification is in the app's default one.
-    const t = getDictionary(DEFAULT_LOCALE).discoveryTab;
-    const result = await discovery.runForEnabledNotes(ownerSub, { notify: { title: t.pushTitle, more: t.pushMore } });
+    const result = await discovery.runForEnabledNotes(ownerSub);
     notesChecked += result.notesChecked;
     candidatesFound += result.candidatesFound;
   }

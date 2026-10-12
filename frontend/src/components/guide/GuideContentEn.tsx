@@ -579,8 +579,8 @@ export function GuideContentEn() {
                 body: "Write what you want to follow on the discovery screen itself. Topics belong to discovery, not Dash Off, so they're never swept away after a week and stay until you delete them. What they find piles up instead of being replaced, and new finds are marked NEW. Make a literature memo from one, dismiss the ones you don't want, or search a single topic now.",
               },
               {
-                title: "Notifications",
-                body: "Turn on “Get notifications on this device” and a notification arrives when a scheduled run or Search now finds something new. It's set per device; on iPhone it only works in the app added to the Home Screen and opened from there (iOS 16.4+).",
+                title: "New finds at a glance",
+                body: "When a scheduled run or Search now finds something new, the discovery icon in the left bar shows how many. Opening the discovery screen clears the count, and what was new is marked NEW for that visit.",
               },
               {
                 title: "How often",

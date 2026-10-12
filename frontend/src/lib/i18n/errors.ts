@@ -51,8 +51,6 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.discoveryTopicInvalid;
     case "discoveryTopicNotFound":
       return dict.discoveryTopicNotFound;
-    case "pushSubscriptionInvalid":
-      return dict.pushSubscriptionInvalid;
     case "mealPlanNotFound":
       return dict.mealPlanNotFound;
     case "inventoryInvalid":

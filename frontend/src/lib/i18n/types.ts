@@ -77,6 +77,7 @@ export interface Dictionary {
     toZettelkasten: string;
     projectsLabel: string;
     discoveryLabel: string;
+    discoveryNew: (n: number) => string;
     calendarLabel: string;
     mealsLabel: string;
     trainingLabel: string;
@@ -509,22 +510,6 @@ export interface Dictionary {
     findingDismiss: string;
     runScope: (topics: number, notes: number) => string;
     notesIntro: string;
-    notifyHeading: string;
-    notifyIntro: string;
-    notifyUnsupported: string;
-    notifyNotConfigured: string;
-    notifyDenied: string;
-    notifyEnable: string;
-    notifyOn: string;
-    notifyTest: string;
-    notifyDisable: string;
-    notifyIosHint: string;
-    notifyFailed: string;
-    notifyTestSent: (n: number) => string;
-    notifyTestTitle: string;
-    notifyTestBody: string;
-    pushTitle: (n: number) => string;
-    pushMore: (n: number) => string;
   };
   daySchedule: {
     heading: string;
@@ -929,7 +914,6 @@ export interface Dictionary {
     discoveryCandidateNotFound: string;
     discoveryTopicInvalid: string;
     discoveryTopicNotFound: string;
-    pushSubscriptionInvalid: string;
     encryptionNotConfigured: string;
     zoteroTitleRequired: string;
     zoteroApiError: (status: number, statusText: string) => string;

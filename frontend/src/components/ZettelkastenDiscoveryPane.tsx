@@ -8,8 +8,8 @@ import {
   saveDiscoveryScheduleAction,
   runDiscoveryAction,
 } from "@/app/dash-off/actions";
-import { listTopicsAction, type DiscoveryTopicView } from "@/app/discovery/actions";
-import { DiscoveryNotifySettings } from "@/components/DiscoveryNotifySettings";
+import { listTopicsAction, markDiscoverySeenAction, type DiscoveryTopicView } from "@/app/discovery/actions";
+import { announceDiscoverySeen } from "@/lib/discoverySeenEvent";
 import { DiscoveryTopicsSection } from "@/components/DiscoveryTopicsSection";
 import { LoadingBlock, Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -28,7 +28,8 @@ import type { DiscoveryNoteRow, DiscoverySchedule } from "@/lib/discovery";
  *
  * Topics are the other way in: written here directly, kept until deleted,
  * for things worth following that never were a scrap. What a run finds
- * new is also sent as a notification to the devices that switched it on.
+ * new shows as a count on this screen's icon in the side bar until this
+ * screen is opened; here it's marked NEW for the visit.
  */
 export function ZettelkastenDiscoveryPane() {
   const { t } = useI18n();
@@ -44,6 +45,9 @@ export function ZettelkastenDiscoveryPane() {
       setNotes(n);
       setSchedule(s);
       setTopics(tp);
+      // Shown, so seen: the NEW marks stay for this visit (they were read
+      // above), and the side bar's count clears.
+      void markDiscoverySeenAction().then(announceDiscoverySeen);
     });
   }, []);
 
@@ -74,7 +78,11 @@ export function ZettelkastenDiscoveryPane() {
     void runDiscoveryAction(true)
       .then(async (r) => {
         setResult(t.discovery.triggerResult(r.notesChecked, r.candidatesFound));
-        setTopics(await listTopicsAction());
+        const [nextNotes, nextTopics] = await Promise.all([listDiscoveryNotesAction(), listTopicsAction()]);
+        setNotes(nextNotes);
+        setTopics(nextTopics);
+        await markDiscoverySeenAction();
+        announceDiscoverySeen();
       })
       .catch(() => setResult(t.discovery.triggerFailed))
       .finally(() => setRunning(false));
@@ -149,6 +157,11 @@ export function ZettelkastenDiscoveryPane() {
                     className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
                   />
                   <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink">{note.preview || t.common.noContent}</span>
+                  {note.newCount > 0 && (
+                    <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-on-accent">
+                      {t.discoveryTab.findingNew} {note.newCount}
+                    </span>
+                  )}
                   {note.candidateCount > 0 && (
                     <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[9px] text-accent">
                       {t.discoveryTab.candidateCount(note.candidateCount)}
@@ -164,7 +177,6 @@ export function ZettelkastenDiscoveryPane() {
         )}
       </section>
 
-      <DiscoveryNotifySettings />
     </div>
   );
 }

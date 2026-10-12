@@ -344,6 +344,10 @@ model DiscoveryCandidate {
   sourceLabel String          @map("source_label")
   url         String?
   confidence  Int
+  /// Null until /discovery has been opened after it was found — what the
+  /// side bar's count of new finds counts. A refresh that finds the same
+  /// thing again carries the mark over (see refreshQuickNote).
+  seenAt      DateTime?       @map("seen_at")
 
   literatureMemoId String?         @map("literature_memo_id")
   literatureMemo   LiteratureMemo? @relation(fields: [literatureMemoId], references: [id], onDelete: SetNull)
@@ -1288,20 +1292,4 @@ model DiscoveryTopicFinding {
   @@index([topicId, createdAt])
   @@index([ownerSub, seenAt])
   @@map("discovery_topic_finding")
-}
-
-/// A browser or installed app that asked to be told when discovery finds
-/// something — a Web Push subscription. One per device; a subscription the
-/// push service reports gone (404/410) is deleted when a send hits it.
-model PushSubscription {
-  id        String   @id @default(uuid())
-  ownerSub  String   @map("owner_sub")
-  endpoint  String   @unique
-  p256dh    String
-  auth      String
-  userAgent String   @default("") @map("user_agent")
-  createdAt DateTime @default(now()) @map("created_at")
-
-  @@index([ownerSub])
-  @@map("push_subscription")
 }

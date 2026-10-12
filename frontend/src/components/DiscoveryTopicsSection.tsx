@@ -1,17 +1,17 @@
 "use client";
 
-import { useEffect, useRef, useState, type FormEvent } from "react";
+import { useState, type FormEvent } from "react";
 import {
   createTopicAction,
   deleteTopicAction,
   dismissFindingAction,
   findingToLiteratureAction,
-  markFindingsSeenAction,
   runTopicAction,
   updateTopicAction,
   type DiscoveryTopicView,
 } from "@/app/discovery/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { announceDiscoverySeen } from "@/lib/discoverySeenEvent";
 import { Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
@@ -37,15 +37,9 @@ export function DiscoveryTopicsSection({
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Which findings were new when the page opened: they keep the mark for
-  // this visit even though they're recorded as seen right away.
+  // this visit even though the page records them as seen right away (see
+  // ZettelkastenDiscoveryPane).
   const [newIds] = useState(() => new Set(topics.flatMap((tp) => tp.findings.filter((f) => f.isNew).map((f) => f.id))));
-  const markedRef = useRef(false);
-
-  useEffect(() => {
-    if (markedRef.current || newIds.size === 0) return;
-    markedRef.current = true;
-    void markFindingsSeenAction([...newIds]);
-  }, [newIds]);
 
   async function add(e: FormEvent) {
     e.preventDefault();
@@ -145,7 +139,7 @@ function TopicCard({
         if (mine) {
           const added = mine.findings.filter((f) => !before.has(f.id)).map((f) => f.id);
           setFreshIds(new Set(added));
-          void markFindingsSeenAction(added);
+          announceDiscoverySeen();
         }
         onReplaceAll(res.topics);
       }

@@ -170,10 +170,7 @@ export async function getQuickNoteDetailAction(id: string): Promise<QuickNoteDet
  * tokens on notes checked moments ago). The cron itself never passes force. */
 export async function runDiscoveryAction(force = false): Promise<{ notesChecked: number; candidatesFound: number }> {
   const ownerSub = await requireOwnerSub();
-  const t = getDictionary(await getLocale()).discoveryTab;
-  // Notifies too: a manual run can outlast the owner's patience with the
-  // screen, and the notification is how they hear what it found.
-  const result = await discovery.runForEnabledNotes(ownerSub, { force, notify: { title: t.pushTitle, more: t.pushMore } });
+  const result = await discovery.runForEnabledNotes(ownerSub, { force });
   revalidatePath("/dash-off");
   return result;
 }

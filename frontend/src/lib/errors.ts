@@ -53,7 +53,6 @@ export type DomainErrorCode =
   | "discoveryCandidateNotFound"
   | "discoveryTopicInvalid"
   | "discoveryTopicNotFound"
-  | "pushSubscriptionInvalid"
   | "projectNotFound"
   | "projectNameRequired"
   | "projectGoalInvalid"

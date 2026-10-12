@@ -1,7 +1,6 @@
 import { prisma } from "@/lib/db";
 import { DiscoveryKind, DiscoveryStatus } from "@/generated/prisma/client";
 import { NotFoundError, ValidationError } from "@/lib/errors";
-import * as push from "@/lib/push";
 import * as quickNotes from "@/lib/quickNotes";
 import type { QuickNoteDetail } from "@/lib/quickNotes";
 import * as aiCredentials from "@/lib/aiCredentials";
@@ -331,14 +330,17 @@ function findingKey(f: { url: string | null; title: string }): string {
 }
 
 /** runForQuickNote's work, returning the findings that weren't there
- * before the refresh — what a notification reports. */
+ * before the refresh. Those are the new ones; a candidate found again
+ * keeps the seen mark it had, so a refresh doesn't make old news new. */
 async function refreshQuickNote(ownerSub: string, quickNoteId: string): Promise<DiscoveryFinding[]> {
   const note = await quickNotes.getDetail(ownerSub, quickNoteId);
   const text = note.content.trim();
 
   const findings = text ? await findCandidatesForNote(ownerSub, text) : [];
-  const before = new Set(
-    (await prisma.discoveryCandidate.findMany({ where: { quickNoteId }, select: { url: true, title: true } })).map(findingKey),
+  const before = new Map(
+    (await prisma.discoveryCandidate.findMany({ where: { quickNoteId }, select: { url: true, title: true, seenAt: true } })).map(
+      (c) => [findingKey(c), c.seenAt] as const,
+    ),
   );
 
   await prisma.$transaction([
@@ -355,6 +357,7 @@ async function refreshQuickNote(ownerSub: string, quickNoteId: string): Promise<
               sourceLabel: f.sourceLabel,
               url: f.url,
               confidence: f.confidence,
+              seenAt: before.get(findingKey(f)) ?? null,
             })),
           }),
         ]
@@ -458,20 +461,6 @@ export async function dismissFinding(ownerSub: string, findingId: string): Promi
   await prisma.discoveryTopicFinding.deleteMany({ where: { id: findingId, ownerSub } });
 }
 
-/** Called once /discovery has shown the new findings, so they stop being
- * new next time. */
-export async function markFindingsSeen(ownerSub: string, findingIds: string[]): Promise<void> {
-  if (findingIds.length === 0) return;
-  await prisma.discoveryTopicFinding.updateMany({
-    where: { ownerSub, id: { in: findingIds }, seenAt: null },
-    data: { seenAt: new Date() },
-  });
-}
-
-export async function countNewFindings(ownerSub: string): Promise<number> {
-  return prisma.discoveryTopicFinding.count({ where: { ownerSub, seenAt: null } });
-}
-
 /** Searches for one topic and keeps what wasn't found before. Nothing
  * already there is replaced or removed. Returns the new findings. */
 export async function runForTopic(ownerSub: string, topicId: string): Promise<DiscoveryFinding[]> {
@@ -527,31 +516,26 @@ export async function resolveLiteratureForFinding(ownerSub: string, findingId: s
   return literatureMemoId;
 }
 
-/* ---------- notifying ---------- */
+/* ---------- what's new ---------- */
 
-export interface FreshFinding {
-  /** The topic or note it was found for, as a short line. */
-  source: string;
-  title: string;
+/** How many findings the owner hasn't seen yet — topic findings and the
+ * candidates under opted-in notes alike. The side bar shows this on the
+ * discovery icon, so a run that found something is visible from anywhere. */
+export async function countNewFindings(ownerSub: string): Promise<number> {
+  const [topics, notes] = await Promise.all([
+    prisma.discoveryTopicFinding.count({ where: { ownerSub, seenAt: null } }),
+    prisma.discoveryCandidate.count({ where: { ownerSub, seenAt: null, quickNote: { status: "ACTIVE" } } }),
+  ]);
+  return topics + notes;
 }
 
-export interface NotificationText {
-  title: (count: number) => string;
-  more: (count: number) => string;
-}
-
-/** One notification for a whole run, however much it found: the count, and
- * the first few titles with what they were found for. */
-export function notificationFor(fresh: FreshFinding[], text: NotificationText): push.PushPayload | null {
-  if (fresh.length === 0) return null;
-  const shown = fresh.slice(0, 3).map((f) => `${f.source}: ${f.title}`);
-  if (fresh.length > shown.length) shown.push(text.more(fresh.length - shown.length));
-  return { title: text.title(fresh.length), body: shown.join("\n"), url: "/discovery", tag: "discovery" };
-}
-
-function sourceLine(content: string): string {
-  const line = content.split("\n").find((l) => l.trim())?.trim() ?? "";
-  return line.length > 24 ? `${line.slice(0, 24)}…` : line;
+/** Opening /discovery is seeing what's new: everything new is marked seen. */
+export async function markAllSeen(ownerSub: string): Promise<void> {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.discoveryTopicFinding.updateMany({ where: { ownerSub, seenAt: null }, data: { seenAt: now } }),
+    prisma.discoveryCandidate.updateMany({ where: { ownerSub, seenAt: null }, data: { seenAt: now } }),
+  ]);
 }
 
 export interface DiscoveryRunStatusSummary {
@@ -628,7 +612,7 @@ async function recordRunStatus(
  */
 export async function runForEnabledNotes(
   ownerSub: string,
-  options?: { force?: boolean; notify?: NotificationText },
+  options?: { force?: boolean },
 ): Promise<{ notesChecked: number; candidatesFound: number }> {
   const refreshCutoff = new Date(Date.now() - MIN_REFRESH_INTERVAL_HOURS * 60 * 60 * 1000);
   const [candidateNotes, topics] = await Promise.all([
@@ -639,7 +623,7 @@ export async function runForEnabledNotes(
         discoveryEnabled: true,
         ...(options?.force ? {} : { OR: [{ discoveryLastRunAt: null }, { discoveryLastRunAt: { lt: refreshCutoff } }] }),
       },
-      select: { id: true, content: true },
+      select: { id: true },
       orderBy: [{ discoveryLastRunAt: { sort: "asc", nulls: "first" } }, { encounteredAt: "asc" }],
       take: MAX_NOTES_PER_RUN,
     }),
@@ -649,7 +633,7 @@ export async function runForEnabledNotes(
         enabled: true,
         ...(options?.force ? {} : { OR: [{ lastRunAt: null }, { lastRunAt: { lt: refreshCutoff } }] }),
       },
-      select: { id: true, content: true },
+      select: { id: true },
       orderBy: [{ lastRunAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
       take: MAX_TOPICS_PER_RUN,
     }),
@@ -657,17 +641,13 @@ export async function runForEnabledNotes(
   if (candidateNotes.length === 0 && topics.length === 0) return { notesChecked: 0, candidatesFound: 0 };
 
   let notesChecked = 0;
-  const fresh: FreshFinding[] = [];
+  let fresh = 0;
   // Topics first: they're what the owner wrote here on purpose.
-  const work = [
-    ...topics.map((t) => ({ source: t.content, run: () => runForTopic(ownerSub, t.id) })),
-    ...candidateNotes.map((n) => ({ source: n.content, run: () => refreshQuickNote(ownerSub, n.id) })),
-  ];
+  const work = [...topics.map((t) => () => runForTopic(ownerSub, t.id)), ...candidateNotes.map((n) => () => refreshQuickNote(ownerSub, n.id))];
   let failed: { code: DiscoveryErrorCode; status: number | null } | null = null;
-  for (const item of work) {
+  for (const run of work) {
     try {
-      const found = await item.run();
-      fresh.push(...found.map((f) => ({ source: sourceLine(item.source), title: f.title })));
+      fresh += (await run()).length;
       notesChecked++;
     } catch (e) {
       failed = e instanceof DiscoveryProviderError ? { code: e.code, status: e.status } : { code: "unknownError" as const, status: null };
@@ -676,12 +656,9 @@ export async function runForEnabledNotes(
   }
 
   await recordRunStatus(ownerSub, failed);
-  // What was found before a failure is still news.
-  const payload = options?.notify ? notificationFor(fresh, options.notify) : null;
-  if (payload) await push.sendToOwner(ownerSub, payload);
   // "Found" is what's new: a refresh that turns up the same three articles
   // again has found nothing.
-  return { notesChecked, candidatesFound: fresh.length };
+  return { notesChecked, candidatesFound: fresh };
 }
 
 /** Every owner who has switched discovery on for at least one note or topic — the
@@ -804,6 +781,8 @@ export interface DiscoveryNoteRow {
   preview: string;
   enabled: boolean;
   candidateCount: number;
+  /** Of those, how many haven't been seen on /discovery yet. */
+  newCount: number;
   lastRunAt: Date | null;
 }
 
@@ -821,11 +800,18 @@ export async function listNotesForDiscoveryTab(ownerSub: string): Promise<Discov
       _count: { select: { discoveryCandidates: true } },
     },
   });
+  const unseen = await prisma.discoveryCandidate.groupBy({
+    by: ["quickNoteId"],
+    where: { ownerSub, seenAt: null },
+    _count: { _all: true },
+  });
+  const newByNote = new Map(unseen.map((u) => [u.quickNoteId, u._count._all]));
   return notes.map((n) => ({
     id: n.id,
     preview: n.content.split("\n").find((line) => line.trim())?.trim().slice(0, 120) ?? "",
     enabled: n.discoveryEnabled,
     candidateCount: n._count.discoveryCandidates,
+    newCount: newByNote.get(n.id) ?? 0,
     lastRunAt: n.discoveryLastRunAt,
   }));
 }
