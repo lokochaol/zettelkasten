@@ -73,3 +73,36 @@ self.addEventListener("fetch", (event) => {
     );
   }
 });
+
+// Web Push (src/lib/push.ts): discovery found something. The payload is
+// { title, body, url, tag }; tapping opens `url`, in an open window of the
+// app if there is one.
+self.addEventListener("push", (event) => {
+  let data = {};
+  try {
+    data = event.data ? event.data.json() : {};
+  } catch {
+    data = { body: event.data ? event.data.text() : "" };
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title || "hibino", {
+      body: data.body || "",
+      tag: data.tag,
+      icon: "/icon-192.png",
+      badge: "/icon-192.png",
+      data: { url: data.url || "/" },
+    }),
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const url = new URL(event.notification.data?.url || "/", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((windows) => {
+      const open = windows.find((w) => w.url.startsWith(self.location.origin));
+      if (open) return open.navigate(url).then((w) => (w ?? open).focus());
+      return self.clients.openWindow(url);
+    }),
+  );
+});
