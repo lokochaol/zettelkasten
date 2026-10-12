@@ -77,6 +77,7 @@ export interface Dictionary {
     toZettelkasten: string;
     projectsLabel: string;
     discoveryLabel: string;
+    discoveryNew: (n: number) => string;
     calendarLabel: string;
     mealsLabel: string;
     trainingLabel: string;
@@ -490,6 +491,25 @@ export interface Dictionary {
     candidateCount: (n: number) => string;
     lastRun: (date: string) => string;
     neverRun: string;
+    topicsHeading: (n: number) => string;
+    topicsIntro: string;
+    topicPlaceholder: string;
+    topicAdd: string;
+    topicEnabled: string;
+    topicRun: string;
+    topicRunResult: (n: number) => string;
+    topicNoFindings: string;
+    topicDeleteConfirm: string;
+    topicDeleteWarning: string;
+    findingNew: string;
+    findingNews: string;
+    findingLiterature: string;
+    findingConfidence: (n: number) => string;
+    findingToLiterature: string;
+    findingLiteratureOpen: string;
+    findingDismiss: string;
+    runScope: (topics: number, notes: number) => string;
+    notesIntro: string;
   };
   daySchedule: {
     heading: string;
@@ -892,6 +912,8 @@ export interface Dictionary {
     quickNoteNotFound: string;
     linkNotFound: string;
     discoveryCandidateNotFound: string;
+    discoveryTopicInvalid: string;
+    discoveryTopicNotFound: string;
     encryptionNotConfigured: string;
     zoteroTitleRequired: string;
     zoteroApiError: (status: number, statusText: string) => string;

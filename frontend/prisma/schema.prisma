@@ -314,6 +314,7 @@ model LiteratureMemo {
   quickNotes          QuickNote[]
   permanentNoteLinks  PermanentNoteLiteratureMemo[]
   discoveryCandidates DiscoveryCandidate[]
+  discoveryTopicFindings DiscoveryTopicFinding[]
 
   @@unique([ownerSub, zoteroKey])
   @@index([ownerSub])
@@ -343,6 +344,10 @@ model DiscoveryCandidate {
   sourceLabel String          @map("source_label")
   url         String?
   confidence  Int
+  /// Null until /discovery has been opened after it was found — what the
+  /// side bar's count of new finds counts. A refresh that finds the same
+  /// thing again carries the mark over (see refreshQuickNote).
+  seenAt      DateTime?       @map("seen_at")
 
   literatureMemoId String?         @map("literature_memo_id")
   literatureMemo   LiteratureMemo? @relation(fields: [literatureMemoId], references: [id], onDelete: SetNull)
@@ -1241,4 +1246,50 @@ model GoalFocusPeriod {
 
   @@index([ownerSub, sortOrder])
   @@map("goal_focus_period")
+}
+
+/// Something to keep looking into, written straight on /discovery — not a
+/// 走り書き, so the one-week sweep never takes it, and it stays until the
+/// owner deletes it.
+model DiscoveryTopic {
+  id        String    @id @default(uuid())
+  ownerSub  String    @map("owner_sub")
+  content   String
+  /// Off keeps the topic and what it found, but the runs skip it.
+  enabled   Boolean   @default(true)
+  lastRunAt DateTime? @map("last_run_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  findings DiscoveryTopicFinding[]
+
+  @@index([ownerSub, createdAt])
+  @@map("discovery_topic")
+}
+
+/// What a run found for a topic. Unlike a 走り書き's candidates, which a
+/// refresh replaces, these accumulate: a later run only adds what wasn't
+/// already found (same URL, or same title when there's none), and nothing
+/// goes until the owner dismisses it. `seenAt` null is what makes it new.
+model DiscoveryTopicFinding {
+  id          String         @id @default(uuid())
+  topicId     String         @map("topic_id")
+  topic       DiscoveryTopic @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  ownerSub    String         @map("owner_sub")
+  kind        DiscoveryKind
+  title       String
+  summary     String
+  sourceLabel String         @map("source_label")
+  url         String?
+  confidence  Int
+  seenAt      DateTime?      @map("seen_at")
+
+  literatureMemoId String?         @map("literature_memo_id")
+  literatureMemo   LiteratureMemo? @relation(fields: [literatureMemoId], references: [id], onDelete: SetNull)
+
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([topicId, createdAt])
+  @@index([ownerSub, seenAt])
+  @@map("discovery_topic_finding")
 }

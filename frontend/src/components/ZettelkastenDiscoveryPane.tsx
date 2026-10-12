@@ -8,6 +8,9 @@ import {
   saveDiscoveryScheduleAction,
   runDiscoveryAction,
 } from "@/app/dash-off/actions";
+import { listTopicsAction, markDiscoverySeenAction, type DiscoveryTopicView } from "@/app/discovery/actions";
+import { announceDiscoverySeen } from "@/lib/discoverySeenEvent";
+import { DiscoveryTopicsSection } from "@/components/DiscoveryTopicsSection";
 import { LoadingBlock, Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { DiscoveryNoteRow, DiscoverySchedule } from "@/lib/discovery";
@@ -22,25 +25,36 @@ import type { DiscoveryNoteRow, DiscoverySchedule } from "@/lib/discovery";
  * the web for all of them was mostly waste. Notes opt in here, one at a
  * time, and the frequency lives next to that choice rather than three
  * screens away — including 0, which is now the default.
+ *
+ * Topics are the other way in: written here directly, kept until deleted,
+ * for things worth following that never were a scrap. What a run finds
+ * new shows as a count on this screen's icon in the side bar until this
+ * screen is opened; here it's marked NEW for the visit.
  */
 export function ZettelkastenDiscoveryPane() {
   const { t } = useI18n();
   const [notes, setNotes] = useState<DiscoveryNoteRow[] | null>(null);
   const [schedule, setSchedule] = useState<DiscoverySchedule | null>(null);
+  const [topics, setTopics] = useState<DiscoveryTopicView[] | null>(null);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [, startSaving] = useTransition();
 
   useEffect(() => {
-    Promise.all([listDiscoveryNotesAction(), getDiscoveryScheduleAction()]).then(([n, s]) => {
+    Promise.all([listDiscoveryNotesAction(), getDiscoveryScheduleAction(), listTopicsAction()]).then(([n, s, tp]) => {
       setNotes(n);
       setSchedule(s);
+      setTopics(tp);
+      // Shown, so seen: the NEW marks stay for this visit (they were read
+      // above), and the side bar's count clears.
+      void markDiscoverySeenAction().then(announceDiscoverySeen);
     });
   }, []);
 
-  if (!notes || !schedule) return <LoadingBlock label={t.discoveryTab.loading} />;
+  if (!notes || !schedule || !topics) return <LoadingBlock label={t.discoveryTab.loading} />;
 
   const enabledCount = notes.filter((n) => n.enabled).length;
+  const enabledTopics = topics.filter((tp) => tp.enabled).length;
 
   function toggle(note: DiscoveryNoteRow) {
     const next = !note.enabled;
@@ -62,7 +76,14 @@ export function ZettelkastenDiscoveryPane() {
     setRunning(true);
     setResult(null);
     void runDiscoveryAction(true)
-      .then((r) => setResult(t.discovery.triggerResult(r.notesChecked, r.candidatesFound)))
+      .then(async (r) => {
+        setResult(t.discovery.triggerResult(r.notesChecked, r.candidatesFound));
+        const [nextNotes, nextTopics] = await Promise.all([listDiscoveryNotesAction(), listTopicsAction()]);
+        setNotes(nextNotes);
+        setTopics(nextTopics);
+        await markDiscoverySeenAction();
+        announceDiscoverySeen();
+      })
       .catch(() => setResult(t.discovery.triggerFailed))
       .finally(() => setRunning(false));
   }
@@ -73,6 +94,21 @@ export function ZettelkastenDiscoveryPane() {
         <h1 className="text-xl font-extrabold tracking-tight text-ink">{t.discoveryTab.heading}</h1>
         <p className="font-mono text-[10.5px] leading-relaxed text-ink-soft">{t.discoveryTab.description}</p>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <button
+          onClick={runNow}
+          disabled={running || enabledCount + enabledTopics === 0}
+          className="btn-sheen flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 font-mono text-[10.5px] font-semibold text-on-accent disabled:opacity-40"
+        >
+          {running && <Spinner size="xs" />}
+          {running ? t.discovery.triggerRunning : t.discovery.triggerLabel}
+        </button>
+        <span className="font-mono text-[10px] text-ink-faint">{t.discoveryTab.runScope(enabledTopics, enabledCount)}</span>
+        {result && <p className="w-full font-mono text-[10px] text-accent">{result}</p>}
+      </div>
+
+      <DiscoveryTopicsSection topics={topics} onTopicsChange={setTopics} />
 
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
         <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.discoveryTab.frequencyHeading}</p>
@@ -102,20 +138,10 @@ export function ZettelkastenDiscoveryPane() {
       </section>
 
       <section className="flex flex-col gap-3 rounded-xl border border-line bg-surface p-4">
-        <div className="flex items-center gap-3">
-          <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">
-            {t.discoveryTab.notesHeading(enabledCount, notes.length)}
-          </p>
-          <button
-            onClick={runNow}
-            disabled={running || enabledCount === 0}
-            className="btn-sheen ml-auto flex items-center gap-1.5 rounded-full bg-accent px-3 py-1.5 font-mono text-[10.5px] font-semibold text-on-accent disabled:opacity-40"
-          >
-            {running && <Spinner size="xs" />}
-            {running ? t.discovery.triggerRunning : t.discovery.triggerLabel}
-          </button>
-        </div>
-        {result && <p className="font-mono text-[10px] text-accent">{result}</p>}
+        <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">
+          {t.discoveryTab.notesHeading(enabledCount, notes.length)}
+        </p>
+        <p className="text-[11px] leading-relaxed text-ink-soft">{t.discoveryTab.notesIntro}</p>
 
         {notes.length === 0 ? (
           <p className="font-mono text-[10.5px] text-ink-faint">{t.discoveryTab.noNotes}</p>
@@ -131,6 +157,11 @@ export function ZettelkastenDiscoveryPane() {
                     className="h-3.5 w-3.5 shrink-0 accent-[var(--color-accent)]"
                   />
                   <span className="min-w-0 flex-1 truncate text-[11.5px] text-ink">{note.preview || t.common.noContent}</span>
+                  {note.newCount > 0 && (
+                    <span className="shrink-0 rounded-full bg-accent px-1.5 py-0.5 font-mono text-[8.5px] font-bold text-on-accent">
+                      {t.discoveryTab.findingNew} {note.newCount}
+                    </span>
+                  )}
                   {note.candidateCount > 0 && (
                     <span className="shrink-0 rounded-full bg-accent-soft px-2 py-0.5 font-mono text-[9px] text-accent">
                       {t.discoveryTab.candidateCount(note.candidateCount)}
@@ -145,6 +176,7 @@ export function ZettelkastenDiscoveryPane() {
           </ul>
         )}
       </section>
+
     </div>
   );
 }

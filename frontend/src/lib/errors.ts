@@ -51,6 +51,8 @@ export type DomainErrorCode =
   | "quickNoteNotFound"
   | "linkNotFound"
   | "discoveryCandidateNotFound"
+  | "discoveryTopicInvalid"
+  | "discoveryTopicNotFound"
   | "projectNotFound"
   | "projectNameRequired"
   | "projectGoalInvalid"

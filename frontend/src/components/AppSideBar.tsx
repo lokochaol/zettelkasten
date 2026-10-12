@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
+import { useNewDiscoveryCount } from "@/lib/useNewDiscoveryCount";
 
 /** The screens the bar switches between, in the order they sit in it. */
 export type ShellView = "goals" | "notes" | "projects" | "calendar" | "meals" | "training" | "money" | "discovery";
@@ -119,11 +120,14 @@ function ActionBarButton({
   active,
   label,
   onClick,
+  badge = 0,
   children,
 }: {
   active: boolean;
   label: string;
   onClick: () => void;
+  /** A count in the corner — something new is waiting on that screen. */
+  badge?: number;
   children: ReactNode;
 }) {
   return (
@@ -132,13 +136,21 @@ function ActionBarButton({
       title={label}
       aria-label={label}
       aria-current={active ? "page" : undefined}
-      className={`flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
+      className={`relative flex h-8 w-8 items-center justify-center rounded-lg border transition-colors ${
         active
           ? "border-accent bg-accent-soft text-accent"
           : "border-transparent text-ink-soft hover:bg-surface-alt hover:text-accent"
       }`}
     >
       {children}
+      {badge > 0 && (
+        <span
+          aria-hidden="true"
+          className="absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 font-mono text-[9px] leading-none font-bold text-on-accent ring-2 ring-bg"
+        >
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </button>
   );
 }
@@ -163,7 +175,10 @@ export function AppSideBar({ active }: { active: ShellView }) {
   // Leaving a screen unmounts whatever editor is open on it, so an unsaved
   // buffer gets a 保存 / 破棄 prompt before the navigation happens.
   const go = (view: ShellView) => guard(() => router.push(SHELL_VIEW_HREF[view]));
-  const entries: { view: ShellView; label: string; icon: ReactNode }[] = [
+  // New discovery finds show as a count on the discovery icon, so a run
+  // that found something is visible from whichever screen is open.
+  const newFinds = useNewDiscoveryCount();
+  const entries: { view: ShellView; label: string; icon: ReactNode; badge?: number }[] = [
     { view: "goals", label: t.nav.goalsLabel, icon: <GoalsIcon /> },
     { view: "notes", label: t.brand.zettelkasten, icon: <NotesIcon /> },
     { view: "projects", label: t.nav.projectsLabel, icon: <ProjectsIcon /> },
@@ -171,12 +186,23 @@ export function AppSideBar({ active }: { active: ShellView }) {
     { view: "meals", label: t.nav.mealsLabel, icon: <MealsIcon /> },
     { view: "training", label: t.nav.trainingLabel, icon: <TrainingIcon /> },
     { view: "money", label: t.nav.moneyLabel, icon: <MoneyIcon /> },
-    { view: "discovery", label: t.nav.discoveryLabel, icon: <DiscoveryIcon /> },
+    {
+      view: "discovery",
+      label: newFinds > 0 ? `${t.nav.discoveryLabel} (${t.nav.discoveryNew(newFinds)})` : t.nav.discoveryLabel,
+      icon: <DiscoveryIcon />,
+      badge: newFinds,
+    },
   ];
   return (
     <div className="flex w-11 shrink-0 flex-col items-center gap-2 border-r border-line py-3">
       {entries.map((entry) => (
-        <ActionBarButton key={entry.view} active={active === entry.view} label={entry.label} onClick={() => go(entry.view)}>
+        <ActionBarButton
+          key={entry.view}
+          active={active === entry.view}
+          label={entry.label}
+          badge={entry.badge}
+          onClick={() => go(entry.view)}
+        >
           {entry.icon}
         </ActionBarButton>
       ))}

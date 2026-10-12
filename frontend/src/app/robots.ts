@@ -10,13 +10,18 @@ import { siteUrl } from "@/lib/siteUrl";
  *
  * `allow` beats `disallow` on a longer path match, which is how both
  * Googlebot and Bingbot resolve the overlap.
+ *
+ * `/$` is the top page and nothing under it. It has to be crawlable: it's
+ * the homepage the OAuth consent screen names, and Search Console reports
+ * a blocked homepage as "URL が robots.txt によってブロックされています".
+ * Signed out, it redirects to /signin, which is allowed too.
  */
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
         userAgent: "*",
-        allow: ["/signin", "/guide", "/privacy", "/terms", "/sitemap.xml"],
+        allow: ["/$", "/signin", "/guide", "/privacy", "/terms", "/sitemap.xml"],
         disallow: "/",
       },
     ],

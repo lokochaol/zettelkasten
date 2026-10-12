@@ -570,17 +570,25 @@ export function GuideContentEn() {
           id="discovery"
           path="/discovery"
           name="Discovery"
-          lead="For the scratch notes you choose, the AI searches the web for related sources and news. It spends your AI credit, so notes are opted in one at a time, and nothing runs automatically by default."
+          lead="For topics you write here and the scratch notes you choose, the AI searches the web for related sources and news. It spends your AI credit, so you choose what it searches, and nothing runs automatically by default."
         >
           <Points
             items={[
+              {
+                title: "Add topics right there",
+                body: "Write what you want to follow on the discovery screen itself. Topics belong to discovery, not Dash Off, so they're never swept away after a week and stay until you delete them. What they find piles up instead of being replaced, and new finds are marked NEW. Make a literature memo from one, dismiss the ones you don't want, or search a single topic now.",
+              },
+              {
+                title: "New finds at a glance",
+                body: "When a scheduled run or Search now finds something new, the discovery icon in the left bar shows how many. Opening the discovery screen clears the count, and what was new is marked NEW for that visit.",
+              },
               {
                 title: "How often",
                 body: "Off, once a day, or twice a day. “Search now” works any time.",
               },
               {
                 title: "Using what it finds",
-                body: "Candidates appear under the note as “Related”. Add one as a literature note, or start a new note from it.",
+                body: "Candidates found for a note appear under it as “Related”. Add one as a literature note, or start a new note from it.",
               },
             ]}
           />

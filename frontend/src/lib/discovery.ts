@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/db";
 import { DiscoveryKind, DiscoveryStatus } from "@/generated/prisma/client";
-import { NotFoundError } from "@/lib/errors";
+import { NotFoundError, ValidationError } from "@/lib/errors";
 import * as quickNotes from "@/lib/quickNotes";
 import type { QuickNoteDetail } from "@/lib/quickNotes";
 import * as aiCredentials from "@/lib/aiCredentials";
@@ -320,10 +320,28 @@ export async function findCandidatesForNote(ownerSub: string, noteText: string):
  * re-picking a barren note ahead of others. Returns the number of fresh
  * candidates stored. */
 export async function runForQuickNote(ownerSub: string, quickNoteId: string): Promise<number> {
+  return (await refreshQuickNote(ownerSub, quickNoteId)).length;
+}
+
+/** Same identity rule everywhere a finding is compared with an earlier
+ * one: the URL when there is one, otherwise the title. */
+function findingKey(f: { url: string | null; title: string }): string {
+  return f.url ? `u:${f.url.trim().replace(/\/+$/, "")}` : `t:${f.title.trim().normalize("NFKC").toLowerCase()}`;
+}
+
+/** runForQuickNote's work, returning the findings that weren't there
+ * before the refresh. Those are the new ones; a candidate found again
+ * keeps the seen mark it had, so a refresh doesn't make old news new. */
+async function refreshQuickNote(ownerSub: string, quickNoteId: string): Promise<DiscoveryFinding[]> {
   const note = await quickNotes.getDetail(ownerSub, quickNoteId);
   const text = note.content.trim();
 
   const findings = text ? await findCandidatesForNote(ownerSub, text) : [];
+  const before = new Map(
+    (await prisma.discoveryCandidate.findMany({ where: { quickNoteId }, select: { url: true, title: true, seenAt: true } })).map(
+      (c) => [findingKey(c), c.seenAt] as const,
+    ),
+  );
 
   await prisma.$transaction([
     prisma.discoveryCandidate.deleteMany({ where: { quickNoteId } }),
@@ -339,6 +357,7 @@ export async function runForQuickNote(ownerSub: string, quickNoteId: string): Pr
               sourceLabel: f.sourceLabel,
               url: f.url,
               confidence: f.confidence,
+              seenAt: before.get(findingKey(f)) ?? null,
             })),
           }),
         ]
@@ -346,7 +365,177 @@ export async function runForQuickNote(ownerSub: string, quickNoteId: string): Pr
     prisma.quickNote.update({ where: { id: quickNoteId }, data: { discoveryLastRunAt: new Date() } }),
   ]);
 
-  return findings.length;
+  return findings.filter((f) => !before.has(findingKey(f)));
+}
+
+/* ---------- topics ---------- */
+
+const MAX_TOPIC_LENGTH = 2000;
+const MAX_TOPICS_PER_RUN = 15;
+
+export interface DiscoveryTopicFindingView {
+  id: string;
+  kind: DiscoveryKind;
+  title: string;
+  summary: string;
+  sourceLabel: string;
+  url: string | null;
+  confidence: number;
+  /** Not yet seen on /discovery. */
+  isNew: boolean;
+  literatureMemoId: string | null;
+  createdAt: Date;
+}
+
+export interface DiscoveryTopicView {
+  id: string;
+  content: string;
+  enabled: boolean;
+  lastRunAt: Date | null;
+  createdAt: Date;
+  /** Newest first. */
+  findings: DiscoveryTopicFindingView[];
+}
+
+function cleanTopicContent(content: unknown): string {
+  const text = typeof content === "string" ? content.trim() : "";
+  if (!text || text.length > MAX_TOPIC_LENGTH) throw new ValidationError("discoveryTopicInvalid", "topic content empty or too long");
+  return text;
+}
+
+async function requireTopic(ownerSub: string, topicId: string) {
+  const topic = await prisma.discoveryTopic.findFirst({ where: { id: topicId, ownerSub } });
+  if (!topic) throw new NotFoundError("discoveryTopicNotFound", `DiscoveryTopic not found: ${topicId}`);
+  return topic;
+}
+
+export async function listTopics(ownerSub: string): Promise<DiscoveryTopicView[]> {
+  const topics = await prisma.discoveryTopic.findMany({
+    where: { ownerSub },
+    orderBy: { createdAt: "desc" },
+    include: { findings: { orderBy: [{ createdAt: "desc" }, { confidence: "desc" }] } },
+  });
+  return topics.map((t) => ({
+    id: t.id,
+    content: t.content,
+    enabled: t.enabled,
+    lastRunAt: t.lastRunAt,
+    createdAt: t.createdAt,
+    findings: t.findings.map((f) => ({
+      id: f.id,
+      kind: f.kind,
+      title: f.title,
+      summary: f.summary,
+      sourceLabel: f.sourceLabel,
+      url: f.url,
+      confidence: f.confidence,
+      isNew: f.seenAt === null,
+      literatureMemoId: f.literatureMemoId,
+      createdAt: f.createdAt,
+    })),
+  }));
+}
+
+export async function createTopic(ownerSub: string, content: string): Promise<string> {
+  const topic = await prisma.discoveryTopic.create({ data: { ownerSub, content: cleanTopicContent(content) } });
+  return topic.id;
+}
+
+export async function updateTopic(ownerSub: string, topicId: string, patch: { content?: string; enabled?: boolean }): Promise<void> {
+  await requireTopic(ownerSub, topicId);
+  await prisma.discoveryTopic.update({
+    where: { id: topicId },
+    data: {
+      ...(patch.content !== undefined ? { content: cleanTopicContent(patch.content) } : {}),
+      ...(typeof patch.enabled === "boolean" ? { enabled: patch.enabled } : {}),
+    },
+  });
+}
+
+export async function deleteTopic(ownerSub: string, topicId: string): Promise<void> {
+  await requireTopic(ownerSub, topicId);
+  await prisma.discoveryTopic.delete({ where: { id: topicId } });
+}
+
+export async function dismissFinding(ownerSub: string, findingId: string): Promise<void> {
+  await prisma.discoveryTopicFinding.deleteMany({ where: { id: findingId, ownerSub } });
+}
+
+/** Searches for one topic and keeps what wasn't found before. Nothing
+ * already there is replaced or removed. Returns the new findings. */
+export async function runForTopic(ownerSub: string, topicId: string): Promise<DiscoveryFinding[]> {
+  const topic = await requireTopic(ownerSub, topicId);
+  const findings = await findCandidatesForNote(ownerSub, topic.content);
+  const existing = new Set(
+    (await prisma.discoveryTopicFinding.findMany({ where: { topicId }, select: { url: true, title: true } })).map(findingKey),
+  );
+  const seen = new Set<string>();
+  const fresh = findings.filter((f) => {
+    const key = findingKey(f);
+    if (existing.has(key) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  await prisma.$transaction([
+    ...(fresh.length > 0
+      ? [
+          prisma.discoveryTopicFinding.createMany({
+            data: fresh.map((f) => ({
+              topicId,
+              ownerSub,
+              kind: f.kind,
+              title: f.title,
+              summary: f.summary,
+              sourceLabel: f.sourceLabel,
+              url: f.url,
+              confidence: f.confidence,
+            })),
+          }),
+        ]
+      : []),
+    prisma.discoveryTopic.update({ where: { id: topicId }, data: { lastRunAt: new Date() } }),
+  ]);
+  return fresh;
+}
+
+/** The literature memo behind a topic's finding — the same find-or-create
+ * by URL as resolveLiteratureForCandidate. */
+export async function resolveLiteratureForFinding(ownerSub: string, findingId: string): Promise<string> {
+  const finding = await prisma.discoveryTopicFinding.findFirst({ where: { id: findingId, ownerSub } });
+  if (!finding) throw new NotFoundError("discoveryCandidateNotFound", `DiscoveryTopicFinding not found: ${findingId}`);
+  if (finding.literatureMemoId) return finding.literatureMemoId;
+  const existing = finding.url ? await prisma.literatureMemo.findFirst({ where: { ownerSub, url: finding.url } }) : null;
+  const literatureMemoId = existing
+    ? existing.id
+    : (
+        await prisma.literatureMemo.create({
+          data: { ownerSub, zoteroKey: null, citation: finding.title, url: finding.url, summary: finding.summary || null },
+        })
+      ).id;
+  await prisma.discoveryTopicFinding.update({ where: { id: findingId }, data: { literatureMemoId, seenAt: finding.seenAt ?? new Date() } });
+  return literatureMemoId;
+}
+
+/* ---------- what's new ---------- */
+
+/** How many findings the owner hasn't seen yet — topic findings and the
+ * candidates under opted-in notes alike. The side bar shows this on the
+ * discovery icon, so a run that found something is visible from anywhere. */
+export async function countNewFindings(ownerSub: string): Promise<number> {
+  const [topics, notes] = await Promise.all([
+    prisma.discoveryTopicFinding.count({ where: { ownerSub, seenAt: null } }),
+    prisma.discoveryCandidate.count({ where: { ownerSub, seenAt: null, quickNote: { status: "ACTIVE" } } }),
+  ]);
+  return topics + notes;
+}
+
+/** Opening /discovery is seeing what's new: everything new is marked seen. */
+export async function markAllSeen(ownerSub: string): Promise<void> {
+  const now = new Date();
+  await prisma.$transaction([
+    prisma.discoveryTopicFinding.updateMany({ where: { ownerSub, seenAt: null }, data: { seenAt: now } }),
+    prisma.discoveryCandidate.updateMany({ where: { ownerSub, seenAt: null }, data: { seenAt: now } }),
+  ]);
 }
 
 export interface DiscoveryRunStatusSummary {
@@ -416,8 +605,8 @@ async function recordRunStatus(
  * every remaining note, burning quota for nothing. A run that completes
  * without any note failing clears any previously recorded error. */
 /**
- * Runs discovery over the notes the owner picked for it, not over every
- * active note. Opting in per note is the whole point of the 探索 tab: the
+ * Runs discovery over the topics written on /discovery and the notes the
+ * owner picked for it, not over every active note. Opting in per note is the whole point of the 探索 tab: the
  * search spends the owner's own API credits, and most scraps are never
  * worth spending them on.
  */
@@ -426,48 +615,66 @@ export async function runForEnabledNotes(
   options?: { force?: boolean },
 ): Promise<{ notesChecked: number; candidatesFound: number }> {
   const refreshCutoff = new Date(Date.now() - MIN_REFRESH_INTERVAL_HOURS * 60 * 60 * 1000);
-  const candidateNotes = await prisma.quickNote.findMany({
-    where: {
-      ownerSub,
-      status: "ACTIVE",
-      discoveryEnabled: true,
-      ...(options?.force ? {} : { OR: [{ discoveryLastRunAt: null }, { discoveryLastRunAt: { lt: refreshCutoff } }] }),
-    },
-    select: { id: true },
-    orderBy: [{ discoveryLastRunAt: { sort: "asc", nulls: "first" } }, { encounteredAt: "asc" }],
-    take: MAX_NOTES_PER_RUN,
-  });
-  if (candidateNotes.length === 0) return { notesChecked: 0, candidatesFound: 0 };
+  const [candidateNotes, topics] = await Promise.all([
+    prisma.quickNote.findMany({
+      where: {
+        ownerSub,
+        status: "ACTIVE",
+        discoveryEnabled: true,
+        ...(options?.force ? {} : { OR: [{ discoveryLastRunAt: null }, { discoveryLastRunAt: { lt: refreshCutoff } }] }),
+      },
+      select: { id: true },
+      orderBy: [{ discoveryLastRunAt: { sort: "asc", nulls: "first" } }, { encounteredAt: "asc" }],
+      take: MAX_NOTES_PER_RUN,
+    }),
+    prisma.discoveryTopic.findMany({
+      where: {
+        ownerSub,
+        enabled: true,
+        ...(options?.force ? {} : { OR: [{ lastRunAt: null }, { lastRunAt: { lt: refreshCutoff } }] }),
+      },
+      select: { id: true },
+      orderBy: [{ lastRunAt: { sort: "asc", nulls: "first" } }, { createdAt: "asc" }],
+      take: MAX_TOPICS_PER_RUN,
+    }),
+  ]);
+  if (candidateNotes.length === 0 && topics.length === 0) return { notesChecked: 0, candidatesFound: 0 };
 
-  let candidatesFound = 0;
   let notesChecked = 0;
-  for (const note of candidateNotes) {
+  let fresh = 0;
+  // Topics first: they're what the owner wrote here on purpose.
+  const work = [...topics.map((t) => () => runForTopic(ownerSub, t.id)), ...candidateNotes.map((n) => () => refreshQuickNote(ownerSub, n.id))];
+  let failed: { code: DiscoveryErrorCode; status: number | null } | null = null;
+  for (const run of work) {
     try {
-      candidatesFound += await runForQuickNote(ownerSub, note.id);
+      fresh += (await run()).length;
       notesChecked++;
     } catch (e) {
-      const error =
-        e instanceof DiscoveryProviderError ? { code: e.code, status: e.status } : { code: "unknownError" as const, status: null };
-      await recordRunStatus(ownerSub, error);
-      return { notesChecked, candidatesFound };
+      failed = e instanceof DiscoveryProviderError ? { code: e.code, status: e.status } : { code: "unknownError" as const, status: null };
+      break;
     }
   }
 
-  await recordRunStatus(ownerSub, null);
-  return { notesChecked, candidatesFound };
+  await recordRunStatus(ownerSub, failed);
+  // "Found" is what's new: a refresh that turns up the same three articles
+  // again has found nothing.
+  return { notesChecked, candidatesFound: fresh };
 }
 
-/** Every owner who has switched discovery on for at least one note — the
+/** Every owner who has switched discovery on for at least one note or topic — the
  * cron route fans runForEnabledNotes out across all tenants with this.
  * Owners who never opted a note in are skipped entirely rather than
  * queried and found empty. */
 export async function listOwnersWithDiscoveryEnabledNotes(): Promise<string[]> {
-  const rows = await prisma.quickNote.findMany({
-    where: { status: "ACTIVE", discoveryEnabled: true },
-    distinct: ["ownerSub"],
-    select: { ownerSub: true },
-  });
-  return rows.map((r) => r.ownerSub);
+  const [notes, topics] = await Promise.all([
+    prisma.quickNote.findMany({
+      where: { status: "ACTIVE", discoveryEnabled: true },
+      distinct: ["ownerSub"],
+      select: { ownerSub: true },
+    }),
+    prisma.discoveryTopic.findMany({ where: { enabled: true }, distinct: ["ownerSub"], select: { ownerSub: true } }),
+  ]);
+  return [...new Set([...notes, ...topics].map((r) => r.ownerSub))];
 }
 
 export interface DiscoverySchedule {
@@ -574,6 +781,8 @@ export interface DiscoveryNoteRow {
   preview: string;
   enabled: boolean;
   candidateCount: number;
+  /** Of those, how many haven't been seen on /discovery yet. */
+  newCount: number;
   lastRunAt: Date | null;
 }
 
@@ -591,11 +800,18 @@ export async function listNotesForDiscoveryTab(ownerSub: string): Promise<Discov
       _count: { select: { discoveryCandidates: true } },
     },
   });
+  const unseen = await prisma.discoveryCandidate.groupBy({
+    by: ["quickNoteId"],
+    where: { ownerSub, seenAt: null },
+    _count: { _all: true },
+  });
+  const newByNote = new Map(unseen.map((u) => [u.quickNoteId, u._count._all]));
   return notes.map((n) => ({
     id: n.id,
     preview: n.content.split("\n").find((line) => line.trim())?.trim().slice(0, 120) ?? "",
     enabled: n.discoveryEnabled,
     candidateCount: n._count.discoveryCandidates,
+    newCount: newByNote.get(n.id) ?? 0,
     lastRunAt: n.discoveryLastRunAt,
   }));
 }
