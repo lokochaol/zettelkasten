@@ -54,6 +54,11 @@ function autoGrow(el: HTMLTextAreaElement | null) {
   const prevTop = scroller.scrollTop;
   el.style.height = "auto";
   el.style.height = `${el.scrollHeight}px`;
+  // Sized to its content, it has nothing of its own to scroll — but a
+  // browser that scrolled it while it was momentarily too short (iOS does,
+  // to keep the caret in view) leaves it scrolled, and the top lines stay
+  // hidden above its edge until it's next re-fitted.
+  el.scrollTop = 0;
   if (scroller.scrollTop !== prevTop) scroller.scrollTop = prevTop;
 }
 
@@ -248,6 +253,11 @@ export function MarkdownNoteEditor({
   }, [draftKey, live, savedValue]);
 
   // The focus padding changes the box height, so re-fit after it lands.
+  // The padding switches instantly rather than animating: measured part way
+  // through an animation, the height came out short of the final padding,
+  // the text no longer fitted, and iOS scrolled the textarea inside itself
+  // to keep the caret in view — cutting off the top lines until the next
+  // blur put the padding back.
   useEffect(() => autoGrow(textareaRef.current), [focused]);
 
   // The embed preview trails the buffer rather than tracking it keystroke by
@@ -455,6 +465,11 @@ export function MarkdownNoteEditor({
           }, 0);
         }}
         onFocus={() => setFocused(true)}
+        // Belt and braces for the same symptom: it's never meant to scroll
+        // inside itself, so any scroll that does happen is undone.
+        onScroll={(e) => {
+          if (e.currentTarget.scrollTop !== 0) e.currentTarget.scrollTop = 0;
+        }}
         onBlur={(e) => {
           // Checked a tick later: a tap on the key bar can blur and refocus
           // within one gesture on some phones, and the bar must still be
@@ -474,7 +489,7 @@ export function MarkdownNoteEditor({
           // whole column of them).
           paddingBottom: focused ? CARET_MARGIN_PX : 0,
         }}
-        className="w-full resize-none overflow-hidden bg-transparent font-mono text-sm leading-relaxed text-ink transition-[padding] placeholder:font-sans placeholder:text-ink-faint focus:outline-none"
+        className="w-full resize-none overflow-hidden bg-transparent font-mono text-sm leading-relaxed text-ink placeholder:font-sans placeholder:text-ink-faint focus:outline-none"
       />
 
       {/* Only renders when the content actually has a diagram, code fence or
