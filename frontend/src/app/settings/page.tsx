@@ -63,7 +63,7 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
           </h2>
           <p className="font-mono text-[10.5px] text-ink-soft">{dict.quickApps.settingsIntro}</p>
           <div className="flex flex-col gap-2 sm:flex-row">
-            {(["money", "scratch"] as const).map((key) => (
+            {(["money", "dash-off"] as const).map((key) => (
               <a
                 key={key}
                 href={QUICK_APPS[key].path}

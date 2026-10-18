@@ -12,7 +12,7 @@
  * manifest and its icons without the session cookie.
  */
 
-export type QuickAppKey = "money" | "scratch";
+export type QuickAppKey = "money" | "dash-off";
 
 export interface QuickApp {
   key: QuickAppKey;
@@ -61,9 +61,9 @@ export const QUICK_APPS: Record<QuickAppKey, QuickApp> = {
     description: "今日のお金を、その場で記録する。",
     glyph: YEN,
   },
-  scratch: {
-    key: "scratch",
-    path: "/quick/scratch",
+  "dash-off": {
+    key: "dash-off",
+    path: "/quick/dash-off",
     name: "走り書き",
     description: "思いついたことを、すぐに書き留める。",
     glyph: PENCIL,
@@ -71,7 +71,7 @@ export const QUICK_APPS: Record<QuickAppKey, QuickApp> = {
 };
 
 export function isQuickAppKey(value: string): value is QuickAppKey {
-  return value === "money" || value === "scratch";
+  return value === "money" || value === "dash-off";
 }
 
 export function quickAppIconSvg(key: QuickAppKey): string {
