@@ -19,7 +19,75 @@ export type { Expense };
 
 /** Offered in the category picker before the owner has invented their own.
  * Not an enum — see the schema comment. */
-export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "その他"] as const;
+export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "サーバー・AI", "その他"] as const;
+
+/** Subscriptions and usage bills for servers and AI — hosting, cloud,
+ * domains, model APIs, AI chat plans. */
+export const SERVER_AI_CATEGORY = "サーバー・AI";
+
+/**
+ * Statement lines from these services land in サーバー・AI unless the owner
+ * has taught a rule of their own for them (their rules win). Card
+ * statements name the merchant in capitals and with suffixes ("ANTHROPIC,
+ * PBC", "OPENAI *CHATGPT SUBSCR", "VERCEL INC."), so matching is on a
+ * lower-cased substring. Kept to names that can't mean anything else.
+ */
+const SERVER_AI_KEYWORDS = [
+  "anthropic",
+  "claude.ai",
+  "openai",
+  "chatgpt",
+  "gemini",
+  "google cloud",
+  "googlecloud",
+  "gcp",
+  "vercel",
+  "aws",
+  "amazon web services",
+  "github",
+  "cloudflare",
+  "netlify",
+  "supabase",
+  "heroku",
+  "digitalocean",
+  "render.com",
+  "fly.io",
+  "neon",
+  "planetscale",
+  "cursor",
+  "perplexity",
+  "midjourney",
+  "elevenlabs",
+  "replicate",
+  "huggingface",
+  "hugging face",
+  "azure",
+  "conoha",
+  "さくらインターネット",
+  "xserver",
+  "エックスサーバー",
+  "お名前.com",
+  "onamae",
+  "ロリポップ",
+  "squarespace domains",
+  "namecheap",
+  "porkbun",
+];
+
+/** サーバー・AI when a line's description names one of those services. */
+export function builtInCategoryFor(memo: string): string | null {
+  // Punctuation is a separator either way: statements write "GOOGLE*CLOUD"
+  // and "ANTHROPIC, PBC", and the keywords "claude.ai".
+  const norm = (t: string) => ` ${t.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
+  const text = norm(memo);
+  // Short names only as whole words, so "lawson" or "neonate" can't match.
+  return SERVER_AI_KEYWORDS.some((k) => {
+    const key = norm(k).trim();
+    return key.length <= 4 ? text.includes(` ${key} `) : text.includes(key);
+  })
+    ? SERVER_AI_CATEGORY
+    : null;
+}
 
 export interface ExpenseInput {
   dateKey: string;
@@ -200,7 +268,7 @@ export async function prepareImport(
     if (match) claimedManual.add(match.id);
     return {
       ...row,
-      category: rule?.category ?? "",
+      category: rule?.category ?? builtInCategoryFor(row.memo) ?? "",
       alreadyImported: importedKeys.has(row.externalKey),
       manualMatchId: match?.id ?? null,
     };
