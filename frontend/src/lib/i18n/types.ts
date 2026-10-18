@@ -273,6 +273,20 @@ export interface Dictionary {
     todayOpen: string;
     todayOverdue: (date: string) => string;
   };
+  quickApps: {
+    openMoney: string;
+    openScratch: string;
+    scratchHeading: string;
+    scratchPlaceholder: string;
+    saved: string;
+    saveFailed: string;
+    recent: string;
+    settingsHeading: string;
+    settingsIntro: string;
+    settingsHowto: string;
+    moneyLabel: string;
+    scratchLabel: string;
+  };
   training: {
     heading: string;
     profileMissing: string;

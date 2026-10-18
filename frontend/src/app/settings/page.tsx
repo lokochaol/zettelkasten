@@ -17,6 +17,7 @@ import { HeaderMenu } from "@/components/HeaderMenu";
 import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
+import { QUICK_APPS, quickAppAssetPath } from "@/lib/quickApps";
 
 export default async function SettingsPage(props: PageProps<"/settings">) {
   const searchParams = await props.searchParams;
@@ -53,6 +54,32 @@ export default async function SettingsPage(props: PageProps<"/settings">) {
           <h1 className="text-3xl font-extrabold tracking-tight text-ink">{dict.settings.heading}</h1>
           <p className="font-mono text-xs text-ink-soft">{dict.settings.description}</p>
         </div>
+
+        {/* The quick apps (src/lib/quickApps.ts): one link each, opened in
+            the browser and added to the home screen from there. */}
+        <section className="flex flex-col gap-3">
+          <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
+            <span className="text-accent">{"//"}</span> {dict.quickApps.settingsHeading}
+          </h2>
+          <p className="font-mono text-[10.5px] text-ink-soft">{dict.quickApps.settingsIntro}</p>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            {(["money", "scratch"] as const).map((key) => (
+              <a
+                key={key}
+                href={QUICK_APPS[key].path}
+                className="flex flex-1 items-center gap-3 rounded-xl border border-line bg-surface p-3 transition-colors hover:border-accent"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- a fixed 40px icon from our own route */}
+                <img src={quickAppAssetPath(key, "icon-192.png")} alt="" width={40} height={40} className="rounded-[10px]" />
+                <span className="flex flex-col">
+                  <span className="text-[13px] font-bold text-ink">{QUICK_APPS[key].name}</span>
+                  <span className="text-[11px] text-ink-soft">{key === "money" ? dict.quickApps.moneyLabel : dict.quickApps.scratchLabel}</span>
+                </span>
+              </a>
+            ))}
+          </div>
+          <p className="font-mono text-[10px] leading-relaxed text-ink-faint">{dict.quickApps.settingsHowto}</p>
+        </section>
 
         <section className="flex flex-col gap-3">
           <h2 className="font-mono text-[10.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
