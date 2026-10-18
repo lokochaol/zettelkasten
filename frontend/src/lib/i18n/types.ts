@@ -129,6 +129,10 @@ export interface Dictionary {
     amountPlaceholder: string;
     memoPlaceholder: string;
     todayTotal: string;
+    entryDate: string;
+    entryDateBackToday: string;
+    entryDateBack: string;
+    dayTotal: (date: string) => string;
     foodProgress: (spent: number, budget: number, daysLeft: number) => string;
     noBudget: string;
     overBudget: string;

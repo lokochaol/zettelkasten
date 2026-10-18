@@ -5,6 +5,8 @@ import { addExpenseAction, getMoneyDayAction, removeExpenseAction, type MoneyDay
 import { useEnterKey } from "@/lib/ime";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { announceChange, useRefreshOn } from "@/lib/dataSync";
+import { formatDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
+import { localeTag } from "@/lib/i18n/dictionary";
 
 /**
  * Typing a purchase in, in one line, wherever the owner already is.
@@ -13,9 +15,19 @@ import { announceChange, useRefreshOn } from "@/lib/dataSync";
  * this stays three fields and a button and never navigates anywhere. The
  * long view — where the year is going — is a different job on a different
  * screen; this one is for the coffee you just bought.
+ *
+ * The date defaults to the screen's day (today on /money, the day being
+ * looked at on the calendar) and can be changed, for the receipt found in
+ * a pocket two days later. The list and total underneath follow the date
+ * picked, so what was just entered is always in view.
  */
 export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: string; compact?: boolean }) {
-  const { t } = useI18n();
+  const { t, locale } = useI18n();
+  // The date picked, remembered against the day it was picked on: when the
+  // screen moves to another day, the entry date goes back to that day.
+  const [picked, setPicked] = useState<{ base: string; value: string }>({ base: dateKey, value: dateKey });
+  const entryDate = picked.base === dateKey ? picked.value : dateKey;
+  const setEntryDate = (value: string) => setPicked({ base: dateKey, value });
   const [view, setView] = useState<MoneyDayView | null>(null);
   const [amount, setAmount] = useState("");
   const [category, setCategory] = useState("");
@@ -27,20 +39,20 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
   const enterKey = useEnterKey(() => submit());
 
   useEffect(() => {
-    getMoneyDayAction(dateKey).then((v) => {
+    getMoneyDayAction(entryDate).then((v) => {
       setView(v);
       setCategory((prev) => prev || v.categories[0] || "");
     });
-  }, [dateKey]);
+  }, [entryDate]);
 
-  useRefreshOn(["money"], () => void getMoneyDayAction(dateKey).then(setView));
+  useRefreshOn(["money"], () => void getMoneyDayAction(entryDate).then(setView));
 
   function submit() {
     const amountYen = Number(amount.replace(/[,¥\s]/g, ""));
     if (!Number.isFinite(amountYen) || amountYen === 0) return;
     setError(null);
     startTransition(async () => {
-      const res = await addExpenseAction({ dateKey, amountYen, category, memo });
+      const res = await addExpenseAction({ dateKey: entryDate, amountYen, category, memo });
       if ("error" in res) {
         setError(res.error);
         return;
@@ -62,6 +74,24 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
     <section className={compact ? "flex flex-col gap-2" : "flex flex-col gap-3 rounded-xl border border-line bg-surface p-4"}>
       {!compact && <p className="font-mono text-[9.5px] tracking-wider text-ink-faint uppercase">{t.money.quickEntryHeading}</p>}
       <div className="flex flex-wrap items-center gap-2">
+        <input
+          type="date"
+          value={entryDate}
+          onChange={(e) => e.target.value && setEntryDate(e.target.value)}
+          aria-label={t.money.entryDate}
+          className={`rounded-md border bg-surface px-2 py-1.5 font-mono text-[11px] focus:border-accent focus:outline-none ${
+            entryDate === dateKey ? "border-line text-ink" : "border-accent text-accent"
+          }`}
+        />
+        {entryDate !== dateKey && (
+          <button
+            type="button"
+            onClick={() => setEntryDate(dateKey)}
+            className="rounded-full border border-line-strong px-2 py-1 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
+          >
+            {dateKey === todayKeyValue() ? t.money.entryDateBackToday : t.money.entryDateBack}
+          </button>
+        )}
         <input
           ref={amountRef}
           value={amount}
@@ -87,7 +117,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
           onChange={(e) => setMemo(e.target.value)}
           {...enterKey}
           placeholder={t.money.memoPlaceholder}
-          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
+          className="min-w-0 flex-1 basis-40 rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
         />
         <button
           onClick={submit}
@@ -109,7 +139,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
               <button
                 onClick={() =>
                   startTransition(async () => {
-                    setView(await removeExpenseAction(e.id, dateKey));
+                    setView(await removeExpenseAction(e.id, entryDate));
                     announceChange("money");
                   })
                 }
@@ -124,7 +154,11 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
 
       {view && (
         <div className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-line pt-2">
-          <span className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">{t.money.todayTotal}</span>
+          <span className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">
+            {entryDate === todayKeyValue()
+              ? t.money.todayTotal
+              : t.money.dayTotal(formatDateKey(entryDate, localeTag(locale), { month: "numeric", day: "numeric", weekday: "short" }))}
+          </span>
           <span className="text-[13px] font-bold text-ink">¥{view.todayTotalYen.toLocaleString()}</span>
           {foodBudget?.budgetYen != null && (
             <span className="font-mono text-[9.5px] text-ink-soft">

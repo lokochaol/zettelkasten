@@ -124,6 +124,10 @@ export const ja: Dictionary = {
     amountPlaceholder: "¥ 金額",
     memoPlaceholder: "メモ（任意）",
     todayTotal: "今日の合計",
+    entryDate: "日付",
+    entryDateBackToday: "今日に戻す",
+    entryDateBack: "この日に戻す",
+    dayTotal: (date) => `${date}の合計`,
     foodProgress: (spent, budget, daysLeft) =>
       `食費 ¥${spent.toLocaleString()} / ¥${budget.toLocaleString()}（残り${daysLeft}日）`,
     noBudget: "予算なし",
