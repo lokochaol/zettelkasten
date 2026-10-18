@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { SignOutButton } from "@/components/SignOutButton";
 
 /**
  * Wraps a header's nav items (brand-adjacent links, locale toggle, sign-out,
@@ -19,8 +20,12 @@ import { createPortal } from "react-dom";
  * and a mask fades everything painted inside that element, portal contents
  * included if left as a child. Portaling keeps the open menu fully opaque
  * regardless of what fading header it's triggered from.
+ *
+ * ログアウト is always the last item, added here rather than by each page,
+ * so no screen's menu can be without it. `signedIn={false}` leaves it out —
+ * only the guide, which is the one page shown to signed-out visitors.
  */
-export function HeaderMenu({ children }: { children: ReactNode }) {
+export function HeaderMenu({ children, signedIn = true }: { children: ReactNode; signedIn?: boolean }) {
   const [open, setOpen] = useState(false);
   const [coords, setCoords] = useState<{ top: number; right: number } | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -78,6 +83,11 @@ export function HeaderMenu({ children }: { children: ReactNode }) {
             className="fixed z-50 flex min-w-[190px] flex-col items-end gap-2.5 rounded-lg border border-line-strong bg-surface p-3.5 shadow-[0_20px_40px_-20px_rgba(0,0,0,0.85)]"
           >
             {children}
+            {signedIn && (
+              <div className="flex w-full justify-end border-t border-line pt-2.5">
+                <SignOutButton />
+              </div>
+            )}
           </div>,
           document.body,
         )}

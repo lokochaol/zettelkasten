@@ -2,7 +2,8 @@ import { prisma } from "@/lib/db";
 import { askForJson, AiJsonError } from "@/lib/aiJson";
 import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
-import { inventoryBrief, listInventory, matchStock } from "@/lib/inventory";
+import { inventoryBrief, listInventory, matchStock, normalizeFoodName } from "@/lib/inventory";
+import { CATEGORIES } from "@/lib/shoppingCategories";
 import type { Prisma } from "@/generated/prisma/client";
 import type { MealSlot, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
@@ -21,9 +22,7 @@ import type { MealSlot, PlannedMeal, ShoppingItem } from "@/generated/prisma/cli
 
 export const MAX_DAYS = 7;
 
-/** The order a shop is walked in, roughly — and the categories the model is
- * asked to use, so the list groups the same way every time. */
-export const CATEGORIES = ["野菜・果物", "肉・魚", "卵・乳製品", "豆腐・大豆製品", "主食", "冷凍食品・惣菜", "調味料・乾物", "その他"];
+export { CATEGORIES };
 
 /** A line set aside because the inventory already has it. */
 export interface ExcludedLine {
@@ -276,3 +275,202 @@ export async function createPurchaseList(ownerSub: string, fromDateKey: string, 
   });
   return toView(list, list.mealsDigest);
 }
+
+/* ---------- editing ---------- */
+
+/** One line as it's written by hand or by the meal chat. */
+export interface PurchaseLine {
+  category: string;
+  name: string;
+  quantity: string;
+  estimatedYen: number;
+}
+
+function cleanLine(v: unknown): PurchaseLine | null {
+  const item = (v ?? {}) as Record<string, unknown>;
+  const name = str(item.name, 100);
+  if (!name) return null;
+  const category = str(item.category, 40);
+  return {
+    category: CATEGORIES.includes(category) ? category : "その他",
+    name,
+    quantity: str(item.quantity, 100),
+    estimatedYen: Math.min(100_000, Math.round(num(item.estimatedYen))),
+  };
+}
+
+async function requireListItem(ownerSub: string, itemId: string) {
+  const item = await prisma.shoppingItem.findFirst({ where: { id: itemId, list: { ownerSub } } });
+  if (!item) throw new ValidationError("purchaseListInvalid", "Shopping item not found");
+  return item;
+}
+
+/** Adds a line by hand, at the end of its category. */
+export async function addItem(ownerSub: string, input: unknown): Promise<PurchaseListView | null> {
+  const line = cleanLine(input);
+  if (!line) throw new ValidationError("purchaseListInvalid", "A line needs a name");
+  const list = await prisma.purchaseList.findUnique({ where: { ownerSub }, include: { items: true } });
+  if (!list) throw new ValidationError("purchaseListInvalid", "There is no purchase list");
+  const last = list.items.reduce((max, i) => Math.max(max, i.sortOrder), -1);
+  await prisma.shoppingItem.create({ data: { listId: list.id, ...line, sortOrder: last + 1 } });
+  return getPurchaseList(ownerSub);
+}
+
+/** Changes a line's quantity (and price) by hand. A ticked line is already
+ * in the inventory, so it's left as it is. */
+export async function updateItem(
+  ownerSub: string,
+  itemId: string,
+  patch: { quantity?: string; estimatedYen?: number },
+): Promise<PurchaseListView | null> {
+  const item = await requireListItem(ownerSub, itemId);
+  if (!item.checked) {
+    await prisma.shoppingItem.update({
+      where: { id: itemId },
+      data: {
+        ...(patch.quantity !== undefined ? { quantity: str(patch.quantity, 100) } : {}),
+        ...(patch.estimatedYen !== undefined ? { estimatedYen: Math.min(100_000, Math.round(num(patch.estimatedYen))) } : {}),
+      },
+    });
+  }
+  return getPurchaseList(ownerSub);
+}
+
+/** Takes a line off. A ticked line stays: it's in the inventory now, and
+ * untick it first to take it back out. */
+export async function removeItem(ownerSub: string, itemId: string): Promise<PurchaseListView | null> {
+  const item = await requireListItem(ownerSub, itemId);
+  if (!item.checked) await prisma.shoppingItem.delete({ where: { id: itemId } });
+  return getPurchaseList(ownerSub);
+}
+
+/**
+ * A change to the list the meal chat proposes — "put Thursday's shopping on
+ * the list", "drop the leeks, add cabbage". Either a new list for a span of
+ * days (`newList`, with `add` as its lines), or edits to the current one.
+ * Nothing happens until the owner applies the chat's proposal.
+ */
+export interface PurchaseProposal {
+  newList: { fromDateKey: string; toDateKey: string } | null;
+  add: PurchaseLine[];
+  /** Names of lines to take off. */
+  remove: string[];
+  /** Names of lines whose quantity changes. */
+  change: { name: string; quantity: string }[];
+  note: string;
+}
+
+export function isEmptyPurchaseProposal(p: PurchaseProposal): boolean {
+  return !p.newList && p.add.length === 0 && p.remove.length === 0 && p.change.length === 0;
+}
+
+const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
+
+/**
+ * Reads the model's proposed list change, or null when there is none worth
+ * applying. A new list needs a valid span of at most MAX_DAYS days that
+ * doesn't end before today; edits need a list to edit. Pure.
+ */
+export function parsePurchaseProposal(value: unknown, ctx: { hasList: boolean; todayKey: string }): PurchaseProposal | null {
+  if (!value || typeof value !== "object") return null;
+  const raw = value as Record<string, unknown>;
+  const nl = (raw.newList ?? null) as Record<string, unknown> | null;
+  let newList: PurchaseProposal["newList"] = null;
+  if (nl && typeof nl === "object") {
+    const fromDateKey = str(nl.fromDateKey, 10);
+    const toDateKey = str(nl.toDateKey, 10);
+    const span = (Date.parse(`${toDateKey}T00:00:00Z`) - Date.parse(`${fromDateKey}T00:00:00Z`)) / 86_400_000 + 1;
+    if (DATE_KEY.test(fromDateKey) && DATE_KEY.test(toDateKey) && span >= 1 && span <= MAX_DAYS && toDateKey >= ctx.todayKey) {
+      newList = { fromDateKey, toDateKey };
+    }
+  }
+  const add = (Array.isArray(raw.add) ? raw.add : []).slice(0, 80).map(cleanLine).filter((l): l is PurchaseLine => l !== null);
+  const remove = (Array.isArray(raw.remove) ? raw.remove : []).map((n) => str(n, 100)).filter(Boolean).slice(0, 80);
+  const change = (Array.isArray(raw.change) ? raw.change : [])
+    .map((c) => {
+      const r = (c ?? {}) as Record<string, unknown>;
+      return { name: str(r.name, 100), quantity: str(r.quantity, 100) };
+    })
+    .filter((c) => c.name && c.quantity)
+    .slice(0, 80);
+  const proposal: PurchaseProposal = newList
+    ? { newList, add, remove: [], change: [], note: str(raw.note, 500) }
+    : { newList: null, add, remove, change, note: str(raw.note, 500) };
+  if (newList && add.length === 0) return null;
+  if (!newList && !ctx.hasList) return null;
+  return isEmptyPurchaseProposal(proposal) ? null : proposal;
+}
+
+/**
+ * Applies a purchase proposal inside the meal chat's transaction, after its
+ * meals are written — so a new list's "made from these meals" mark is taken
+ * from the meals as they now stand. Lines the inventory already covers are
+ * set aside, as when the list is made from the button. Edits leave ticked
+ * lines alone (they're in the inventory already).
+ */
+export async function applyPurchaseProposal(
+  tx: Prisma.TransactionClient,
+  ownerSub: string,
+  p: PurchaseProposal,
+  stock: { name: string; quantity: string }[],
+): Promise<void> {
+  const digestFor = async (fromDateKey: string, toDateKey: string) => {
+    const meals = await tx.plannedMeal.findMany({ where: { plan: { ownerSub }, dateKey: { gte: fromDateKey, lte: toDateKey } } });
+    return digestOf(meals.sort((a, b) => a.dateKey.localeCompare(b.dateKey) || SLOT_ORDER[a.slot] - SLOT_ORDER[b.slot]));
+  };
+
+  if (p.newList) {
+    const rank = (c: string) => CATEGORIES.indexOf(c);
+    const ordered = p.add.map((l, i) => ({ l, i })).sort((a, b) => rank(a.l.category) - rank(b.l.category) || a.i - b.i).map(({ l }) => l);
+    const { keep, excluded } = splitByStock(ordered, stock);
+    await tx.purchaseList.deleteMany({ where: { ownerSub } });
+    await tx.purchaseList.create({
+      data: {
+        ownerSub,
+        fromDateKey: p.newList.fromDateKey,
+        toDateKey: p.newList.toDateKey,
+        mealsDigest: await digestFor(p.newList.fromDateKey, p.newList.toDateKey),
+        note: p.note,
+        excluded: excluded as unknown as Prisma.InputJsonValue,
+        items: { create: keep.map((l, i) => ({ ...l, sortOrder: i })) },
+      },
+    });
+    return;
+  }
+
+  const list = await tx.purchaseList.findUnique({ where: { ownerSub }, include: { items: { orderBy: { sortOrder: "asc" } } } });
+  if (!list) throw new ValidationError("mealChatProposalGone", "The purchase list it edits is gone");
+  const key = (name: string) => normalizeFoodName(name) || name.trim();
+  const open = list.items.filter((i) => !i.checked);
+  const byName = new Map(open.map((i) => [key(i.name), i]));
+
+  const removed = new Set(p.remove.map(key));
+  const toDelete = open.filter((i) => removed.has(key(i.name))).map((i) => i.id);
+  if (toDelete.length > 0) await tx.shoppingItem.deleteMany({ where: { id: { in: toDelete } } });
+
+  for (const c of p.change) {
+    const item = byName.get(key(c.name));
+    if (item && !removed.has(key(c.name))) await tx.shoppingItem.update({ where: { id: item.id }, data: { quantity: c.quantity } });
+  }
+
+  let next = list.items.reduce((max, i) => Math.max(max, i.sortOrder), -1) + 1;
+  for (const line of p.add) {
+    const same = byName.get(key(line.name));
+    if (same && !removed.has(key(line.name))) {
+      await tx.shoppingItem.update({ where: { id: same.id }, data: { quantity: line.quantity, estimatedYen: line.estimatedYen } });
+    } else {
+      await tx.shoppingItem.create({ data: { listId: list.id, ...line, sortOrder: next++ } });
+    }
+  }
+
+  // The chat made these edits with the current meals in view, so the list
+  // is in step with them again.
+  await tx.purchaseList.update({
+    where: { id: list.id },
+    data: {
+      mealsDigest: await digestFor(list.fromDateKey, list.toDateKey),
+      ...(p.note ? { note: p.note } : {}),
+    },
+  });
+}
+

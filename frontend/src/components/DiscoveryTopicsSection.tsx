@@ -219,7 +219,7 @@ function TopicCard({
             <FindingRow
               key={f.id}
               finding={f}
-              isNew={newIds.has(f.id) || freshIds.has(f.id)}
+              isNew={f.isNew || newIds.has(f.id) || freshIds.has(f.id)}
               onLiterature={(literatureMemoId) =>
                 onChange({ ...topic, findings: topic.findings.map((x) => (x.id === f.id ? { ...x, literatureMemoId } : x)) })
               }

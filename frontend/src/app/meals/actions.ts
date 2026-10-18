@@ -105,6 +105,33 @@ export async function restoreExcludedPurchaseAction(name: string): Promise<Purch
   return list;
 }
 
+/** Editing the list by hand: add a line, change a quantity, take one off. */
+export async function addShoppingItemAction(line: purchaseList.PurchaseLine): Promise<PurchaseListView | null | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  try {
+    const list = await purchaseList.addItem(ownerSub, line);
+    revalidatePath("/meals");
+    return list;
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(await getLocale(), e) };
+    throw e;
+  }
+}
+
+export async function updateShoppingItemAction(itemId: string, patch: { quantity?: string; estimatedYen?: number }): Promise<PurchaseListView | null> {
+  const ownerSub = await requireOwnerSub();
+  const list = await purchaseList.updateItem(ownerSub, itemId, patch);
+  revalidatePath("/meals");
+  return list;
+}
+
+export async function removeShoppingItemAction(itemId: string): Promise<PurchaseListView | null> {
+  const ownerSub = await requireOwnerSub();
+  const list = await purchaseList.removeItem(ownerSub, itemId);
+  revalidatePath("/meals");
+  return list;
+}
+
 export async function clearPurchaseListAction(): Promise<void> {
   await purchaseList.clearPurchaseList(await requireOwnerSub());
   revalidatePath("/meals");

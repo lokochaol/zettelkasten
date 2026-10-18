@@ -333,6 +333,8 @@ function ProposalCard({
         </div>
       )}
 
+      {proposal.purchase && <PurchaseChange purchase={proposal.purchase} locale={locale} />}
+
       {state === "applied" ? (
         <p className="font-mono text-[10.5px] text-accent">{t.meals.chatApplied}</p>
       ) : state === "dismissed" ? (
@@ -357,6 +359,54 @@ function ProposalCard({
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** The purchase-list half of a proposal: a whole new list, or the lines it
+ * adds, takes off and changes. Shown in full — this is the list that goes
+ * to the shop, so it's checked before it's applied. */
+function PurchaseChange({ purchase, locale }: { purchase: NonNullable<Proposal["purchase"]>; locale: string }) {
+  const { t } = useI18n();
+  const day = (key: string) => formatDateKey(key, localeTag(locale as "ja" | "en"), { month: "numeric", day: "numeric", weekday: "short" });
+  const total = purchase.add.reduce((sum, l) => sum + l.estimatedYen, 0);
+  return (
+    <div className="flex flex-col gap-1.5 border-t border-line pt-2.5 first:border-t-0 first:pt-0">
+      <p className="font-mono text-[9px] tracking-wider text-accent uppercase">
+        {purchase.newList
+          ? t.meals.chatPurchaseNew(day(purchase.newList.fromDateKey), day(purchase.newList.toDateKey), purchase.add.length)
+          : t.meals.chatPurchaseEdit}
+      </p>
+      {purchase.newList && <p className="text-[10.5px] text-ink-faint">{t.meals.chatPurchaseReplaces}</p>}
+      {purchase.add.length > 0 && (
+        <ul className="flex flex-col gap-0.5">
+          {purchase.add.map((l) => (
+            <li key={l.name} className="flex items-baseline gap-2 text-[11.5px]">
+              {!purchase.newList && <span className="w-4 shrink-0 font-mono text-[10px] text-accent">＋</span>}
+              <span className="min-w-0 flex-1 text-ink">{l.name}</span>
+              <span className="shrink-0 font-mono text-[10px] text-ink-faint">{l.quantity}</span>
+              <span className="w-14 shrink-0 text-right font-mono text-[10px] text-ink-soft">¥{l.estimatedYen.toLocaleString()}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+      {purchase.change.map((c) => (
+        <p key={c.name} className="flex items-baseline gap-2 text-[11.5px]">
+          <span className="w-4 shrink-0 font-mono text-[10px] text-accent">～</span>
+          <span className="min-w-0 flex-1 text-ink">{c.name}</span>
+          <span className="shrink-0 font-mono text-[10px] text-ink-soft">→ {c.quantity}</span>
+        </p>
+      ))}
+      {purchase.remove.map((name) => (
+        <p key={name} className="flex items-baseline gap-2 text-[11.5px]">
+          <span className="w-4 shrink-0 font-mono text-[10px] text-accent">－</span>
+          <span className="min-w-0 flex-1 text-ink-faint line-through">{name}</span>
+        </p>
+      ))}
+      {purchase.newList && purchase.add.length > 0 && (
+        <p className="text-right font-mono text-[10.5px] font-semibold text-ink">{t.meals.purchaseTotal(total)}</p>
+      )}
+      {purchase.note && <p className="text-[10.5px] leading-relaxed text-ink-soft">{purchase.note}</p>}
     </div>
   );
 }

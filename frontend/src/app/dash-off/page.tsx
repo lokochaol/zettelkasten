@@ -3,7 +3,6 @@ import * as quickNotes from "@/lib/quickNotes";
 import * as discovery from "@/lib/discovery";
 import { requireSession } from "@/lib/session";
 import { HomeSearchBar } from "@/components/HomeSearchBar";
-import { SignOutButton } from "@/components/SignOutButton";
 import { ScratchTimeline } from "@/components/ScratchTimeline";
 import { ZettelkastenNavButton } from "@/components/ZettelkastenNavButton";
 import { DiscoveryTriggerButton } from "@/components/DiscoveryTriggerButton";
@@ -59,7 +58,6 @@ export default async function ScratchPage() {
             <DiscoveryTriggerButton />
             <LocaleToggle />
             <ThemeToggle />
-            <SignOutButton />
           </HeaderMenu>
         </div>
       </div>

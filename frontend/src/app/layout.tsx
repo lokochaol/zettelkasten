@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { CustomCursor } from "@/components/CustomCursor";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { ResumeRefresh } from "@/components/ResumeRefresh";
 import { LocaleProvider } from "@/lib/i18n/LocaleProvider";
 import { getLocale } from "@/lib/i18n/locale";
 import { PreferencesProvider } from "@/lib/preferences/PreferencesProvider";
@@ -81,6 +82,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
                 <TimeZoneSync serverTimeZone={timeZone} />
                 <CustomCursor />
                 <ServiceWorkerRegister />
+                <ResumeRefresh />
                 {children}
               </UnsavedChangesProvider>
             </PreferencesProvider>

@@ -462,7 +462,7 @@ export function GuideContentEn() {
               },
               {
                 title: "To-buy list",
-                body: "Once the meals are settled, choose the day you shop and how many days to buy for, and press “Make the to-buy list”. It lists what those days' recipes need, less what's in the inventory. If the meals change, the list offers to remake itself. Tick what you buy and it goes into the inventory; press “Done shopping” to close it.",
+                body: "Once the meals are settled, choose the day you shop and how many days to buy for, and press “Make the to-buy list”. It lists what those days' recipes need, less what's in the inventory. If the meals change, the list offers to remake itself. Tick what you buy and it goes into the inventory; press “Done shopping” to close it. You can also ask the chat to make or change it (\u201cput Thursday\u2019s shopping on the list\u201d, \u201cno leeks\u201d); it changes only when you press Apply. Lines not yet ticked can be edited by hand too: change the quantity, remove one with ×, or add one from the row below.",
               },
               {
                 title: "Inventory",

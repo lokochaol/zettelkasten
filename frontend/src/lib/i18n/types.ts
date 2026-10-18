@@ -417,6 +417,13 @@ export interface Dictionary {
     chatDismiss: string;
     chatDismissed: string;
     chatAppliedNote: string;
+    chatPurchaseNew: (from: string, to: string, n: number) => string;
+    chatPurchaseEdit: string;
+    chatPurchaseReplaces: string;
+    purchaseAddName: string;
+    purchaseAddQuantity: string;
+    purchaseAdd: string;
+    purchaseRemove: string;
   };
   health: {
     compositionMoved: string;

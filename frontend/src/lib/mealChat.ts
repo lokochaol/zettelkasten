@@ -7,6 +7,12 @@ import { ValidationError } from "@/lib/errors";
 import { currentTargets } from "@/lib/health";
 import { inventoryBrief, listInventory } from "@/lib/inventory";
 import { getPreference } from "@/lib/mealPlanning";
+import {
+  applyPurchaseProposal,
+  CATEGORIES,
+  parsePurchaseProposal,
+  type PurchaseProposal,
+} from "@/lib/purchaseList";
 import type { MealChatMessage, MealKind, MealSlot, PlannedMeal } from "@/generated/prisma/client";
 
 export type { MealChatMessage };
@@ -18,9 +24,10 @@ export type { MealChatMessage };
  * and Thursday, eating out on Friday" gets a proposal for the whole week.
  * Then the same conversation carries every change after it — a different
  * dinner on the 14th, the chicken sold out so it's pork.
- * What to buy follows from the settled meals and the inventory, so it isn't
- * proposed here: the purchase list is made from them afterwards
- * (src/lib/purchaseList.ts).
+ * The purchase list can be changed from here too — "put Thursday's
+ * shopping on the list", "drop the leeks" — as part of the same proposal,
+ * applied with the same button. It can also still be made from the button
+ * under the meals (src/lib/purchaseList.ts).
  *
  * The chat reads the inventory but never changes it. Stock moves only when
  * the owner ticks something bought on the purchase list, or edits it by
@@ -66,10 +73,12 @@ export interface ProposedMeal {
 
 export interface Proposal {
   meals: ProposedMeal[];
+  /** A change to the purchase list, applied with the meals. */
+  purchase?: PurchaseProposal | null;
 }
 
 export function isEmptyProposal(p: Proposal): boolean {
-  return p.meals.length === 0;
+  return p.meals.length === 0 && !p.purchase;
 }
 
 const num = (v: unknown): number => {
@@ -87,8 +96,13 @@ const str = (v: unknown, max = 500): string => (typeof v === "string" ? v.trim()
  * other slot is dropped rather than applied, whatever the model said. Numbers are clamped
  * non-negative, kinds and locations fall back to safe defaults.
  */
-export function parseChatReply(value: unknown, changeable: Map<string, string>): { reply: string; proposal: Proposal } {
-  const raw = (value ?? {}) as { reply?: unknown; meals?: unknown };
+export function parseChatReply(
+  value: unknown,
+  changeable: Map<string, string>,
+  /** Whether there's a list to edit, and today, for the purchase part. */
+  purchaseCtx: { hasList: boolean; todayKey: string } = { hasList: false, todayKey: "" },
+): { reply: string; proposal: Proposal } {
+  const raw = (value ?? {}) as { reply?: unknown; meals?: unknown; purchase?: unknown };
   const seen = new Set<string>();
 
   const meals: ProposedMeal[] = [];
@@ -119,7 +133,7 @@ export function parseChatReply(value: unknown, changeable: Map<string, string>):
   }
   meals.sort((a, b) => a.dateKey.localeCompare(b.dateKey) || SLOTS.indexOf(a.slot) - SLOTS.indexOf(b.slot));
 
-  return { reply: str(raw.reply, 2000), proposal: { meals } };
+  return { reply: str(raw.reply, 2000), proposal: { meals, purchase: parsePurchaseProposal(raw.purchase, purchaseCtx) } };
 }
 
 const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担当です。会話しながら1週間の献立を一緒に作り、その後も日ごとの変更や買い物中の相談を受けて組み直します。
@@ -130,7 +144,12 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担
 - 買い物中: 「鶏むね肉が売り切れで豚こまを買った」（買ったものに合わせて献立を組み直す）
 
 すること:
-- 相手の話に合わせて、献立（meals）を提案する。在庫（家にある食材）は本人が自分で記録するので、在庫の変更は提案しない。買い物リストは献立と在庫から別に作るので、買う物も提案しなくてよい。
+- 相手の話に合わせて、献立（meals）を提案する。在庫（家にある食材）は本人が自分で記録するので、在庫の変更は提案しない。
+- 購入予定リスト（買い物リスト）を作る・直すように頼まれたら、purchase で提案する。頼まれていなければ purchase は null にする。
+  - 新しく作る（「木曜の買い物をまとめて」など）: newList に期間（fromDateKey〜toDateKey、7日以内）を入れ、add にその期間の献立に必要な物をすべて入れる。今あるリストは置き換わる。
+  - 今のリストを直す（「ネギはいらない」「キャベツを足して」「卵は2パックに」など）: newList は null にし、add（足す物）・remove（消す物の品名）・change（量を変える物の品名と量）を使う。✓の付いた買えた物は変えない。
+  - 買う物の決め方: 期間の献立の recipe の材料と分量から必要量を合計し、店で買う単位に丸める。在庫にある物は入れない。BATCH の食事の材料は元の COOK の料理の分で買うので入れない。READY は商品そのものを1行にする。
+  - category は次のどれか: ${CATEGORIES.join(" / ")}。estimatedYen は日本のスーパーでの税込の概算（円）。
 - 「空き」になっている食事は新しく埋めてよい。献立づくりを頼まれたら、空きの食事をまとめて提案する（朝・昼・夕を日ごとにすべて）。
 - 変更は必要な食事だけにする。変えなくてよい食事は meals に含めない。「変更してよい食事」に挙がっていない食事は絶対に変えない。
 - 情報が足りなくて決められないことがあれば、meals は空にして reply で短く質問してよい。ただし、決められる範囲は提案する。
@@ -158,7 +177,17 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担
   "reply": "相手への返事",
   "meals": [
     { "dateKey": "YYYY-MM-DD", "slot": "DINNER", "kind": "COOK", "title": "料理名", "recipe": "材料（分量つき）と作り方。120字以内。", "kcal": 520, "proteinG": 32, "fatG": 15, "carbG": 55, "fiberG": 6, "saltG": 1.8, "prepMinutes": 20 }
-  ]
+  ],
+  "purchase": null
+}
+
+purchase を提案するときの形（使わない項目は空の配列）:
+"purchase": {
+  "newList": { "fromDateKey": "YYYY-MM-DD", "toDateKey": "YYYY-MM-DD" },
+  "add": [ { "category": "肉・魚", "name": "鶏もも肉", "quantity": "2枚（約600g）", "estimatedYen": 700 } ],
+  "remove": [ "長ねぎ" ],
+  "change": [ { "name": "卵", "quantity": "2パック" } ],
+  "note": "買うときの注意があれば1文で"
 }
 
 slot は BREAKFAST / LUNCH / DINNER、kind は COOK（その日に作る）/ BATCH（作り置きを食べる）/ READY（冷凍食品・惣菜・外食）のいずれか。`;
@@ -320,7 +349,7 @@ export async function sendMessage(
   try {
     // Room for a whole week of meals with recipes in one reply.
     const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 20000, undefined, onProgress && progressReporter(onProgress, "meals"));
-    parsed = parseChatReply(value, changeable);
+    parsed = parseChatReply(value, changeable, { hasList: purchase !== null, todayKey });
     onProgress?.({ stage: "saving", reply: parsed.reply, items: [] });
   } catch (e) {
     await prisma.mealChatMessage.delete({ where: { id: userMessage.id } });
@@ -344,12 +373,13 @@ function readProposal(value: unknown): Proposal | null {
   const p = value as Partial<Proposal>;
   return {
     meals: Array.isArray(p.meals) ? p.meals : [],
+    purchase: p.purchase ?? null,
   };
 }
 
 /**
- * Applies a proposal: fills or replaces the meals —
- * all in one transaction, so a half-applied proposal can't exist. The
+ * Applies a proposal: fills or replaces the meals, and changes the purchase
+ * list if it proposes that — all in one transaction, so a half-applied proposal can't exist. The
  * week's plan is created by the first one applied, with the targets and
  * constraints of that moment, the same snapshot a plan always carries.
  *
@@ -376,6 +406,8 @@ export async function applyProposal(
   const changeable = changeableSlots(weekStartDateKey, existing?.meals ?? [], todayKey);
   const meals = proposal.meals.filter((m) => changeable.has(`${m.dateKey}|${m.slot}`));
   const calendarNeedsUpdate = (existing?.meals ?? []).some((m) => m.googleEventId) && meals.length > 0;
+  // Read before the transaction: the purchase part sets aside what's at home.
+  const stock = proposal.purchase ? await listInventory(ownerSub) : [];
 
   let planSnapshot: Prisma.MealPlanCreateWithoutMealsInput | null = null;
   if (!existing && meals.length > 0) {
@@ -441,6 +473,8 @@ export async function applyProposal(
         })),
       });
     }
+
+    if (proposal.purchase) await applyPurchaseProposal(tx, ownerSub, proposal.purchase, stock);
 
     await tx.mealChatMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });
   }, TRANSACTION_OPTIONS);
