@@ -21,7 +21,16 @@ import { localeTag } from "@/lib/i18n/dictionary";
  * a pocket two days later. The list and total underneath follow the date
  * picked, so what was just entered is always in view.
  */
-export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: string; compact?: boolean }) {
+export function ExpenseQuickEntry({
+  dateKey,
+  compact = false,
+  autoFocus = false,
+}: {
+  dateKey: string;
+  compact?: boolean;
+  /** The cursor starts in the amount — the money quick app opens to type. */
+  autoFocus?: boolean;
+}) {
   const { t, locale } = useI18n();
   // The date picked, remembered against the day it was picked on: when the
   // screen moves to another day, the entry date goes back to that day.
@@ -94,6 +103,7 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
         )}
         <input
           ref={amountRef}
+          autoFocus={autoFocus}
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
           {...enterKey}
