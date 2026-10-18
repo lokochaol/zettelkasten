@@ -8,6 +8,9 @@ export async function googleSignIn(form: FormData) {
   await signIn("google", { redirectTo: safeReturnPath(form.get("from")) });
 }
 
+/** Clears the session and leaves the navigation to the caller (see
+ * SignOutButton): the button sits in a menu that closes — and unmounts —
+ * on the same click, so nothing on the page is left to follow a redirect. */
 export async function googleSignOut() {
-  await signOut({ redirectTo: "/signin" });
+  await signOut({ redirect: false });
 }

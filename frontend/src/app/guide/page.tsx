@@ -36,7 +36,7 @@ export default async function GuidePage() {
       <div className="flex w-full max-w-[760px] flex-col gap-8">
         <div className="flex items-center justify-between gap-3">
           <PageIndex current="guide" />
-          <HeaderMenu>
+          <HeaderMenu signedIn={!!session}>
             {session && (
               <>
                 <div className="flex w-full flex-col items-end gap-1.5 border-b border-line pb-2.5">

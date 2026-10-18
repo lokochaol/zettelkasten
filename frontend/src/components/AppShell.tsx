@@ -9,7 +9,6 @@ import { HeaderMenu } from "@/components/HeaderMenu";
 import { HeaderAccountBadge } from "@/components/HeaderAccountBadge";
 import { LocaleToggle } from "@/components/LocaleToggle";
 import { ThemeToggle } from "@/components/ThemeToggle";
-import { SignOutButton } from "@/components/SignOutButton";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { navigateWithViewTransition } from "@/lib/viewTransition";
 import { usePaneScrollMemory } from "@/lib/viewState";
@@ -89,7 +88,6 @@ export function AppShell({
             </Link>
             <LocaleToggle />
             <ThemeToggle />
-            <SignOutButton />
           </HeaderMenu>
         </div>
       </div>
