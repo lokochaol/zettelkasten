@@ -19,74 +19,67 @@ export type { Expense };
 
 /** Offered in the category picker before the owner has invented their own.
  * Not an enum — see the schema comment. */
-export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "サーバー・AI", "その他"] as const;
+export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "サーバー・AI", "旅行", "本・教材", "その他"] as const;
 
 /** Subscriptions and usage bills for servers and AI — hosting, cloud,
  * domains, model APIs, AI chat plans. */
 export const SERVER_AI_CATEGORY = "サーバー・AI";
 
 /**
- * Statement lines from these services land in サーバー・AI unless the owner
- * has taught a rule of their own for them (their rules win). Card
- * statements name the merchant in capitals and with suffixes ("ANTHROPIC,
- * PBC", "OPENAI *CHATGPT SUBSCR", "VERCEL INC."), so matching is on a
- * lower-cased substring. Kept to names that can't mean anything else.
+ * Statement lines from well-known services start out in a category unless
+ * the owner has taught a rule of their own for them (their rules win).
+ * Card statements name the merchant in capitals and with suffixes
+ * ("ANTHROPIC, PBC", "OPENAI *CHATGPT SUBSCR", "VERCEL INC."), so matching
+ * is on a lower-cased substring. Kept to names that can't mean anything
+ * else; first category that matches wins.
  */
-const SERVER_AI_KEYWORDS = [
-  "anthropic",
-  "claude.ai",
-  "openai",
-  "chatgpt",
-  "gemini",
-  "google cloud",
-  "googlecloud",
-  "gcp",
-  "vercel",
-  "aws",
-  "amazon web services",
-  "github",
-  "cloudflare",
-  "netlify",
-  "supabase",
-  "heroku",
-  "digitalocean",
-  "render.com",
-  "fly.io",
-  "neon",
-  "planetscale",
-  "cursor",
-  "perplexity",
-  "midjourney",
-  "elevenlabs",
-  "replicate",
-  "huggingface",
-  "hugging face",
-  "azure",
-  "conoha",
-  "さくらインターネット",
-  "xserver",
-  "エックスサーバー",
-  "お名前.com",
-  "onamae",
-  "ロリポップ",
-  "squarespace domains",
-  "namecheap",
-  "porkbun",
+const BUILT_IN_KEYWORDS: { category: string; keywords: string[] }[] = [
+  {
+    category: SERVER_AI_CATEGORY,
+    keywords: [
+      "anthropic", "claude.ai", "openai", "chatgpt", "gemini", "google cloud", "googlecloud", "gcp", "vercel", "aws",
+      "amazon web services", "github", "cloudflare", "netlify", "supabase", "heroku", "digitalocean", "render.com",
+      "fly.io", "neon", "planetscale", "cursor", "perplexity", "midjourney", "elevenlabs", "replicate", "huggingface",
+      "hugging face", "azure", "conoha", "さくらインターネット", "xserver", "エックスサーバー", "お名前.com", "onamae",
+      "ロリポップ", "squarespace domains", "namecheap", "porkbun",
+    ],
+  },
+  {
+    // Where to stay and how to get far: lodging, flights, travel agencies.
+    // Trains and buses stay in 交通.
+    category: "旅行",
+    keywords: [
+      "楽天トラベル", "rakuten travel", "じゃらん", "ジャラン", "jalan", "booking.com", "expedia", "agoda", "airbnb", "hotels.com",
+      "trip.com", "一休", "ikyu", "jtb", "近畿日本ツーリスト", "日本旅行", "jal", "日本航空", "ana", "全日空", "peach aviation",
+      "jetstar", "ジェットスター", "skymark", "スカイマーク", "zipair", "東横イン", "toyoko inn", "アパホテル",
+      "apa hotel", "ルートイン", "ドーミーイン", "星野リゾート", "hoshino resort", "ホテル", "hotel", "旅館",
+    ],
+  },
+  {
+    // Books, e-books and audiobooks, courses, language learning, exams.
+    category: "本・教材",
+    keywords: [
+      "kindle", "紀伊國屋", "紀伊国屋", "kinokuniya", "丸善", "ジュンク堂", "有隣堂", "三省堂書店", "ブックオフ", "bookoff",
+      "honto", "楽天ブックス", "rakuten books", "kobo", "audible", "オーディブル", "書店", "書房", "本屋", "udemy",
+      "coursera", "schoo", "オライリー", "oreilly", "o reilly", "翔泳社", "技術評論社", "スタディサプリ", "duolingo",
+      "ielts", "toeic", "英検", "eiken", "放送大学",
+    ],
+  },
 ];
 
-/** サーバー・AI when a line's description names one of those services. */
+/** The category a line's description puts it in by name, if any. */
 export function builtInCategoryFor(memo: string): string | null {
   // Punctuation is a separator either way: statements write "GOOGLE*CLOUD"
   // and "ANTHROPIC, PBC", and the keywords "claude.ai".
   const norm = (t: string) => ` ${t.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
   const text = norm(memo);
-  // Short names only as whole words, so "lawson" or "neonate" can't match.
-  return SERVER_AI_KEYWORDS.some((k) => {
+  // Short names only as whole words, so "lawson", "neonate" or "banana"
+  // can't match.
+  const hit = (k: string) => {
     const key = norm(k).trim();
-    return key.length <= 4 ? text.includes(` ${key} `) : text.includes(key);
-  })
-    ? SERVER_AI_CATEGORY
-    : null;
+    return key.length <= 4 && /^[a-z0-9 ]+$/.test(key) ? text.includes(` ${key} `) : text.includes(key);
+  };
+  return BUILT_IN_KEYWORDS.find((group) => group.keywords.some(hit))?.category ?? null;
 }
 
 export interface ExpenseInput {
