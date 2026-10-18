@@ -124,6 +124,10 @@ export const en: Dictionary = {
     amountPlaceholder: "¥ amount",
     memoPlaceholder: "Note (optional)",
     todayTotal: "Today",
+    entryDate: "Date",
+    entryDateBackToday: "Back to today",
+    entryDateBack: "Back to this day",
+    dayTotal: (date) => `${date}`,
     foodProgress: (spent, budget, daysLeft) =>
       `Food ¥${spent.toLocaleString()} / ¥${budget.toLocaleString()} (${daysLeft} days left)`,
     noBudget: "no budget",
