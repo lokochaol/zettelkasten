@@ -19,6 +19,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { replaceQuery } from "@/lib/viewState";
 import type { InventoryItem, MealKind, MealSlot } from "@/generated/prisma/client";
+import { announceChange, useRefreshOn } from "@/lib/dataSync";
 
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 
@@ -58,6 +59,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
 
   const anchorKey = shiftDateKey(todayKey, weekOffset * 7);
 
+  const reloadWeek = () => void getMealWeekAction(anchorKey).then(setData);
   useEffect(() => {
     getMealWeekAction(anchorKey).then(setData);
     // Kept in the address so a reload stays on this week (src/lib/viewState.ts).
@@ -69,10 +71,17 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
   // yet", `null` is "no list".
   const [inventory, setInventory] = useState<InventoryItem[] | null>(null);
   const [purchase, setPurchase] = useState<PurchaseListView | null | undefined>(undefined);
-  useEffect(() => {
+  const reloadStock = () => {
     listInventoryAction().then(setInventory);
     getPurchaseListAction().then(setPurchase);
-  }, []);
+  };
+  useEffect(reloadStock, []);
+
+  // The week re-reads when something it's built from changes elsewhere —
+  // a meal marked eaten on the calendar, the body's targets, the training
+  // days — or when the app comes back after a while (src/lib/dataSync.ts).
+  useRefreshOn(["meals", "health", "training"], reloadWeek);
+  useRefreshOn(["inventory", "purchase"], reloadStock);
 
   if (!data) return <LoadingBlock label={t.common.loading} />;
 
@@ -107,6 +116,11 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         cookSessionsPerWeek: next.cookSessionsPerWeek,
         readyMadeMealsPerWeek: next.readyMadeMealsPerWeek,
       });
+      // The preference shapes the rest of the screen: the start day moves
+      // which seven days the table shows, the budget and cooking time move
+      // the warnings. So the week is read again rather than patched.
+      reloadWeek();
+      announceChange("meals");
     });
   }
 
@@ -305,6 +319,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         hasMeals={(view?.meals.length ?? 0) > 0}
         todayKey={todayKey}
         onApplied={(week, items) => {
+          announceChange("meals");
           setData(week);
           setInventory(items);
           // Changed meals can leave the to-buy list behind; re-read it so

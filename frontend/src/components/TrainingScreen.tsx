@@ -18,6 +18,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { replaceQuery } from "@/lib/viewState";
 import type { TrainingExperience, TrainingKind, TrainingStatus } from "@/generated/prisma/client";
+import { announceChange, useRefreshOn } from "@/lib/dataSync";
 
 const EXPERIENCES: TrainingExperience[] = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
 
@@ -49,6 +50,8 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
   const [generating, startGenerating] = useTransition();
   const chatRef = useRef<TrainerChatHandle>(null);
   const anchorKey = shiftDateKey(todayKey, weekOffset * 7);
+
+  useRefreshOn(["training", "health"], () => void getTrainingOverviewAction(anchorKey, todayKey).then(setData));
 
   useEffect(() => {
     getTrainingOverviewAction(anchorKey, todayKey).then(setData);
@@ -189,7 +192,10 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
           weekStartDateKey={data.weekStartDateKey}
           hasSessions={data.week.sessions.length > 0}
           todayKey={todayKey}
-          onApplied={(week) => setData((prev) => (prev ? { ...prev, week } : prev))}
+          onApplied={(week) => {
+            setData((prev) => (prev ? { ...prev, week } : prev));
+            announceChange("training");
+          }}
         />
       )}
 
@@ -226,7 +232,11 @@ function CompositionPanel({
     startSaving(async () => {
       const res = await saveCompositionTargetAction(target, todayKey);
       if ("error" in res) setError(res.error);
-      else onSaved(res.composition, target);
+      else {
+        onSaved(res.composition, target);
+        // The target moves the nutrition targets: meals and the calendar.
+        announceChange("health");
+      }
     });
   }
 

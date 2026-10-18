@@ -12,6 +12,7 @@ import { LoadingBlock } from "@/components/LoadingSpinner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { announceChange } from "@/lib/dataSync";
 
 /**
  * Body, goal, and the iPhone link that keeps them current.
@@ -76,6 +77,8 @@ export function HealthSettings() {
         return;
       }
       setData((prev) => (prev ? { ...prev, current: res.current } : prev));
+      // The targets feed the meal plan, the calendar's day and training.
+      announceChange("health");
     });
   }
 

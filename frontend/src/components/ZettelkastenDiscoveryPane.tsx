@@ -14,6 +14,7 @@ import { DiscoveryTopicsSection } from "@/components/DiscoveryTopicsSection";
 import { LoadingBlock, Spinner } from "@/components/LoadingSpinner";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import type { DiscoveryNoteRow, DiscoverySchedule } from "@/lib/discovery";
+import { useRefreshOn } from "@/lib/dataSync";
 
 /**
  * Picking what discovery looks at, and how often.
@@ -50,6 +51,16 @@ export function ZettelkastenDiscoveryPane() {
       void markDiscoverySeenAction().then(announceDiscoverySeen);
     });
   }, []);
+
+  // A scheduled run may have found things while the app was away.
+  useRefreshOn(["discovery"], () => {
+    void Promise.all([listDiscoveryNotesAction(), listTopicsAction()]).then(([n, tp]) => {
+      setNotes(n);
+      setTopics(tp);
+      // On screen, so seen — they keep their NEW mark until the next read.
+      void markDiscoverySeenAction().then(announceDiscoverySeen);
+    });
+  });
 
   if (!notes || !schedule || !topics) return <LoadingBlock label={t.discoveryTab.loading} />;
 

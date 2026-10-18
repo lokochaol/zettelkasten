@@ -10,6 +10,7 @@ import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/da
 import { listTodayProjectNotesAction } from "@/app/calendar/actions";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import type { TodayProjectNote } from "@/lib/projectTaskNotes";
+import { useRefreshOn } from "@/lib/dataSync";
 
 /** How many days' worth of notes stay cached at once (least-recently-viewed
  * evicted first once exceeded) — enough for a session of hopping back and
@@ -53,7 +54,10 @@ export function CalendarTodaySection({
   todayAside?: ReactNode;
 }) {
   const { t, locale } = useI18n();
-  const { guard } = useUnsavedChanges();
+  const { guard, hasUnsaved } = useUnsavedChanges();
+  // Bumped when the day's notes are re-read, so the editors start over from
+  // what's saved (an editor otherwise keeps the text it opened with).
+  const [generation, setGeneration] = useState(0);
   const todayKey = todayKeyValue();
   // The browser's own zone: the timeline lays events out on an hour axis,
   // so it needs the zone the owner reads clock times in, not the server's.
@@ -100,6 +104,22 @@ export function CalendarTodaySection({
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedDateKey]);
+
+  // Back in the app after a while: the notes may have been written on
+  // another device. Re-read the day on screen — unless something here is
+  // mid-edit, which is never replaced (src/lib/dataSync.ts).
+  useRefreshOn(
+    ["schedule"],
+    () => {
+      const key = viewedDateKey;
+      void listTodayProjectNotesAction(key).then((result) => {
+        if (hasUnsaved()) return;
+        setNotesCache((prev) => ({ ...prev, [key]: result }));
+        setGeneration((g) => g + 1);
+      });
+    },
+    hasUnsaved,
+  );
 
   const viewedLabel = formatDateKey(viewedDateKey, localeTag(locale));
   const isToday = viewedDateKey === todayKey;
@@ -157,7 +177,7 @@ export function CalendarTodaySection({
       {viewedNotes === undefined ? (
         <LoadingBlock label={t.calendar.projectTaskLoading} />
       ) : (
-        <CalendarTodayView key={viewedDateKey} dateKey={viewedDateKey} initialNotes={viewedNotes} onOpenProject={onOpenProject} />
+        <CalendarTodayView key={`${viewedDateKey}:${generation}`} dateKey={viewedDateKey} initialNotes={viewedNotes} onOpenProject={onOpenProject} />
       )}
     </div>
   );

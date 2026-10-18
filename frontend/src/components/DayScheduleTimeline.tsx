@@ -16,6 +16,7 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { layoutSpans } from "@/lib/dayLayout";
 import { todayKey as todayKeyIn } from "@/lib/dateKey";
+import { announceChange, useRefreshOn } from "@/lib/dataSync";
 
 /** Hours are drawn at a fixed scale rather than stretched to fill: an hour
  * has to be the same height on a day with two events and a day with ten,
@@ -87,9 +88,16 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   function logMeal(mealId: string, status: DayMeal["status"], note = "") {
     startLogging(async () => {
       const next = await setMealStatusAction(mealId, status, note, dateKey);
+      announceChange("meals");
       if (!("error" in next)) setLoaded({ dateKey, view: next });
     });
   }
+
+  // Meals, money and the body's targets all show up in the day; any of
+  // them changing elsewhere re-reads it (src/lib/dataSync.ts).
+  useRefreshOn(["meals", "money", "health", "training", "schedule"], () => {
+    void getDayScheduleAction(dateKey).then((v) => setLoaded({ dateKey, view: v }));
+  });
 
   useEffect(() => {
     let cancelled = false;

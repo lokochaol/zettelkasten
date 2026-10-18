@@ -9,6 +9,7 @@ import { LoadingBlock } from "@/components/LoadingSpinner";
 import type { MonthTotal } from "@/lib/expenses";
 import { todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { useRefreshOn } from "@/lib/dataSync";
 
 /**
  * 家計: today's entry, the month's plan (which is also where the month is
@@ -40,6 +41,10 @@ export function MoneyScreen() {
     getMonthlyTotalsAction(todayKey).then(setTrend);
     setPlanVersion((v) => v + 1);
   }
+
+  // An expense entered anywhere (here, or on the calendar's day) moves the
+  // month and the plan's categories (src/lib/dataSync.ts).
+  useRefreshOn(["money"], reload);
 
   if (!view) return <LoadingBlock label={t.common.loading} />;
 

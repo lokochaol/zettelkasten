@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { addExpenseAction, getMoneyDayAction, removeExpenseAction, type MoneyDayView } from "@/app/money/actions";
 import { useEnterKey } from "@/lib/ime";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import { announceChange, useRefreshOn } from "@/lib/dataSync";
 
 /**
  * Typing a purchase in, in one line, wherever the owner already is.
@@ -32,6 +33,8 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
     });
   }, [dateKey]);
 
+  useRefreshOn(["money"], () => void getMoneyDayAction(dateKey).then(setView));
+
   function submit() {
     const amountYen = Number(amount.replace(/[,¥\s]/g, ""));
     if (!Number.isFinite(amountYen) || amountYen === 0) return;
@@ -43,6 +46,8 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
         return;
       }
       setView(res.view);
+      // The day's totals on the calendar and the month on /money move too.
+      announceChange("money");
       setAmount("");
       setMemo("");
       // Straight back to the amount: the next thing anyone does here is
@@ -102,7 +107,12 @@ export function ExpenseQuickEntry({ dateKey, compact = false }: { dateKey: strin
               <span className="min-w-0 flex-1 truncate text-[11px] text-ink">{e.memo || "—"}</span>
               <span className="font-mono text-[11px] text-ink">¥{e.amountYen.toLocaleString()}</span>
               <button
-                onClick={() => startTransition(async () => setView(await removeExpenseAction(e.id, dateKey)))}
+                onClick={() =>
+                  startTransition(async () => {
+                    setView(await removeExpenseAction(e.id, dateKey));
+                    announceChange("money");
+                  })
+                }
                 className="font-mono text-[9px] text-ink-faint transition-opacity mouse:opacity-0 group-hover:opacity-100 hover:text-accent touch:-my-1 touch:px-1.5 touch:py-1 touch:text-[10.5px]"
               >
                 {t.common.delete}

@@ -5,6 +5,7 @@ import {
   createFocusPeriodAction,
   createGoalAction,
   deleteGoalAction,
+  getGoalsOverviewAction,
   reorderGoalsAction,
   saveCompassFieldAction,
   type GoalsOverview,
@@ -19,6 +20,7 @@ import { todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import type { CompassField } from "@/lib/goals";
+import { useRefreshOn } from "@/lib/dataSync";
 
 type Tab = "goals" | "days" | "compass";
 const TABS: Tab[] = ["goals", "days", "compass"];
@@ -36,7 +38,7 @@ const COMPASS_ORDER: CompassField[] = ["principles", "happiness", "essentials", 
  */
 export function GoalsScreen({ initial }: { initial: GoalsOverview }) {
   const { t } = useI18n();
-  const { guard } = useUnsavedChanges();
+  const { guard, hasUnsaved } = useUnsavedChanges();
   const todayKey = todayKeyValue();
   const [tab, setTab] = useState<Tab>("goals");
   const [overview, setOverview] = useState(initial);
@@ -45,6 +47,19 @@ export function GoalsScreen({ initial }: { initial: GoalsOverview }) {
   const [newTitle, setNewTitle] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
+
+  // Back in the app after a while, re-read — unless something is mid-edit
+  // (src/lib/dataSync.ts). The editors start over from what's saved.
+  useRefreshOn(
+    ["goals"],
+    () =>
+      void getGoalsOverviewAction().then((next) => {
+        if (hasUnsaved()) return;
+        setOverview(next);
+        setGeneration((g) => g + 1);
+      }),
+    hasUnsaved,
+  );
 
   const active = overview.goals.filter((g) => g.status === "ACTIVE");
   const archived = overview.goals.filter((g) => g.status === "ARCHIVED");
