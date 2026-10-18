@@ -319,7 +319,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         hasMeals={(view?.meals.length ?? 0) > 0}
         todayKey={todayKey}
         onApplied={(week, items) => {
-          announceChange("meals");
+          announceChange("meals", "purchase");
           setData(week);
           setInventory(items);
           // Changed meals can leave the to-buy list behind; re-read it so

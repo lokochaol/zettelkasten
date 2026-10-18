@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type FormEvent } from "react";
 import {
+  addShoppingItemAction,
   clearPurchaseListAction,
   createPurchaseListAction,
+  removeShoppingItemAction,
   restoreExcludedPurchaseAction,
   toggleShoppingItemAction,
+  updateShoppingItemAction,
   type PurchaseListView,
 } from "@/app/meals/actions";
 import { formatDateKey } from "@/lib/dateKey";
+import { CATEGORIES } from "@/lib/shoppingCategories";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import type { InventoryItem, ShoppingItem } from "@/generated/prisma/client";
@@ -26,6 +30,9 @@ const DAY_CHOICES = [1, 2, 3, 4, 5, 6, 7];
  * says so and offers to remake itself.
  *
  * Ticking a line puts it in the inventory (see inventory.setShoppingItemBought).
+ * Lines not yet ticked can be edited by hand — the quantity changed, the
+ * line taken off, a line added — and the meal chat can propose the same
+ * edits (applied with its 反映する).
  */
 export function PurchaseListPanel({
   list,
@@ -45,6 +52,9 @@ export function PurchaseListPanel({
   const [creating, startCreating] = useTransition();
   // Ticks shown at once, before the round trip, and kept across re-renders.
   const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [newName, setNewName] = useState("");
+  const [newQuantity, setNewQuantity] = useState("");
+  const [newCategory, setNewCategory] = useState(CATEGORIES[CATEGORIES.length - 1]);
   const isChecked = (item: ShoppingItem) => checked[item.id] ?? item.checked;
   const day = (key: string) => formatDateKey(key, localeTag(locale), { month: "numeric", day: "numeric", weekday: "short" });
 
@@ -65,6 +75,20 @@ export function PurchaseListPanel({
   function toggle(item: ShoppingItem, next: boolean) {
     setChecked((prev) => ({ ...prev, [item.id]: next }));
     void toggleShoppingItemAction(item.id, next).then(onInventoryChange);
+  }
+
+  function addLine(e: FormEvent) {
+    e.preventDefault();
+    if (!newName.trim()) return;
+    setError(null);
+    void addShoppingItemAction({ category: newCategory, name: newName, quantity: newQuantity, estimatedYen: 0 }).then((res) => {
+      if (res && "error" in res) setError(res.error);
+      else {
+        onListChange(res);
+        setNewName("");
+        setNewQuantity("");
+      }
+    });
   }
 
   function finish() {
@@ -170,12 +194,73 @@ export function PurchaseListPanel({
                   className="h-5 w-5 shrink-0 accent-[var(--color-accent)]"
                 />
                 <span className={`min-w-0 flex-1 text-[12.5px] ${isChecked(item) ? "text-ink-faint line-through" : "text-ink"}`}>{item.name}</span>
-                <span className="shrink-0 font-mono text-[10px] text-ink-faint">{item.quantity}</span>
+                {isChecked(item) ? (
+                  <span className="shrink-0 font-mono text-[10px] text-ink-faint">{item.quantity}</span>
+                ) : (
+                  // Edited in place; saved when it loses focus.
+                  <input
+                    key={`${item.id}:${item.quantity}`}
+                    defaultValue={item.quantity}
+                    aria-label={t.meals.purchaseAddQuantity}
+                    onClick={(e) => e.preventDefault()}
+                    onBlur={(e) =>
+                      e.target.value.trim() !== item.quantity &&
+                      void updateShoppingItemAction(item.id, { quantity: e.target.value }).then((next) => next && onListChange(next))
+                    }
+                    className="w-24 shrink-0 rounded border border-transparent bg-transparent px-1 text-right font-mono text-[10px] text-ink-soft hover:border-line focus:border-accent focus:outline-none"
+                  />
+                )}
                 <span className="w-14 shrink-0 text-right font-mono text-[10px] text-ink-soft">¥{item.estimatedYen.toLocaleString()}</span>
+                {!isChecked(item) && (
+                  <button
+                    type="button"
+                    aria-label={t.meals.purchaseRemove}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      void removeShoppingItemAction(item.id).then((next) => next && onListChange(next));
+                    }}
+                    className="shrink-0 rounded-full px-1.5 font-mono text-[11px] text-ink-faint hover:text-accent"
+                  >
+                    ×
+                  </button>
+                )}
               </label>
             ))}
         </div>
       ))}
+
+      <form onSubmit={addLine} className="flex flex-wrap items-center gap-1.5">
+        <select
+          value={newCategory}
+          onChange={(e) => setNewCategory(e.target.value)}
+          className="rounded-md border border-line bg-surface px-1.5 py-1 font-mono text-[10.5px] text-ink focus:outline-none"
+        >
+          {CATEGORIES.map((c) => (
+            <option key={c} value={c}>
+              {c}
+            </option>
+          ))}
+        </select>
+        <input
+          value={newName}
+          onChange={(e) => setNewName(e.target.value)}
+          placeholder={t.meals.purchaseAddName}
+          className="min-w-0 flex-1 rounded-md border border-line bg-surface px-2 py-1 text-[12px] text-ink focus:border-accent focus:outline-none"
+        />
+        <input
+          value={newQuantity}
+          onChange={(e) => setNewQuantity(e.target.value)}
+          placeholder={t.meals.purchaseAddQuantity}
+          className="w-20 rounded-md border border-line bg-surface px-2 py-1 font-mono text-[11px] text-ink focus:border-accent focus:outline-none"
+        />
+        <button
+          type="submit"
+          disabled={!newName.trim()}
+          className="rounded-md border border-line-strong px-2.5 py-1 font-mono text-[10.5px] text-ink-soft hover:border-accent hover:text-accent disabled:opacity-40"
+        >
+          {t.meals.purchaseAdd}
+        </button>
+      </form>
 
       {/* What the inventory already covers, set aside rather than dropped:
           enough at home is the usual case, but "4 eggs, need 10" is the
