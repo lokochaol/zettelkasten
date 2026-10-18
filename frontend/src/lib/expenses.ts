@@ -19,7 +19,7 @@ export type { Expense };
 
 /** Offered in the category picker before the owner has invented their own.
  * Not an enum — see the schema comment. */
-export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "サーバー・AI", "旅行", "本・教材", "その他"] as const;
+export const DEFAULT_CATEGORIES = ["食費", "日用品", "交通", "交際", "住居", "サーバー・AI", "旅行", "本・教材", "道具・設備", "その他"] as const;
 
 /** Subscriptions and usage bills for servers and AI — hosting, cloud,
  * domains, model APIs, AI chat plans. */
@@ -56,6 +56,17 @@ const BUILT_IN_KEYWORDS: { category: string; keywords: string[] }[] = [
     ],
   },
   {
+    // Things bought once and used for years — a computer, a chair, a pan —
+    // as against 日用品, which is used up. Electronics, furniture and DIY
+    // stores; shops that mostly sell consumables are left out.
+    category: "道具・設備",
+    keywords: [
+      "ヨドバシ", "yodobashi", "ビックカメラ", "bic camera", "biccamera", "ヤマダ電機", "ヤマダデンキ", "yamada denki",
+      "ケーズデンキ", "エディオン", "edion", "ジョーシン", "joshin", "ノジマ", "nojima", "コジマ", "ソフマップ", "sofmap",
+      "apple store", "ニトリ", "nitori", "ikea", "イケア", "カインズ", "cainz", "コーナン", "ハンズ", "hands", "島忠",
+    ],
+  },
+  {
     // Books, e-books and audiobooks, courses, language learning, exams.
     category: "本・教材",
     keywords: [
@@ -73,11 +84,12 @@ export function builtInCategoryFor(memo: string): string | null {
   // and "ANTHROPIC, PBC", and the keywords "claude.ai".
   const norm = (t: string) => ` ${t.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, " ").trim()} `;
   const text = norm(memo);
-  // Short names only as whole words, so "lawson", "neonate" or "banana"
-  // can't match.
+  // Latin names only as whole words, so "lawson", "banana" or "chands"
+  // can't match "aws", "ana" or "hands"; Japanese, which has no spaces to
+  // tell words apart, as a substring.
   const hit = (k: string) => {
     const key = norm(k).trim();
-    return key.length <= 4 && /^[a-z0-9 ]+$/.test(key) ? text.includes(` ${key} `) : text.includes(key);
+    return /^[a-z0-9 ]+$/.test(key) ? text.includes(` ${key} `) : text.includes(key);
   };
   return BUILT_IN_KEYWORDS.find((group) => group.keywords.some(hit))?.category ?? null;
 }
