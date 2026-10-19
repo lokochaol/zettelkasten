@@ -109,13 +109,25 @@ function toSessionView(s: TrainingSession): SessionView {
 }
 
 export async function getWeek(ownerSub: string, weekStartDateKey: string): Promise<TrainingWeekView> {
-  const plan = await prisma.trainingPlan.findUnique({
-    where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
-    include: { sessions: { orderBy: [{ dateKey: "asc" }, { sortOrder: "asc" }] } },
-  });
-  if (!plan) return { plan: null, sessions: [] };
-  const { sessions, ...rest } = plan;
-  return { plan: rest, sessions: sessions.map(toSessionView) };
+  // Sessions are read by date, not by the plan they were filed under. A
+  // plan is keyed by the day its week starts, and that follows the meals'
+  // week-start setting: change it, and a week's sessions sit under a plan
+  // whose key no longer matches — looked up by key, a day that was trained
+  // and logged showed as empty.
+  const toDateKey = shiftDateKey(weekStartDateKey, 6);
+  const [exact, sessions] = await Promise.all([
+    prisma.trainingPlan.findUnique({ where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } } }),
+    sessionsBetween(ownerSub, weekStartDateKey, toDateKey),
+  ]);
+  // The analysis and focus shown with the week: its own plan's, or failing
+  // that the newest plan that has sessions in these days.
+  const plan =
+    exact ??
+    (await prisma.trainingPlan.findFirst({
+      where: { ownerSub, sessions: { some: { dateKey: { gte: weekStartDateKey, lte: toDateKey } } } },
+      orderBy: { createdAt: "desc" },
+    }));
+  return { plan, sessions };
 }
 
 /** The week a date falls in, on the same calendar the meals use. */
@@ -362,7 +374,7 @@ export async function trainerContext(ownerSub: string, weekStartDateKey: string,
  * the past is evidence for the analysis, not something to overwrite.
  */
 export async function generateWeek(ownerSub: string, weekStartDateKey: string, todayKey: string): Promise<TrainingWeekView> {
-  const { preference, existing, dates, kept, open, daysLeft, brief: context } = await trainerContext(ownerSub, weekStartDateKey, todayKey);
+  const { preference, dates, kept, open, daysLeft, brief: context } = await trainerContext(ownerSub, weekStartDateKey, todayKey);
   const brief = [
     `今日: ${todayKey}`,
     `計画する週: ${dates[0]} 〜 ${dates[6]}`,
@@ -380,10 +392,17 @@ export async function generateWeek(ownerSub: string, weekStartDateKey: string, t
   }
 
   await prisma.$transaction(async (tx) => {
-    const plan = existing.plan
-      ? await tx.trainingPlan.update({ where: { id: existing.plan.id }, data: { analysis: parsed.analysis, focus: parsed.focus } })
-      : await tx.trainingPlan.create({ data: { ownerSub, weekStartDateKey, analysis: parsed.analysis, focus: parsed.focus } });
-    await tx.trainingSession.deleteMany({ where: { planId: plan.id, dateKey: { gte: todayKey } } });
+    const plan = await tx.trainingPlan.upsert({
+      where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
+      create: { ownerSub, weekStartDateKey, analysis: parsed.analysis, focus: parsed.focus },
+      update: { analysis: parsed.analysis, focus: parsed.focus },
+    });
+    // The week's days from today on are planned again — by date, so a
+    // session filed under an older week's plan (before the week-start
+    // setting changed) is replaced too rather than left as a duplicate.
+    await tx.trainingSession.deleteMany({
+      where: { plan: { ownerSub }, dateKey: { gte: todayKey > dates[0] ? todayKey : dates[0], lte: dates[6] } },
+    });
     await tx.trainingSession.createMany({
       data: parsed.sessions.map((s, i) => ({
         planId: plan.id,

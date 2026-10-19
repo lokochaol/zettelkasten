@@ -18,6 +18,7 @@ import * as health from "@/lib/health";
 import * as timeBlocks from "@/lib/timeBlocks";
 import * as expenses from "@/lib/expenses";
 import type { TimeBlock } from "@/lib/timeBlocks";
+import * as training from "@/lib/training";
 
 export async function listTodayProjectNotesAction(dateKey: string): Promise<TodayProjectNote[]> {
   const ownerSub = await requireOwnerSub();
@@ -78,8 +79,21 @@ export interface DayNutrition {
   weightKg: number | null;
 }
 
+/** A training session on the day, as the calendar shows it. */
+export interface DayTraining {
+  id: string;
+  title: string;
+  kind: training.TrainingKind;
+  minutes: number;
+  status: training.TrainingStatus;
+  rpe: number | null;
+  log: string;
+}
+
 export type DayScheduleView = {
   tasks: DayScheduleTask[];
+  /** The day's training — what was planned, and how it went if logged. */
+  training: DayTraining[];
   /** Time the owner blocked out by hand. Separate from events: these are
    * not in anyone's calendar, they're this app's own record of when a
    * task is meant to happen. */
@@ -111,12 +125,22 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
     projectTaskNotes.listAllProjectsTodayNotes(ownerSub, dateKey),
     getTimeZone(),
   ]);
-  const [scheduled, targetsNow, metric, blocks] = await Promise.all([
+  const [scheduled, targetsNow, metric, blocks, sessions] = await Promise.all([
     mealPlanning.scheduledMealsForDay(ownerSub, dateKey, timeZone),
     health.currentTargets(ownerSub, dateKey),
     health.getDailyMetric(ownerSub, dateKey),
     timeBlocks.listForDay(ownerSub, dateKey),
+    training.sessionsBetween(ownerSub, dateKey, dateKey),
   ]);
+  const trainingToday: DayTraining[] = sessions.map((s) => ({
+    id: s.id,
+    title: s.title,
+    kind: s.kind,
+    minutes: s.minutes,
+    status: s.status,
+    rpe: s.rpe,
+    log: s.log,
+  }));
   const foodSpentYen = await expenses.sumForRange(ownerSub, dateKey, dateKey, expenses.FOOD_CATEGORY);
   const meals: DayMeal[] = scheduled.map(({ meal, start, end }) => ({
     id: meal.id,
@@ -166,11 +190,11 @@ export async function getDayScheduleAction(dateKey: string): Promise<DaySchedule
 
   try {
     const events = await googleCalendar.listDayEvents(ownerSub, dateKey, timeZone);
-    return { calendar: "linked", events, tasks, meals, nutrition, blocks };
+    return { calendar: "linked", events, tasks, training: trainingToday, meals, nutrition, blocks };
   } catch (e) {
-    if (e instanceof googleCalendar.GoogleCalendarNotLinkedError) return { calendar: "not_linked", tasks, meals, nutrition, blocks };
-    if (e instanceof googleCalendar.GoogleCalendarAuthError) return { calendar: "reauth_required", tasks, meals, nutrition, blocks };
-    if (e instanceof googleCalendar.GoogleCalendarApiError) return { calendar: "error", tasks, meals, nutrition, blocks };
+    if (e instanceof googleCalendar.GoogleCalendarNotLinkedError) return { calendar: "not_linked", tasks, training: trainingToday, meals, nutrition, blocks };
+    if (e instanceof googleCalendar.GoogleCalendarAuthError) return { calendar: "reauth_required", tasks, training: trainingToday, meals, nutrition, blocks };
+    if (e instanceof googleCalendar.GoogleCalendarApiError) return { calendar: "error", tasks, training: trainingToday, meals, nutrition, blocks };
     throw e;
   }
 }

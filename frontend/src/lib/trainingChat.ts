@@ -242,16 +242,17 @@ export async function applyProposal(ownerSub: string, messageId: string, todayKe
   const remove = proposal.remove.filter((r) => changeable.get(r.dateKey));
 
   await prisma.$transaction(async (tx) => {
-    const plan =
-      week.plan ??
-      (await tx.trainingPlan.upsert({
-        where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
-        create: { ownerSub, weekStartDateKey, focus: proposal.focus },
-        update: {},
-      }));
-    if (proposal.focus && week.plan) await tx.trainingPlan.update({ where: { id: plan.id }, data: { focus: proposal.focus } });
+    // Written to this week's own plan; what it replaces is found by date,
+    // whichever week's plan it was filed under (see getWeek).
+    const plan = await tx.trainingPlan.upsert({
+      where: { ownerSub_weekStartDateKey: { ownerSub, weekStartDateKey } },
+      create: { ownerSub, weekStartDateKey, focus: proposal.focus },
+      update: proposal.focus ? { focus: proposal.focus } : {},
+    });
     const days = [...sessions.map((s) => s.dateKey), ...remove.map((r) => r.dateKey)];
-    if (days.length > 0) await tx.trainingSession.deleteMany({ where: { planId: plan.id, dateKey: { in: days }, status: "PLANNED" } });
+    if (days.length > 0) {
+      await tx.trainingSession.deleteMany({ where: { plan: { ownerSub }, dateKey: { in: days }, status: "PLANNED" } });
+    }
     if (sessions.length > 0) {
       await tx.trainingSession.createMany({
         data: sessions.map((s, i) => ({
