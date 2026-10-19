@@ -537,6 +537,9 @@ export interface Dictionary {
     notesIntro: string;
   };
   daySchedule: {
+    trainingHeading: string;
+    trainingOpen: string;
+    trainingMinutes: (n: number) => string;
     heading: string;
     flowHeading: string;
     flowNote: string;

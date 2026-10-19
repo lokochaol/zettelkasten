@@ -567,6 +567,9 @@ export const en: Dictionary = {
     notesIntro: "You can also pick Dash Off notes. Once a note is swept away after a week, discovery stops searching it.",
   },
   daySchedule: {
+    trainingHeading: "Training",
+    trainingOpen: "Log it",
+    trainingMinutes: (n) => `${n} min`,
     heading: "Schedule & tasks",
     flowHeading: "The day",
     flowNote: "Meals are placed automatically from the week's plan. Add your own blocks under the tasks.",

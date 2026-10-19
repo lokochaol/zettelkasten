@@ -567,6 +567,9 @@ export const ja: Dictionary = {
     notesIntro: "走り書きから選ぶこともできます。走り書きは1週間で片付くと、探索の対象からも外れます。",
   },
   daySchedule: {
+    trainingHeading: "運動",
+    trainingOpen: "記録する",
+    trainingMinutes: (n) => `${n}分`,
     heading: "その日の予定とタスク",
     flowHeading: "今日の流れ",
     flowNote: "食事は献立から自動で置かれた時間枠です。予定・タスクの時間枠は右の「時間を確保する」から追加できます。",

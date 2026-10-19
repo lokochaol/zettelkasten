@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState, useTransition } from "react";
 import {
   addTimeBlockAction,
@@ -319,6 +320,39 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
               <ul className="flex flex-col gap-2">
                 {view.meals.map((m) => (
                   <MealRow key={m.id} meal={m} onLog={logMeal} />
+                ))}
+              </ul>
+            </section>
+          )}
+
+          {/* The day's training, planned or logged — logged on /training,
+              so it's shown here and linked there. */}
+          {view.training.length > 0 && (
+            <section className="flex flex-col gap-2.5 rounded-xl border border-line bg-surface p-4">
+              <div className="flex items-baseline justify-between gap-2">
+                <Heading label={t.daySchedule.trainingHeading} />
+                <Link href={`/training?week=${dateKey}`} className="font-mono text-[9.5px] text-ink-soft hover:text-accent">
+                  {t.daySchedule.trainingOpen} →
+                </Link>
+              </div>
+              <ul className="flex flex-col gap-2">
+                {view.training.map((s) => (
+                  <li key={s.id} className="flex flex-col gap-0.5">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                      <span className="font-mono text-[9px] tracking-wider text-accent uppercase">{t.training.kind[s.kind]}</span>
+                      <span className={`text-[12px] font-semibold ${s.status === "SKIPPED" ? "text-ink-faint line-through" : "text-ink"}`}>{s.title}</span>
+                      <span className="font-mono text-[9.5px] text-ink-faint">{t.daySchedule.trainingMinutes(s.minutes)}</span>
+                      <span
+                        className={`ml-auto rounded-full px-2 py-0.5 font-mono text-[9px] ${
+                          s.status === "DONE" ? "bg-accent-soft text-accent" : "bg-surface-alt text-ink-soft"
+                        }`}
+                      >
+                        {t.training.status[s.status]}
+                        {s.status === "DONE" && s.rpe !== null ? ` · RPE ${s.rpe}` : ""}
+                      </span>
+                    </div>
+                    {s.log && <p className="text-[11px] leading-relaxed text-ink-soft">{s.log}</p>}
+                  </li>
                 ))}
               </ul>
             </section>

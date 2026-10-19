@@ -22,11 +22,11 @@ import { announceChange, useRefreshOn } from "@/lib/dataSync";
 
 const EXPERIENCES: TrainingExperience[] = ["BEGINNER", "INTERMEDIATE", "ADVANCED"];
 
-/** Whole weeks from `todayKey` to `dateKey` (0 when absent or malformed). */
-function weeksFrom(todayKey: string, dateKey: string | undefined): number {
-  if (!dateKey || !/^\d{4}-\d{2}-\d{2}$/.test(dateKey)) return 0;
-  const days = (Date.parse(`${dateKey}T00:00:00Z`) - Date.parse(`${todayKey}T00:00:00Z`)) / 86_400_000;
-  return Number.isFinite(days) ? Math.round(days / 7) : 0;
+/** How many weeks the week starting `weekStartDateKey` is from the one
+ * holding today: 0 for this week, -1 for last week. */
+function weeksFromToday(todayKey: string, weekStartDateKey: string): number {
+  const days = (Date.parse(`${todayKey}T00:00:00Z`) - Date.parse(`${weekStartDateKey}T00:00:00Z`)) / 86_400_000;
+  return Number.isFinite(days) ? -Math.floor(days / 7) : 0;
 }
 
 const round1 = (n: number) => Math.round(n * 10) / 10;
@@ -44,20 +44,25 @@ const signed = (n: number) => {
 export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
   const { t, locale } = useI18n();
   const todayKey = todayKeyValue();
-  const [weekOffset, setWeekOffset] = useState(() => weeksFrom(todayKey, initialWeek));
+  // Any day of the week being looked at; the server works out which week
+  // that is. A date, not a count of weeks from today, so ?week= with any
+  // day in it (the calendar links here with the day it shows) opens the
+  // week that holds that day.
+  const [anchorKey, setAnchorKey] = useState(() =>
+    initialWeek && /^\d{4}-\d{2}-\d{2}$/.test(initialWeek) ? initialWeek : todayKey,
+  );
   const [data, setData] = useState<TrainingOverview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [generating, startGenerating] = useTransition();
   const chatRef = useRef<TrainerChatHandle>(null);
-  const anchorKey = shiftDateKey(todayKey, weekOffset * 7);
 
   useRefreshOn(["training", "health"], () => void getTrainingOverviewAction(anchorKey, todayKey).then(setData));
 
   useEffect(() => {
     getTrainingOverviewAction(anchorKey, todayKey).then(setData);
     // Kept in the address so a reload stays on this week (src/lib/viewState.ts).
-    replaceQuery({ week: weekOffset === 0 ? null : anchorKey });
-  }, [anchorKey, todayKey, weekOffset]);
+    replaceQuery({ week: anchorKey === todayKey ? null : anchorKey });
+  }, [anchorKey, todayKey]);
 
   // Closing the tab mid-call costs an API call and leaves no plan.
   useEffect(() => {
@@ -121,20 +126,20 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
           </span>
           <div className="flex items-center gap-1">
             <button
-              onClick={() => setWeekOffset((o) => o - 1)}
+              onClick={() => setAnchorKey((a) => shiftDateKey(a, -7))}
               aria-label={t.meals.prevWeek}
               className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-soft hover:border-accent hover:text-accent"
             >
               ‹
             </button>
             <button
-              onClick={() => setWeekOffset(0)}
+              onClick={() => setAnchorKey(todayKey)}
               className="rounded-md border border-line px-2 py-1 font-mono text-[10px] text-ink-soft hover:border-accent hover:text-accent"
             >
-              {t.meals.weeksAhead(weekOffset)}
+              {t.meals.weeksAhead(weeksFromToday(todayKey, data.weekStartDateKey))}
             </button>
             <button
-              onClick={() => setWeekOffset((o) => o + 1)}
+              onClick={() => setAnchorKey((a) => shiftDateKey(a, 7))}
               aria-label={t.meals.nextWeek}
               className="rounded-md border border-line px-2 py-1 font-mono text-[11px] text-ink-soft hover:border-accent hover:text-accent"
             >
