@@ -136,6 +136,9 @@ export function OverviewTab(props: TabProps) {
           selectedId={selected?.milestoneId ?? null}
           onSelect={(goalId, milestoneId) => setSelected((s) => (s?.milestoneId === milestoneId ? null : { goalId, milestoneId }))}
           onAddPhase={(goalId) => void addPhase(goalId)}
+          marks={ov.subPlans.flatMap((p) =>
+            p.goalId ? p.steps.filter((s) => s.kind === "DUE").map((s) => ({ goalId: p.goalId!, dateKey: s.dateKey, label: s.label, done: s.done })) : [],
+          )}
         />
         {selGoal && selPhase && (
           <PhaseEditor

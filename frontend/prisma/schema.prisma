@@ -1207,6 +1207,7 @@ model Goal {
   tasks        GoalTask[]
   deliverables GoalDeliverable[]
   experiments  GoalExperiment[]
+  subPlans     GoalSubPlan[]
 
   @@index([ownerSub, status, sortOrder])
   @@map("goal")
@@ -1590,8 +1591,97 @@ model GoalPlanDocument {
   source    String   @default("MANUAL")
   /// How it was applied: FULL (the plan rewritten from it) or MERGE.
   applied   String   @default("")
+  /// Set for an area's detailed plan (GoalSubPlan); null for the whole plan.
+  subPlanId String?  @map("sub_plan_id")
   createdAt DateTime @default(now()) @map("created_at")
 
   @@index([ownerSub, createdAt])
+  @@index([subPlanId, createdAt])
   @@map("goal_plan_document")
+}
+
+/// One area's detailed plan — e.g. a degree's course plan under 大学・建築:
+/// the ledger of items (courses, assignments) with their size and state,
+/// the dated steps of each (work periods, drafts, checks, submission
+/// targets with a fallback, sessions), a week-by-week execution table and
+/// a day-by-day table for the first days (src/lib/goalSubPlan.ts).
+model GoalSubPlan {
+  id          String     @id @default(uuid())
+  ownerSub    String     @map("owner_sub")
+  goalId      String?    @map("goal_id")
+  goal        Goal?      @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  title       String
+  summary     String     @default("")
+  /// What an item's size counts ("単位"), and the total aimed at (124).
+  unitLabel   String     @default("") @map("unit_label")
+  targetTotal Float      @default(0) @map("target_total")
+  /// Already counted outside the ledger (credits transferred in, say).
+  baseDone    Float      @default(0) @map("base_done")
+  /// The execution table's column headings, and its rows:
+  /// [{ label, fromDateKey, toDateKey, cells: string[] }].
+  weekColumns Json       @default("[]") @map("week_columns")
+  weeks       Json       @default("[]")
+  /// The day-by-day table: [{ dateKey, time, work, output }].
+  days        Json       @default("[]")
+  sortOrder   Int        @default(0) @map("sort_order")
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  items       GoalItem[]
+  steps       GoalItemStep[]
+
+  @@index([ownerSub, sortOrder])
+  @@map("goal_sub_plan")
+}
+
+/// A line of a detailed plan's ledger: a course, an assignment, a module.
+model GoalItem {
+  id          String         @id @default(uuid())
+  subPlanId   String         @map("sub_plan_id")
+  subPlan     GoalSubPlan    @relation(fields: [subPlanId], references: [id], onDelete: Cascade)
+  /// The ledger's section ("登録中", "専門必修", "選択必修" …).
+  group       String         @default("")
+  code        String         @default("")
+  title       String
+  /// S/T, 必修 … — how it's taken.
+  kind        String         @default("")
+  /// Credits or the like, in the plan's unitLabel.
+  size        Float          @default(0)
+  /// PLANNED / REGISTERED / IN_PROGRESS / SUBMITTED / PASSED / DONE / DROPPED.
+  status      String         @default("PLANNED")
+  /// What's on record now ("報告①B、SC①優").
+  record      String         @default("")
+  /// When it's aimed at ("2027前期"), and as dates when known.
+  periodLabel String         @default("") @map("period_label")
+  fromDateKey String?        @map("from_date_key")
+  toDateKey   String?        @map("to_date_key")
+  /// What to leave behind for a good result.
+  note        String         @default("")
+  sortOrder   Int            @default(0) @map("sort_order")
+  steps       GoalItemStep[]
+
+  @@index([subPlanId, sortOrder])
+  @@map("goal_item")
+}
+
+/// A dated step of a detailed plan: a work period (with a start), or a
+/// point — draft, check, submission target (with a fallback date), session,
+/// decision. On an item, or on the plan itself.
+model GoalItemStep {
+  id            String      @id @default(uuid())
+  subPlanId     String      @map("sub_plan_id")
+  subPlan       GoalSubPlan @relation(fields: [subPlanId], references: [id], onDelete: Cascade)
+  itemId        String?     @map("item_id")
+  item          GoalItem?   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  label         String
+  /// WORK / DRAFT / CHECK / DUE / SESSION / DECISION / OTHER.
+  kind          String      @default("OTHER")
+  startDateKey  String?     @map("start_date_key")
+  dateKey       String      @map("date_key")
+  backupDateKey String?     @map("backup_date_key")
+  doneAt        DateTime?   @map("done_at")
+  note          String      @default("")
+  sortOrder     Int         @default(0) @map("sort_order")
+
+  @@index([subPlanId, dateKey])
+  @@map("goal_item_step")
 }

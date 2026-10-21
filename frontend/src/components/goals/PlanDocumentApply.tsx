@@ -52,6 +52,7 @@ export function PlanDocumentApply({
   const [applying, setApplying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const started = useRef(false);
+  const area = draft?.scope === "area";
 
   async function read(startedAt: number) {
     setError(null);
@@ -126,11 +127,42 @@ export function PlanDocumentApply({
 
       {draft && (
         <div className="flex flex-col gap-3 rounded-lg border border-line bg-surface px-3 py-3">
+          {draft.scope === "area" && draft.area && (
+            <p className="rounded-md bg-accent/10 px-2 py-1 text-[11.5px] font-semibold text-ink">{t.plan.importPreviewArea(draft.area)}</p>
+          )}
           {draft.summary && <p className="text-[12px] leading-relaxed text-ink">{draft.summary}</p>}
           {draft.vision && <p className="border-l-2 border-accent pl-2 text-[11.5px] whitespace-pre-wrap text-ink-soft">{draft.vision}</p>}
 
+          {draft.subPlans.map((sp, i) => {
+            const groups = [...new Set(sp.items.map((x) => x.group))];
+            return (
+              <div key={`sp${i}`} className="flex flex-col gap-1.5 rounded-lg border border-line p-2.5">
+                <p className="text-[12.5px] font-bold text-ink">{t.plan.importPreviewSubPlan(sp.title, sp.items.length, sp.steps.length, sp.weeks.length, sp.days.length)}</p>
+                {groups.map((g) => (
+                  <p key={g} className="text-[11px] leading-relaxed text-ink-soft">
+                    <span className="mr-1 font-mono text-[9.5px] text-ink-faint">{g || "—"}</span>
+                    {sp.items
+                      .filter((x) => x.group === g)
+                      .map((x) => `${x.title}${x.size ? ` ${x.size}${sp.unitLabel}` : ""}`)
+                      .join("、")}
+                  </p>
+                ))}
+                {sp.steps.filter((x) => x.kind === "DUE").length > 0 && (
+                  <p className="font-mono text-[10px] text-ink-faint">
+                    {t.plan.stepKind.DUE}:{" "}
+                    {sp.steps
+                      .filter((x) => x.kind === "DUE")
+                      .slice(0, 8)
+                      .map((x) => `${day.short(x.dateKey)} ${x.label}`)
+                      .join(" / ")}
+                  </p>
+                )}
+              </div>
+            );
+          })}
+
           <ul className="flex flex-col gap-2">
-            {draft.goals.map((g, i) => {
+            {(draft.scope === "area" ? [] : draft.goals).map((g, i) => {
               const hex = GOAL_COLORS[(goalCount + i) % GOAL_COLORS.length].hex;
               return (
                 <li key={i} className="flex flex-col gap-1 border-l-4 pl-2" style={{ borderColor: hex }}>
@@ -180,7 +212,7 @@ export function PlanDocumentApply({
               ))}
           </div>
 
-          {/* How it goes in: the whole plan from now on, or added to what's here. */}
+          {/* How it goes in: the whole plan (or the area's detailed plan) from now on, or added to what's here. */}
           <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={t.plan.applyModeLabel}>
             {(["replace", "merge"] as ApplyMode[]).map((m) => (
               <button
@@ -193,9 +225,11 @@ export function PlanDocumentApply({
               >
                 <span className="flex items-center gap-1.5 text-[12px] font-bold text-ink">
                   <span className={`h-3 w-3 rounded-full border-2 ${mode === m ? "border-accent bg-accent" : "border-line-strong"}`} />
-                  {m === "replace" ? t.plan.applyReplace : t.plan.applyMerge}
+                  {m === "replace" ? (area ? t.plan.applyReplaceArea : t.plan.applyReplace) : t.plan.applyMerge}
                 </span>
-                <span className="text-[10.5px] leading-relaxed text-ink-soft">{m === "replace" ? t.plan.applyReplaceNote : t.plan.applyMergeNote}</span>
+                <span className="text-[10.5px] leading-relaxed text-ink-soft">
+                  {m === "replace" ? (area ? t.plan.applyReplaceAreaNote : t.plan.applyReplaceNote) : area ? t.plan.applyMergeAreaNote : t.plan.applyMergeNote}
+                </span>
               </button>
             ))}
           </div>

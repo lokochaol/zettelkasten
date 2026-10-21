@@ -59,7 +59,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
     !selectedDate && topView === "today" ? await projectTaskNotes.listAllProjectsTodayNotes(ownerSub, todayKey) : [];
   const focus = !selectedDate && topView === "today" ? await goals.todayFocus(ownerSub, todayKey) : null;
   const todayPlan = !selectedDate && topView === "today" ? await goalPlan.todayPlan(ownerSub, todayKey) : null;
-  const hasPlan = todayPlan !== null && (todayPlan.slots.length > 0 || todayPlan.events.length > 0);
+  const hasPlan = todayPlan !== null && (todayPlan.slots.length > 0 || todayPlan.events.length > 0 || todayPlan.steps.length > 0 || todayPlan.dayRows.length > 0);
   const timelineMarks =
     !selectedDate && topView === "timeline"
       ? await projectTaskNotes.listTimelineMarks(ownerSub, viewedYear, viewedMonth, todayKey)

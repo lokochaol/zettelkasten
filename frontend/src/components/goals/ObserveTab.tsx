@@ -58,6 +58,8 @@ const ALERT_ICON: Record<Alert["kind"], string> = {
   reviewDue: "↻",
   deadlineSoon: "◆",
   experimentDue: "⚗",
+  stepSoon: "◇",
+  stepOverdue: "!",
 };
 
 function AlertsCard({ obs, goals, hexes }: { obs: Observation; goals: TabProps["ov"]["goals"]; hexes: Map<string, string> }) {
@@ -83,6 +85,10 @@ function AlertsCard({ obs, goals, hexes }: { obs: Observation; goals: TabProps["
         return t.plan.alert.deadlineSoon(a.title, day.withWeekday(a.dateKey));
       case "experimentDue":
         return t.plan.alert.experimentDue(a.title, day.short(a.dateKey));
+      case "stepSoon":
+        return t.plan.alert.stepSoon(t.plan.stepKind[a.stepKind] ?? a.stepKind, a.title, a.itemTitle, day.withWeekday(a.dateKey));
+      case "stepOverdue":
+        return t.plan.alert.stepOverdue(a.title, a.itemTitle, day.short(a.dateKey), a.backupDateKey ? day.short(a.backupDateKey) : null);
     }
   };
   const hexOf = (a: Alert) =>

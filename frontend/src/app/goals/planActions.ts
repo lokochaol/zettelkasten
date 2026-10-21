@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import * as plan from "@/lib/goalPlan";
 import * as planImport from "@/lib/goalPlanImport";
 import * as advisor from "@/lib/goalAdvisor";
+import * as subPlan from "@/lib/goalSubPlan";
 import { requireOwnerSub } from "@/lib/session";
 import { DomainError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
@@ -211,4 +212,34 @@ export async function dismissAdvisorProposalAction(messageId: string) {
     await advisor.dismissProposal(o, messageId);
     return { messages: (await advisor.listMessages(o)).map(advisor.toMessageView) };
   });
+}
+
+/* ---------- detailed plans ---------- */
+
+export async function createSubPlanAction(goalId: string | null, title: string) {
+  return run(async (o) => ({ subPlan: await subPlan.createSubPlan(o, goalId, title) }));
+}
+export async function updateSubPlanAction(id: string, patch: subPlan.SubPlanPatch) {
+  return run(async (o) => ({ subPlan: await subPlan.updateSubPlan(o, id, patch) }));
+}
+export async function deleteSubPlanAction(id: string) {
+  return run(async (o) => (await subPlan.deleteSubPlan(o, id), ok));
+}
+export async function saveItemAction(subPlanId: string, itemId: string | null, input: subPlan.ItemInput) {
+  return run(async (o) => ({ subPlan: await subPlan.saveItem(o, subPlanId, itemId, input) }));
+}
+export async function deleteItemAction(id: string) {
+  return run(async (o) => (await subPlan.deleteItem(o, id), ok));
+}
+export async function saveStepAction(subPlanId: string, stepId: string | null, input: subPlan.StepInput) {
+  return run(async (o) => ({ subPlan: await subPlan.saveStep(o, subPlanId, stepId, input) }));
+}
+export async function deleteStepAction(id: string) {
+  return run(async (o) => (await subPlan.deleteStep(o, id), ok));
+}
+export async function saveWeekCellAction(subPlanId: string, row: number, col: number, text: string) {
+  return run(async (o) => ({ subPlan: await subPlan.saveWeekCell(o, subPlanId, row, col, text) }));
+}
+export async function getSubPlanDocumentAction(subPlanId: string) {
+  return run(async (o) => ({ markdown: await subPlan.subPlanDocument(o, subPlanId) }));
 }

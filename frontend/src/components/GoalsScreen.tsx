@@ -6,6 +6,7 @@ import type { PlanOverview } from "@/lib/goalPlan";
 import { AdvisorDrawer } from "@/components/goals/AdvisorDrawer";
 import { CompassTab } from "@/components/goals/CompassTab";
 import { CycleTab } from "@/components/goals/CycleTab";
+import { DetailTab } from "@/components/goals/DetailTab";
 import { ObserveTab } from "@/components/goals/ObserveTab";
 import { OverviewTab } from "@/components/goals/OverviewTab";
 import { PlanImportPanel } from "@/components/goals/PlanImportPanel";
@@ -16,8 +17,8 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { useUnsavedChanges } from "@/lib/unsavedChanges/UnsavedChangesProvider";
 import { useRefreshOn } from "@/lib/dataSync";
 
-type Tab = "overview" | "cycle" | "week" | "records" | "observe" | "compass";
-const TABS: Tab[] = ["overview", "cycle", "week", "records", "observe", "compass"];
+type Tab = "overview" | "cycle" | "detail" | "week" | "records" | "observe" | "compass";
+const TABS: Tab[] = ["overview", "cycle", "detail", "week", "records", "observe", "compass"];
 const TAB_KEY = "goals:tab";
 
 /**
@@ -26,6 +27,7 @@ const TAB_KEY = "goals:tab";
  *
  *   全体     vision, the roadmap (a Gantt of every goal's phases), the goals
  *   実行期間 the current 12 weeks: targets, evidence, 4-week phases, dates
+ *   詳細計画 an area's ledger of courses or assignments and their steps
  *   1週間    the weekly budget, the 168 hours, the standard week
  *   記録     the daily record and the weekly / 4- / 12-week reviews
  *   観測     what the records say, and what the rules suggest changing
@@ -159,6 +161,7 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
 
       {tab === "overview" && <OverviewTab {...props} />}
       {tab === "cycle" && <CycleTab {...props} />}
+      {tab === "detail" && <DetailTab {...props} />}
       {tab === "week" && <WeekTab {...props} />}
       {tab === "records" && <RecordsTab {...props} />}
       {tab === "observe" && <ObserveTab {...props} />}

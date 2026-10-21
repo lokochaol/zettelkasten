@@ -339,6 +339,10 @@ export function GuideContentEn() {
                 body: "Create a span like \"the first 12 weeks\" and it gets 4-week phases and a week counter. For each area write the target, the evidence that it's done, the time it takes and what each 4 weeks is for; keep the deadlines, windows, class days, review days and things to start alongside.",
               },
               {
+                title: "Detailed plans",
+                body: "An area's finer plan. Like a course plan: a ledger of courses or assignments (size, state, what's on record, when it's aimed at), each assignment's draft, check, submission target and fallback, session dates, a week-by-week execution table and day-by-day plans for the first days. Steps line up on a timeline — work periods as bars, the rest as marks by kind — and those coming up also show under Observe and on the calendar's Today. Importing a course-plan document touches only that area; you can also build one with the advisor, or tell it what you've submitted to update the states.",
+              },
+              {
                 title: "Week",
                 body: "Set each area's weekly hours (and commuting share) and the split of the 168 hours. Place blocks on the standard week and the gap between blocks and budget shows in colour. Today's blocks also show on the calendar's Today.",
               },

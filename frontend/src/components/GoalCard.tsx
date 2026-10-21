@@ -15,7 +15,6 @@ import {
 import { ConfirmDialog } from "@/components/ConfirmDialog";
 import { BlurText, HoursInput, LABEL } from "@/components/goals/ui";
 import { GOAL_COLORS, tint } from "@/lib/goalColors";
-import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { HORIZON_PRESETS, horizonDateKey } from "@/lib/goalFocus";
 import { formatDateKey } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -26,8 +25,8 @@ const INPUT =
 const PILL =
   "rounded-full border border-line-strong px-2.5 py-0.5 font-mono text-[10px] text-ink-soft transition-colors hover:border-accent hover:text-accent disabled:opacity-50";
 
-/** Throws the action's error, so MarkdownNoteEditor shows the save as failed
- * and keeps the text. */
+/** Throws the action's error, so the field shows the save as failed and
+ * keeps the text. */
 function orThrow<T extends object>(res: T | { error: string }): T {
   if ("error" in res) throw new Error(res.error);
   return res;
@@ -253,12 +252,12 @@ export function GoalCard({
       {open && (
         <div className="flex flex-col gap-4 sm:pl-8">
           <div className="flex flex-col gap-1">
-            <p className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">{t.goals.statementLabel}</p>
-            <MarkdownNoteEditor
-              content={goal.statement}
-              draftKey={`goal:${goal.id}:statement`}
-              onSave={async (content) => {
-                onChange(orThrow(await updateGoalAction(goal.id, { statement: content })).goal);
+            <BlurText
+              label={t.goals.statementLabel}
+              value={goal.statement}
+              rows={2}
+              onSave={async (statement) => {
+                onChange(orThrow(await updateGoalAction(goal.id, { statement })).goal);
               }}
             />
           </div>
@@ -466,13 +465,8 @@ function MilestoneRow({
         label={milestone.condition ? t.plan.phaseCondition : undefined}
         onSave={(v) => onPatch({ condition: v })}
       />
-      <MarkdownNoteEditor
-        content={milestone.body}
-        draftKey={`goal-step:${milestone.id}`}
-        onSave={async (content) => {
-          await onPatch({ body: content });
-        }}
-      />
+      {/* Notes from the earlier format, kept readable; new detail goes to 詳細計画. */}
+      {milestone.body.trim() && <p className="pl-6 text-[11px] leading-relaxed whitespace-pre-wrap text-ink-faint">{milestone.body}</p>}
     </div>
   );
 }

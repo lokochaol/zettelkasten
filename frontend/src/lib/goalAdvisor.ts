@@ -4,6 +4,7 @@ import { askForJson } from "@/lib/aiJson";
 import type { ChatProgress, ProgressItem } from "@/lib/chatProgress";
 import { partialString } from "@/lib/chatProgress";
 import { ValidationError } from "@/lib/errors";
+import { subPlanDocument, toWeeks } from "@/lib/goalSubPlan";
 import { addChange, EVENT_KINDS, getPlanOverview, observe, PLAN_DATE_KEY, PLAN_TIME, type PlanOverview } from "@/lib/goalPlan";
 
 /**
@@ -30,9 +31,10 @@ const HISTORY_TURNS = 40;
 const HISTORY_CHARS = 1500;
 /** Long enough for a pasted page of notes or an existing plan. */
 const MAX_MESSAGE_LENGTH = 20_000;
-const MAX_DOCUMENT_CHARS = 80_000;
+const MAX_DOCUMENT_CHARS = 200_000;
 /** The current 計画書 as the model reads it. */
 const DOCUMENT_CONTEXT_CHARS = 40_000;
+const SUBPLAN_DOCUMENT_CHARS = 120_000;
 const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 const WEEKDAY = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -52,7 +54,13 @@ export type OpType =
   | "check.update"
   | "task.add"
   | "task.update"
-  | "experiment.add";
+  | "experiment.add"
+  | "item.add"
+  | "item.update"
+  | "step.add"
+  | "step.update"
+  | "step.remove"
+  | "week.update";
 
 /** A change as checked and resolved: real ids, clean values, and the line
  * that says what it does. */
@@ -105,7 +113,59 @@ export async function listMessages(ownerSub: string) {
 
 /** The plan as the advisor sees it, with a short ref for everything it may
  * change. The maps turn the refs back into rows. */
-export function briefOf(ov: PlanOverview, extra: { observation: string; logs: string; review: string; experiments: string }) {
+const STEP_LABEL: Record<string, string> = { WORK: "作業", DRAFT: "初稿", CHECK: "点検", DUE: "提出目標", SESSION: "授業", DECISION: "判定", OTHER: "その他" };
+const STATUS_LABEL: Record<string, string> = { PLANNED: "予定", REGISTERED: "登録", IN_PROGRESS: "取り組み中", SUBMITTED: "提出済み", PASSED: "合格", DONE: "完了", DROPPED: "見送り" };
+
+/** The detailed plans, as the model reads them: every ledger line, the
+ * steps near today and every open target, and this week's and today's rows. */
+function briefSubPlans(
+  ov: PlanOverview,
+  lines: string[],
+  ref: (prefix: string, kind: string, id: string, i: number) => string,
+  g: (id: string | null) => string,
+  todayKey: string,
+) {
+  if (ov.subPlans.length === 0) return;
+  lines.push("", "詳細計画:");
+  let itemIndex = 0;
+  let stepIndex = 0;
+  ov.subPlans.forEach((p, i) => {
+    const r = ref("D", "subPlan", p.id, i);
+    const done = p.baseDone + p.items.filter((x) => x.status === "DONE").reduce((a, x) => a + x.size, 0);
+    lines.push(`- ${r} ${p.title}（${g(p.goalId) || "領域なし"}）${p.targetTotal ? ` 完了${done}/${p.targetTotal}${p.unitLabel}` : ""}`);
+    const itemRef = new Map<string, string>();
+    for (const it of p.items) {
+      const ir = ref("I", "item", it.id, itemIndex++);
+      itemRef.set(it.id, ir);
+      lines.push(
+        `    - ${ir} [${it.group}] ${it.code} ${it.title} ${it.kind} ${it.size}${p.unitLabel} ／ ${STATUS_LABEL[it.status]}${it.record ? ` ／ 記録: ${it.record.slice(0, 80)}` : ""}${it.periodLabel ? ` ／ 配置: ${it.periodLabel.slice(0, 80)}` : ""}`,
+      );
+    }
+    const near = p.steps.filter((x) => (!x.done && x.kind !== "WORK") || (x.dateKey >= shift(todayKey, -21) && (x.startDateKey ?? x.dateKey) <= shift(todayKey, 120)));
+    if (near.length > 0) lines.push("    工程（近いものと未了の目標）:");
+    for (const x of near.slice(0, 80)) {
+      const kr = ref("K", "step", x.id, stepIndex++);
+      lines.push(
+        `    - ${kr} [${STEP_LABEL[x.kind]}] ${x.startDateKey ? `${x.startDateKey}〜` : ""}${x.dateKey}${x.backupDateKey ? `（予備${x.backupDateKey}）` : ""} ${x.label}${x.itemId ? ` ${itemRef.get(x.itemId) ?? ""}` : ""}${x.done ? " 済" : ""}`,
+      );
+    }
+    const week = p.weeks.findIndex((w) => w.fromDateKey && w.toDateKey && w.fromDateKey <= todayKey && todayKey <= w.toDateKey);
+    for (const wi of [week, week + 1].filter((x) => x >= 0 && x < p.weeks.length)) {
+      const w = p.weeks[wi];
+      lines.push(`    実行表 週「${w.label}」${w.fromDateKey}〜${w.toDateKey}: ${w.cells.map((c, ci) => `${p.weekColumns[ci] ?? ci}=${c.slice(0, 200)}`).join(" ／ ")}`);
+    }
+    const day = p.days.find((d) => d.dateKey === todayKey);
+    if (day) lines.push(`    今日の予定: ${day.time} ／ ${day.work.slice(0, 300)} ／ 残すもの: ${day.output.slice(0, 200)}`);
+  });
+}
+
+const shift = (key: string, days: number) => {
+  const d = new Date(`${key}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+};
+
+export function briefOf(ov: PlanOverview, extra: { observation: string; logs: string; review: string; experiments: string; todayKey?: string }) {
   const refs = new Map<string, { kind: string; id: string }>();
   const ref = (prefix: string, kind: string, id: string, i: number) => {
     const r = `${prefix}${i + 1}`;
@@ -157,6 +217,7 @@ export function briefOf(ov: PlanOverview, extra: { observation: string; logs: st
     const r = ref("T", "task", t.id, i);
     lines.push(`- ${r} ${t.done ? "済" : "未"} ${t.text} ${g(t.goalId)}${t.dueDateKey ? ` 期限${t.dueDateKey}` : ""}`);
   });
+  briefSubPlans(ov, lines, ref, g, extra.todayKey ?? new Date().toISOString().slice(0, 10));
   if (ov.plan.decisionRules) lines.push("", "判断ルール（本人の計画）:", ov.plan.decisionRules.slice(0, 5000));
   lines.push("", "観測:", extra.observation, "", "最近の日次記録:", extra.logs || "（なし）", "", "直近の週次レビュー:", extra.review || "（なし）", "", "試している改善:", extra.experiments || "（なし）");
   lines.push("", "最近の変更履歴:", ...(ov.changeLog.slice(0, 10).map((c) => `- ${c.dateKey} ${c.after.slice(0, 200)}${c.reason ? ` ／ 理由: ${c.reason.slice(0, 120)}` : ""}`) || []));
@@ -199,6 +260,12 @@ const SYSTEM_PROMPT = `あなたは、この人の目標と計画のアドバイ
 - 領域の名前は、既にある目標（G1…）と同じものはその名前のまま使う。
 - 計画書を出すときの reply は、何をどうまとめたか・前と何が変わったかを3〜6文で。
 
+1つの領域の詳細計画（例: 大学の履修計画、資格の学習計画）を作る／全体を書き直すときも 3 で、その領域だけの詳細計画書を document に入れる（読み込み側が領域の計画として扱い、他の領域には触れない）。
+- 聞く順番: 要件（卒業・修了に必要なもの、順序や受講条件）→ 現在の記録（修得済み・評価・登録中）→ 使える時間とその領域の週の時間 → 科目・課題ごとの到達点と工程 → 授業・申請・提出の日程 → 週ごと・最初の2週間の日ごとの配置 → 計測と見直しの判断日。
+- 書き方（Markdown）: 題名と前提（作成日・版・対象・基準資料・時間）／今すぐ使う要点と判断表／現在地と確認事項／要件から逆算（単位の集計・順序と条件）／台帳の表 | コード | 科目 | 種別・単位 | 現在の記録 | 目標配置 | 高評価のために残すもの |（節ごとに表を分ける）／学期ごとの配置表／授業日程の表 | 科目・回 | 全受講日 | 申請 | ほか |／課題ごとの工程の表 | 課題 | 初稿 | 点検 | 第一提出目標 | 予備目標 |／通常週の時間割の表 | 曜日 | 時間 | 取り組むこと | 時間数 |／週ごとの実行表 | 週・期間 | 配分 | 主な成果物 | 手続き・締切 |／mermaid の gantt（section は科目、締切は milestone）／最初の2週間の日ごとの表 | 日付 | 時間・配分 | 実作業 | 残す成果物 |／計測と計画を変えるルール。
+- 公式の要件・公表済みの日程と、こちらの提案（内部の目標日・将来の配置）を区別して書く。日付には年を入れる。
+- 既にその領域の詳細計画書がある（下に全文がある）なら、それを土台に変える所だけ変えて全文を書く。
+
 一部を変えるとき（ops）の姿勢:
 - 本人の判断ルールに従い、観測（実績時間・実現率・成果物の状態・詰まり）を根拠にする。改善は一度に1つが基本。
 - 大きな進路や卒業年月を、単発の好調・不調だけで動かさない。時間を増やすなら、どこを減らすかも示す。
@@ -222,6 +289,14 @@ const SYSTEM_PROMPT = `あなたは、この人の目標と計画のアドバイ
 - {"type":"task.add","text","goalRef":null,"dueDateKey":null}
 - {"type":"task.update","ref":"T1","done":true}
 - {"type":"experiment.add","goalRef":null,"observation","hypothesis","change","evidence","reviewDateKey","keepIf","otherwise"}
+詳細計画（D1, I3, K5）への変更:
+- {"type":"item.update","ref":"I3", "status"?: "PLANNED|REGISTERED|IN_PROGRESS|SUBMITTED|PASSED|DONE|DROPPED", "record"?, "periodLabel"?, "fromDateKey"?, "toDateKey"?, "note"?}
+- {"type":"item.add","planRef":"D1","group","code","title","kind","size","status","periodLabel","note"}
+- {"type":"step.add","planRef":"D1","itemRef":"I3"または null,"label","kind":"WORK|DRAFT|CHECK|DUE|SESSION|DECISION|OTHER","startDateKey"（期間なら）,"dateKey","backupDateKey"（予備目標）}
+- {"type":"step.update","ref":"K5", "label"?, "startDateKey"?, "dateKey"?, "backupDateKey"?, "done"?}
+- {"type":"step.remove","ref":"K5"}
+- {"type":"week.update","planRef":"D1","week":"実行表の週の label","column":"列見出し","text"}
+- 提出・合格・単位認定は別の出来事: 提出したら item を SUBMITTED、合格は PASSED、認定・修得で DONE。提出目標の step は済にする。遅れたら dateKey を予備目標へ動かすか、予備も過ぎるなら次の期への移動を相談する。
 
 日付は YYYY-MM-DD、時刻は HH:MM、曜日は 0=日〜6=土。
 
@@ -237,6 +312,12 @@ const hrs = (v: unknown) => {
   return Number.isFinite(x) && x >= 0 && x <= 168 ? Math.round(x * 4) / 4 : undefined;
 };
 const bool = (v: unknown) => (typeof v === "boolean" ? v : undefined);
+const amount = (v: unknown) => {
+  const x = typeof v === "number" ? v : typeof v === "string" ? Number(v) : NaN;
+  return Number.isFinite(x) && x >= 0 && x <= 10_000 ? Math.round(x * 100) / 100 : undefined;
+};
+const ITEM_STATUSES: string[] = ["PLANNED", "REGISTERED", "IN_PROGRESS", "SUBMITTED", "PASSED", "DONE", "DROPPED"];
+const STEP_KINDS: string[] = ["WORK", "DRAFT", "CHECK", "DUE", "SESSION", "DECISION", "OTHER"];
 const defined = (o: Record<string, unknown>) => Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined));
 const list = (o: Record<string, unknown>) =>
   Object.entries(o)
@@ -266,8 +347,10 @@ export function resolveOps(raw: unknown, ov: PlanOverview, refs: Map<string, { k
   const goalName = (id: string | null) => (id ? (ov.goals.find((g) => g.id === id)?.title ?? "") : "");
   const phases = ov.goals.flatMap((g) => g.milestones.map((m) => ({ ...m, goalId: g.id })));
   const cycle = ov.cycles.find((c) => c.id === ov.currentCycleId);
+  const items = ov.subPlans.flatMap((p) => p.items);
+  const steps = ov.subPlans.flatMap((p) => p.steps);
 
-  for (const item of Array.isArray(raw) ? raw.slice(0, 40) : []) {
+  for (const item of Array.isArray(raw) ? raw.slice(0, 60) : []) {
     const o = (item ?? {}) as Record<string, unknown>;
     const type = s(o.type, 30) as OpType | undefined;
     switch (type) {
@@ -439,6 +522,95 @@ export function resolveOps(raw: unknown, ov: PlanOverview, refs: Map<string, { k
         ops.push({ type, targetId: null, data, before: "", after: `改善を試す: ${change}${data.reviewDateKey ? `（${data.reviewDateKey}に見直し）` : ""}` });
         break;
       }
+      case "item.add": {
+        const subPlanId = target(o.planRef, "subPlan");
+        const title = s(o.title, 300);
+        if (!subPlanId || !title) break;
+        const status = s(o.status, 20);
+        const data = defined({
+          subPlanId,
+          group: s(o.group, 100) ?? "",
+          code: s(o.code, 40) ?? "",
+          title,
+          kind: s(o.kind, 60) ?? "",
+          size: amount(o.size) ?? 0,
+          status: status && ITEM_STATUSES.includes(status) ? status : "PLANNED",
+          periodLabel: s(o.periodLabel, 300) ?? "",
+          note: s(o.note, 3000) ?? "",
+        });
+        ops.push({ type, targetId: null, data, before: "", after: `項目を追加: ${title}${data.periodLabel ? `（${data.periodLabel}）` : ""}` });
+        break;
+      }
+      case "item.update": {
+        const id = target(o.ref, "item");
+        const it = items.find((x) => x.id === id);
+        const status = s(o.status, 20);
+        const data = defined({
+          status: status && ITEM_STATUSES.includes(status) ? status : undefined,
+          record: s(o.record, 1000),
+          periodLabel: s(o.periodLabel, 300),
+          fromDateKey: date(o.fromDateKey),
+          toDateKey: date(o.toDateKey),
+          note: s(o.note, 3000),
+        });
+        if (!it || Object.keys(data).length === 0) break;
+        const label = (d: Record<string, unknown>) => list(Object.fromEntries(Object.entries(d).map(([k, v]) => [k, k === "status" ? (STATUS_LABEL[v as string] ?? v) : v])));
+        const before = Object.fromEntries(Object.keys(data).map((k) => [k, (it as unknown as Record<string, unknown>)[k]]));
+        ops.push({ type, targetId: it.id, data, before: `${it.title}: ${label(before)}`, after: `${it.title}: ${label(data)}` });
+        break;
+      }
+      case "step.add": {
+        const subPlanId = target(o.planRef, "subPlan");
+        const label = s(o.label, 300);
+        const dateKey = date(o.dateKey);
+        if (!subPlanId || !label || !dateKey) break;
+        const itemId = target(o.itemRef, "item");
+        let startDateKey = date(o.startDateKey) ?? null;
+        if (startDateKey && startDateKey > dateKey) startDateKey = null;
+        let backupDateKey = date(o.backupDateKey) ?? null;
+        if (backupDateKey && backupDateKey < dateKey) backupDateKey = null;
+        const kind = s(o.kind, 20);
+        const data = { subPlanId, itemId, label, kind: kind && STEP_KINDS.includes(kind) ? kind : startDateKey ? "WORK" : "OTHER", startDateKey, dateKey, backupDateKey, note: s(o.note, 2000) ?? "" };
+        const itemTitle = items.find((x) => x.id === itemId)?.title;
+        ops.push({ type, targetId: null, data, before: "", after: `工程を追加: ${itemTitle ? `${itemTitle} ` : ""}${label} ${startDateKey ? `${startDateKey}〜` : ""}${dateKey}${backupDateKey ? `（予備${backupDateKey}）` : ""}` });
+        break;
+      }
+      case "step.update": {
+        const id = target(o.ref, "step");
+        const st = steps.find((x) => x.id === id);
+        if (!st) break;
+        const data = defined({ label: s(o.label, 300), startDateKey: date(o.startDateKey), dateKey: date(o.dateKey) ?? undefined, backupDateKey: date(o.backupDateKey), done: bool(o.done), note: s(o.note, 2000) });
+        const start = (data.startDateKey as string | null | undefined) === undefined ? st.startDateKey : (data.startDateKey as string | null);
+        const end = (data.dateKey as string | undefined) ?? st.dateKey;
+        if (start && start > end) break;
+        if (Object.keys(data).length === 0) break;
+        const before = Object.fromEntries(Object.keys(data).map((k) => [k, (st as unknown as Record<string, unknown>)[k]]));
+        ops.push({ type, targetId: st.id, data, before: `${st.label}: ${list(before)}`, after: `${st.label}: ${list(data)}` });
+        break;
+      }
+      case "step.remove": {
+        const id = target(o.ref, "step");
+        const st = steps.find((x) => x.id === id);
+        if (st) ops.push({ type, targetId: st.id, data: {}, before: `${st.label} ${st.dateKey}`, after: "（削除）" });
+        break;
+      }
+      case "week.update": {
+        const subPlanId = target(o.planRef, "subPlan");
+        const plan = ov.subPlans.find((x) => x.id === subPlanId);
+        const text = s(o.text, 1500);
+        if (!plan || text === undefined) break;
+        const row = plan.weeks.findIndex((w) => w.label === s(o.week, 100) || (w.fromDateKey !== null && w.fromDateKey === date(o.week)));
+        const col = plan.weekColumns.findIndex((c) => c === s(o.column, 100));
+        if (row < 0 || col < 0) break;
+        ops.push({
+          type,
+          targetId: plan.id,
+          data: { row, col, text },
+          before: `実行表 ${plan.weeks[row].label}・${plan.weekColumns[col]}: ${plan.weeks[row].cells[col] ?? ""}`,
+          after: `実行表 ${plan.weeks[row].label}・${plan.weekColumns[col]}: ${text}`,
+        });
+        break;
+      }
       default:
         break;
     }
@@ -485,7 +657,25 @@ async function context(ownerSub: string, todayKey: string) {
   const r = (review?.data ?? {}) as Record<string, string>;
   const reviewText = review ? `週${review.dateKey}: 詰まり: ${r.blocker ?? ""} ／ 仮説: ${r.hypothesis ?? ""} ／ 変えること: ${r.change ?? ""}` : "";
   const experiments = obs.experiments.map((x) => `- ${x.change}（見直し${x.reviewDateKey ?? "未定"}）`).join("\n");
-  return { ov, brief: briefOf(ov, { observation, logs: logsText, review: reviewText, experiments }) };
+  return { ov, brief: briefOf(ov, { observation, logs: logsText, review: reviewText, experiments, todayKey }) };
+}
+
+/**
+ * The full text of an area's detailed plan, when the message is about it —
+ * named, or a rewrite asked for. They're long (a course plan runs to
+ * 100,000 characters), so they're not sent with every message.
+ */
+async function subPlanDocuments(ownerSub: string, ov: PlanOverview, message: string): Promise<string[]> {
+  const rewrite = /書き直|作り直|見直|計画書|全体|まとめ/.test(message);
+  const out: string[] = [];
+  for (const p of ov.subPlans) {
+    const goal = ov.goals.find((x) => x.id === p.goalId)?.title ?? "";
+    const named = message.includes(p.title) || (goal !== "" && message.includes(goal)) || p.items.some((i) => i.title.length >= 3 && message.includes(i.title));
+    if (!named && !rewrite) continue;
+    const markdown = await subPlanDocument(ownerSub, p.id);
+    if (markdown) out.push("", `詳細計画書「${p.title}」（${goal}）:`, markdown.slice(0, SUBPLAN_DOCUMENT_CHARS));
+  }
+  return out;
 }
 
 export async function sendMessage(ownerSub: string, text: string, todayKey: string, onProgress?: (p: ChatProgress) => void) {
@@ -504,6 +694,7 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
     "",
     "現在の計画書:",
     ov.document ? ov.document.markdown.slice(0, DOCUMENT_CONTEXT_CHARS) : "（まだ無い）",
+    ...(await subPlanDocuments(ownerSub, ov, content)),
     "",
     "これまでの会話:",
     ...(history.length === 0
@@ -525,7 +716,7 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
       ownerSub,
       SYSTEM_PROMPT,
       prompt,
-      32000,
+      64000,
       undefined,
       onProgress &&
         ((p) => {
@@ -667,6 +858,69 @@ export async function applyProposal(ownerSub: string, messageId: string, todayKe
         case "experiment.add":
           await tx.goalExperiment.create({ data: { ownerSub, ...(d as { change: string }), goalId: await ownGoal(d.goalId) } });
           break;
+        case "item.add": {
+          const plan = await tx.goalSubPlan.findFirst({ where: { id: String(d.subPlanId), ownerSub }, include: { items: { select: { sortOrder: true } } } });
+          if (!plan) {
+            done = false;
+            break;
+          }
+          const { subPlanId: _p, ...rest } = d as { subPlanId: string; title: string };
+          void _p;
+          await tx.goalItem.create({ data: { subPlanId: plan.id, ...rest, sortOrder: plan.items.reduce((m, x) => Math.max(m, x.sortOrder), -1) + 1 } });
+          break;
+        }
+        case "item.update":
+          done = (await tx.goalItem.updateMany({ where: { id: op.targetId!, subPlan: { ownerSub } }, data: d })).count > 0;
+          break;
+        case "step.add": {
+          const plan = await tx.goalSubPlan.findFirst({ where: { id: String(d.subPlanId), ownerSub }, select: { id: true } });
+          if (!plan) {
+            done = false;
+            break;
+          }
+          const itemId = typeof d.itemId === "string" ? ((await tx.goalItem.findFirst({ where: { id: d.itemId, subPlanId: plan.id }, select: { id: true } }))?.id ?? null) : null;
+          const count = await tx.goalItemStep.count({ where: { subPlanId: plan.id } });
+          await tx.goalItemStep.create({
+            data: {
+              subPlanId: plan.id,
+              itemId,
+              label: String(d.label),
+              kind: String(d.kind),
+              startDateKey: (d.startDateKey as string | null) ?? null,
+              dateKey: String(d.dateKey),
+              backupDateKey: (d.backupDateKey as string | null) ?? null,
+              note: String(d.note ?? ""),
+              sortOrder: count,
+            },
+          });
+          break;
+        }
+        case "step.update": {
+          const { done: isDone, ...rest } = d as { done?: boolean };
+          const data: Prisma.GoalItemStepUpdateManyMutationInput = { ...rest };
+          if (typeof isDone === "boolean") data.doneAt = isDone ? new Date() : null;
+          done = (await tx.goalItemStep.updateMany({ where: { id: op.targetId!, subPlan: { ownerSub } }, data })).count > 0;
+          break;
+        }
+        case "step.remove":
+          done = (await tx.goalItemStep.deleteMany({ where: { id: op.targetId!, subPlan: { ownerSub } } })).count > 0;
+          break;
+        case "week.update": {
+          const plan = await tx.goalSubPlan.findFirst({ where: { id: op.targetId!, ownerSub } });
+          const weeks = plan ? toWeeks(plan.weeks) : [];
+          const row = Number(d.row);
+          const col = Number(d.col);
+          if (!plan || !weeks[row]) {
+            done = false;
+            break;
+          }
+          const cells = [...weeks[row].cells];
+          while (cells.length <= col) cells.push("");
+          cells[col] = String(d.text);
+          weeks[row] = { ...weeks[row], cells };
+          await tx.goalSubPlan.update({ where: { id: plan.id }, data: { weeks: weeks as unknown as Prisma.InputJsonValue } });
+          break;
+        }
       }
       if (!done) continue;
       applied++;
