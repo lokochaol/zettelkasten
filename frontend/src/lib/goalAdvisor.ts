@@ -16,10 +16,23 @@ import { addChange, EVENT_KINDS, getPlanOverview, observe, PLAN_DATE_KEY, PLAN_T
  * things by short refs — G1, P3, S7 — that are resolved to real rows here),
  * the owner sees each change spelled out, and only "反映する" writes them,
  * all at once, with a line in the change log for each.
+ *
+ * The same conversation is where a plan is made in the first place: the
+ * model interviews (vision, where things stand, constraints, each area,
+ * the first 12 weeks, the week's hours) and, once there's enough, writes
+ * the plan out whole as a document like the owner's roadmap. That document
+ * is applied by reading it into the plan (goalPlanImport) — as a rewrite of
+ * the whole plan or merged in — and kept as a version of the 計画書.
  */
 
-const HISTORY_TURNS = 12;
-const MAX_MESSAGE_LENGTH = 3000;
+/** Enough of the conversation for a planning interview to keep its thread. */
+const HISTORY_TURNS = 40;
+const HISTORY_CHARS = 1500;
+/** Long enough for a pasted page of notes or an existing plan. */
+const MAX_MESSAGE_LENGTH = 20_000;
+const MAX_DOCUMENT_CHARS = 80_000;
+/** The current 計画書 as the model reads it. */
+const DOCUMENT_CONTEXT_CHARS = 40_000;
 const TRANSACTION_OPTIONS = { maxWait: 10_000, timeout: 30_000 };
 const WEEKDAY = ["日", "月", "火", "水", "木", "金", "土"];
 
@@ -56,6 +69,12 @@ export interface ResolvedOp {
 export interface AdvisorProposal {
   reason: string;
   ops: ResolvedOp[];
+  /**
+   * The whole plan written out as a document (計画書) — when the plan is
+   * being made from scratch or rewritten as a whole. Applied through the
+   * document import (goalPlanImport), previewed first; not through ops.
+   */
+  document?: string;
 }
 
 export interface AdvisorMessageView {
@@ -144,15 +163,46 @@ export function briefOf(ov: PlanOverview, extra: { observation: string; logs: st
   return { text: lines.join("\n"), refs, goalRef };
 }
 
-const SYSTEM_PROMPT = `あなたは、この人の計画のアドバイザーです。本人の目標・ロードマップ・実行期間・標準の1週間・記録と観測を読み、会話しながら計画を一緒に更新します。
+const SYSTEM_PROMPT = `あなたは、この人の目標と計画のアドバイザーです。計画を一から一緒に立てることも、今ある計画を記録と観測にもとづいて直していくこともします。
 
-姿勢:
-- 本人の計画の書き方と判断ルールに従う。観測（実績時間・実現率・成果物の状態・詰まり）を根拠にする。
-- 改善は一度に1つに絞るのが基本。大きな進路や卒業年月を、単発の好調・不調だけで動かさない。
-- 睡眠やパートナーとの時間を削って埋め合わせる提案はしない。
-- 時間を増やす提案をするときは、どこを減らすかも一緒に示す。
+返し方は3つ。どれにするかは会話の段階で決める:
+1. 話すだけ（質問・整理・相談）: ops は空、document は空。
+2. 計画の一部を変える: ops に変更を入れる（下の一覧）。document は空。
+3. 計画を一から作る／全体を書き直す: document に計画書の全文を入れる。ops は空。
+   - 「全体を見直したい」「作り直したい」と言われたとき、または変更が多くの領域・ロードマップ・1週間に及ぶときは 3。
+   - 計画書が既にあるなら、それを土台に、変える所だけ変えて全文を書く（残すべき部分を落とさない）。
+
+計画を一から立てるとき（計画が空のとき、または頼まれたとき）は、面談のように順番に聞いていく。1回の返事で聞くのは2〜4個まで。それまでに分かったことを短くまとめてから次を聞く:
+  ① 目指す姿と大きな目標（領域ごとに、目指す状態）
+  ② 現在地: 年齢・仕事（契約・時間・出社日・通勤）・学業（在籍・単位・条件）・睡眠・家計・大切な人との時間など、事実として分かっていること
+  ③ 制約と優先: 動かせない予定、締切、申請期間、使える時間の合計
+  ④ 長期ロードマップ: 領域ごとに年度ごとの段階と「次へ進む条件」
+  ⑤ 直近の実行期間（基本は12週間、開始は次の月曜）: 領域ごとの到達点・完了と判断する証拠・使う時間、4週ごとの進め方
+  ⑥ 週の時間予算（机と通勤中）と168時間の整合、標準の1週間の時間割
+  ⑦ 何を計測し、いつ振り返り、何が起きたら何を変えるか
+- 分からないことは決めつけず「仮置き」として置き、確認事項に入れる。本人が全部答えなくても、十分になったら「計画書にまとめましょうか」と提案してよい。頼まれたらすぐに書く。
+- 成果量・期限は最初の2週間の実績で見直す前提で置く。睡眠や大切な人との時間を削って埋め合わせない。
+
+計画書（document）の書き方。この文書はそのまま読み込まれて、目標・ガントチャート・実行期間・時間割・日付・確認事項になる。Markdownで、次の節をこの順に（無い節は省く）:
+  # 題名
+  - 作成日・バージョン・最初の実行期間・基準（睡眠・仕事・学習等の時間）
+  ## 1. 目指す姿と目標の関係 — 引用（>）で目指す姿。表: | 大きな目標 | 目指す状態 | 当面の進め方 |
+  ## 2. 現在地と仮置き — 確認できたこと（表）と、これから確認すること（箇条書き）
+  ## 3. 長期ロードマップ — 表: | 領域 | 期間ごとの段階… | 次へ進む条件 | と、mermaid の gantt（dateFormat YYYY-MM-DD、section = 領域、各行「段階名 :id, 開始日, 終了日」）
+  ## 4. 直近12週間の到達点 — 期間。表: | 領域 | 12週間で目指すもの | 完了したと判断する証拠 | 使用する時間 |。4週ごとの表: | 領域 | 第1〜4週：月/日〜月/日 | … |。締切・申請期間・授業日の表（日付は年を入れる）
+  ## 5. 週の時間予算 — 表: | 領域 | 週の時間 | 机 | 通勤中 | 含めるもの |。168時間の表: | 用途 | 時間／週 | 確定・仮置き |
+  ## 6. 標準の1週間 — 表: | 曜日 | 机で取り組む枠 | 通勤中 | 合計 |。枠は「06:00〜07:00 領域：内容」を「／」区切り
+  ## 7. 何を計測するか — 領域ごとの残す記録と4〜12週で確認する改善（表）、指標の定義
+  ## 8. 振り返りと判断ルール — レビューの周期と日付、「何が起きたら何を変えるか」の表
+  ## 9. 確認事項 — 表: | 確認すること | 確認方法 | 計画への影響 | 期限 |
+  ## 10. 最初の1週間でやること — チェックリスト
+- 領域の名前は、既にある目標（G1…）と同じものはその名前のまま使う。
+- 計画書を出すときの reply は、何をどうまとめたか・前と何が変わったかを3〜6文で。
+
+一部を変えるとき（ops）の姿勢:
+- 本人の判断ルールに従い、観測（実績時間・実現率・成果物の状態・詰まり）を根拠にする。改善は一度に1つが基本。
+- 大きな進路や卒業年月を、単発の好調・不調だけで動かさない。時間を増やすなら、どこを減らすかも示す。
 - 過去の予定や記録は書き換えない（変更は今後に対して行う）。
-- 情報が足りなければ ops を空にして、短く質問してよい。相談・質問だけで変更が要らなければ ops は空。
 - reply は日本語で、何を読み取り、何をどう変える提案かを2〜5文で。
 
 変更（ops）の種類。ref は下の一覧の記号（G1, P3, O2, E1, C4, T2）。新しいものは ref なし:
@@ -175,8 +225,8 @@ const SYSTEM_PROMPT = `あなたは、この人の計画のアドバイザーで
 
 日付は YYYY-MM-DD、時刻は HH:MM、曜日は 0=日〜6=土。
 
-出力は次のJSONのみ（前後に文章やコードフェンスを付けない）:
-{ "reply": "相手への返事", "reason": "変更する根拠（観測したこと）を1〜2文。変更が無ければ空", "ops": [] }`;
+出力は次のJSONのみ（前後に文章やコードフェンスを付けない。document の中の改行は \\n で書く）:
+{ "reply": "相手への返事", "reason": "変更する根拠（観測したこと）を1〜2文。変更が無ければ空", "ops": [], "document": "" }`;
 
 /* ---------- checking a proposal ---------- */
 
@@ -400,6 +450,11 @@ export function resolveOps(raw: unknown, ov: PlanOverview, refs: Map<string, { k
 
 function progressFrom(text: string): ChatProgress {
   const items: ProgressItem[] = [...text.matchAll(/"type"\s*:\s*"([a-z.]+)"/g)].map((m) => ({ dateKey: "", slot: null, title: m[1] }));
+  // A plan document being written: its headings, as they come.
+  const doc = /"document"\s*:\s*"/.exec(text);
+  if (doc) {
+    for (const m of text.slice(doc.index).matchAll(/\\n(#{1,2} [^\\]{1,80})/g)) items.push({ dateKey: "", slot: null, title: m[1].replace(/^#+ /, "") });
+  }
   return { stage: "writing", reply: partialString(text, "reply"), items };
 }
 
@@ -445,10 +500,19 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
   const prompt = [
     `今日: ${todayKey}`,
     "",
-    brief.text,
+    ov.goals.some((g) => g.status === "ACTIVE") ? brief.text : "計画はまだ空です（目標・期間・1週間・記録のいずれも無い）。",
+    "",
+    "現在の計画書:",
+    ov.document ? ov.document.markdown.slice(0, DOCUMENT_CONTEXT_CHARS) : "（まだ無い）",
     "",
     "これまでの会話:",
-    ...(history.length === 0 ? ["  （なし）"] : [...history].reverse().map((m) => `  ${m.role === "USER" ? "相手" : "あなた"}: ${m.content}`)),
+    ...(history.length === 0
+      ? ["  （なし）"]
+      : [...history].reverse().map((m) => {
+          const doc = (m.proposal as unknown as AdvisorProposal | null)?.document;
+          const note = doc ? `（計画書を提示・${m.appliedAt ? "反映済み" : m.dismissedAt ? "見送り" : "未反映"}）` : "";
+          return `  ${m.role === "USER" ? "相手" : "あなた"}: ${m.content.slice(0, HISTORY_CHARS)}${note}`;
+        })),
     "",
     `相手の新しいメッセージ: ${content}`,
   ].join("\n");
@@ -461,7 +525,7 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
       ownerSub,
       SYSTEM_PROMPT,
       prompt,
-      12000,
+      32000,
       undefined,
       onProgress &&
         ((p) => {
@@ -475,7 +539,11 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
     );
     const o = (value ?? {}) as Record<string, unknown>;
     reply = (s(o.reply, 4000) ?? "") || "（返事が空でした）";
-    proposal = { reason: s(o.reason, 2000) ?? "", ops: resolveOps(o.ops, ov, brief.refs) };
+    const document = s(o.document, MAX_DOCUMENT_CHARS) ?? "";
+    // A plan document is a rewrite on its own; ops alongside it would apply twice.
+    proposal = looksLikePlan(document)
+      ? { reason: s(o.reason, 2000) ?? "", ops: [], document }
+      : { reason: s(o.reason, 2000) ?? "", ops: resolveOps(o.ops, ov, brief.refs) };
     onProgress?.({ stage: "saving", reply, items: [] });
   } catch (e) {
     await prisma.goalAdvisorMessage.delete({ where: { id: userMessage.id } });
@@ -486,7 +554,7 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
       ownerSub,
       role: "ASSISTANT",
       content: reply,
-      proposal: proposal.ops.length > 0 ? (proposal as unknown as Prisma.InputJsonValue) : undefined,
+      proposal: proposal.ops.length > 0 || proposal.document ? (proposal as unknown as Prisma.InputJsonValue) : undefined,
     },
   });
   return listMessages(ownerSub);
@@ -501,7 +569,7 @@ export async function sendMessage(ownerSub: string, text: string, todayKey: stri
 export async function applyProposal(ownerSub: string, messageId: string, todayKey: string): Promise<number> {
   const message = await prisma.goalAdvisorMessage.findFirst({ where: { id: messageId, ownerSub } });
   const proposal = message?.proposal as unknown as AdvisorProposal | null;
-  if (!message || !proposal || message.appliedAt || message.dismissedAt) {
+  if (!message || !proposal || proposal.document || message.appliedAt || message.dismissedAt) {
     throw new ValidationError("mealChatProposalGone", "This proposal can no longer be applied");
   }
   let applied = 0;
@@ -607,6 +675,31 @@ export async function applyProposal(ownerSub: string, messageId: string, todayKe
     await tx.goalAdvisorMessage.update({ where: { id: messageId }, data: { appliedAt: new Date() } });
   }, TRANSACTION_OPTIONS);
   return applied;
+}
+
+/** A plan document worth reading in: long enough, with headings. */
+export function looksLikePlan(document: string): boolean {
+  return document.length >= 200 && /^#{1,3} /m.test(document);
+}
+
+/** The plan document a message proposed, still open — to be read in by the import. */
+export async function openDocument(ownerSub: string, messageId: string): Promise<string> {
+  const message = await prisma.goalAdvisorMessage.findFirst({ where: { id: messageId, ownerSub } });
+  const document = (message?.proposal as unknown as AdvisorProposal | null)?.document;
+  if (!message || !document || message.appliedAt || message.dismissedAt) {
+    throw new ValidationError("mealChatProposalGone", "This proposal can no longer be applied");
+  }
+  return document;
+}
+
+/** Marks a proposed plan document as applied, once the import has written it. */
+export async function markApplied(ownerSub: string, messageId: string): Promise<void> {
+  await prisma.goalAdvisorMessage.updateMany({ where: { id: messageId, ownerSub, appliedAt: null }, data: { appliedAt: new Date() } });
+}
+
+/** Starts the conversation over. The plan and its change log stay. */
+export async function clearConversation(ownerSub: string): Promise<void> {
+  await prisma.goalAdvisorMessage.deleteMany({ where: { ownerSub } });
 }
 
 export async function dismissProposal(ownerSub: string, messageId: string): Promise<void> {

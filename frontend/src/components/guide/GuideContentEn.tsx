@@ -327,6 +327,10 @@ export function GuideContentEn() {
           <Points
             items={[
               {
+                title: "Plan it in the chat",
+                body: "With no goals yet, start from \"Plan it in the chat\". The advisor asks two to four questions at a time, in order: the vision and big goals, where things stand (work, commute, study, sleep), what's fixed, each area's long-term phases, the first 12 weeks, the week's hours and standard week, and how to measure and review. Once it's settled it writes the plan out as a document; Apply reads it in and shows what it found, and you choose to rewrite the whole plan or add to it.",
+              },
+              {
                 title: "Overview and roadmap",
                 body: "Write the vision and the baseline, give each area phases (start, end, condition to move on), and they line up on a Gantt chart. Switch the scale between all, one year and the cycle; today, the cycle and deadlines and application windows are on the same chart. Tap a bar to edit it in place.",
               },
@@ -352,7 +356,11 @@ export function GuideContentEn() {
               },
               {
                 title: "Advisor",
-                body: "Reads the goals, cycle, week and records, talks it through and proposes changes — hours, phase dates, week blocks, deadlines, experiments. Nothing changes until you press Apply, and applied changes are logged with the reason.",
+                body: "Reads the goals, cycle, week and records and talks it through. For a partial change it proposes edits (hours, phase dates, week blocks, deadlines, experiments); for a wholesale review it writes a revised plan document. Nothing changes until you press Apply, and what's applied is logged with the reason. New conversation starts the chat over.",
+              },
+              {
+                title: "Plan document",
+                body: "The plan as one document is kept under Compass. What the advisor wrote, what was imported and what you edited are kept as versions; save one as .md, or rebuild the plan from an edited document.",
               },
               {
                 title: "Import a document",

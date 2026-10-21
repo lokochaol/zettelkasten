@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { applyAdvisorProposalAction, dismissAdvisorProposalAction, getAdvisorMessagesAction } from "@/app/goals/planActions";
+import { applyAdvisorProposalAction, clearAdvisorAction, dismissAdvisorProposalAction, getAdvisorMessagesAction } from "@/app/goals/planActions";
 import type { AdvisorMessageView } from "@/lib/goalAdvisor";
 import type { PlanOverview } from "@/lib/goalPlan";
 import { ChatThinking } from "@/components/ChatThinking";
+import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { PlanDocumentApply, documentHeadings, documentTitle, downloadMarkdown } from "@/components/goals/PlanDocumentApply";
 import { Spinner } from "@/components/LoadingSpinner";
 import { PILL, PRIMARY } from "@/components/goals/ui";
 import { postChatStream } from "@/lib/chatStreamClient";
@@ -17,9 +19,32 @@ import { useI18n } from "@/lib/i18n/LocaleProvider";
  * concrete edits (a goal's hours, a phase's dates, the week's blocks, a new
  * deadline, an experiment). Nothing changes until 反映する; what's applied
  * is written to the change log with the reason (goalAdvisor.applyProposal).
+ *
+ * It's also where a plan is made: the advisor interviews, and when there's
+ * enough it writes the whole plan as a document. That document is applied
+ * through the import (PlanDocumentApply) — read, previewed, then written as
+ * the whole plan or added to it.
  */
-export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: string; onClose: () => void; onApplied: (ov: PlanOverview) => void }) {
+export function AdvisorDrawer({
+  todayKey,
+  goalCount,
+  planEmpty,
+  startWith,
+  onClose,
+  onApplied,
+}: {
+  todayKey: string;
+  goalCount: number;
+  /** No goals yet: the suggestions are for making a plan. */
+  planEmpty: boolean;
+  /** A first message to send as it opens, when the conversation is empty. */
+  startWith?: string;
+  onClose: () => void;
+  onApplied: (ov: PlanOverview) => void;
+}) {
   const { t } = useI18n();
+  const [confirmNew, setConfirmNew] = useState(false);
+  const sentStart = useRef(false);
   const [messages, setMessages] = useState<AdvisorMessageView[] | null>(null);
   const [text, setText] = useState("");
   const [pending, setPending] = useState<{ progress: ChatProgress | null; startedAt: number } | null>(null);
@@ -28,7 +53,16 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
   const bottom = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    void getAdvisorMessagesAction().then(setMessages);
+    void getAdvisorMessagesAction().then((list) => {
+      setMessages(list);
+      // Opened to start planning: say so, unless there's a conversation already.
+      if (!startWith || sentStart.current) return;
+      sentStart.current = true;
+      if (list.length === 0) void send(startWith, Date.now());
+      else setText(startWith);
+    });
+    // Once, as it opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
@@ -93,11 +127,16 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
   return (
     <div className="fixed inset-0 z-50 flex justify-end" role="dialog" aria-modal="true" aria-label={t.plan.advisorHeading}>
       <button type="button" aria-label={t.plan.close} onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <aside className="relative flex h-full w-full max-w-[460px] flex-col border-l border-line bg-bg shadow-2xl">
+      <aside className="relative flex h-full w-full max-w-[560px] flex-col border-l border-line bg-bg shadow-2xl">
         <header className="flex items-center gap-2 border-b border-line px-4 py-3">
           <span className="flex h-6 w-6 items-center justify-center rounded-full bg-accent font-mono text-[11px] font-bold text-on-accent">A</span>
           <p className="font-mono text-[11px] font-semibold tracking-[0.2em] text-ink">{t.plan.advisorHeading}</p>
-          <button type="button" onClick={onClose} aria-label={t.plan.close} className="ml-auto font-mono text-[14px] text-ink-faint hover:text-accent">
+          {messages && messages.length > 0 && (
+            <button type="button" onClick={() => setConfirmNew(true)} disabled={pending !== null} className={`${PILL} ml-auto`}>
+              + {t.plan.advisorNew}
+            </button>
+          )}
+          <button type="button" onClick={onClose} aria-label={t.plan.close} className={`${messages && messages.length > 0 ? "" : "ml-auto"} font-mono text-[14px] text-ink-faint hover:text-accent`}>
             ×
           </button>
         </header>
@@ -118,8 +157,21 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
                 ) : (
                   <div key={m.id} className="mr-4 flex flex-col gap-2">
                     <div className="rounded-2xl rounded-bl-sm border border-line bg-surface px-3 py-2 text-[12.5px] leading-relaxed whitespace-pre-wrap text-ink">{m.content}</div>
-                    {m.proposal && m.proposal.ops.length > 0 && (
-                      <Proposal message={m} busy={busyId === m.id} onApply={() => void apply(m.id)} onDismiss={() => void dismiss(m.id)} />
+                    {m.proposal?.document ? (
+                      <DocumentProposal
+                        message={m}
+                        todayKey={todayKey}
+                        goalCount={goalCount}
+                        busy={busyId === m.id}
+                        onApplied={(r) => {
+                          if (r.messages) setMessages(r.messages);
+                          onApplied(r.overview);
+                        }}
+                        onDismiss={() => void dismiss(m.id)}
+                      />
+                    ) : (
+                      m.proposal &&
+                      m.proposal.ops.length > 0 && <Proposal message={m} busy={busyId === m.id} onApply={() => void apply(m.id)} onDismiss={() => void dismiss(m.id)} />
                     )}
                   </div>
                 ),
@@ -143,7 +195,7 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
           {error && <p className="text-[11px] text-accent">{error}</p>}
           {messages && messages.length === 0 && !pending && (
             <div className="flex flex-wrap gap-1.5">
-              {t.plan.advisorSuggestions.map((s) => (
+              {(planEmpty ? t.plan.advisorPlanSuggestions : [...t.plan.advisorSuggestions, t.plan.advisorPlanSuggestions[1]]).map((s) => (
                 <button key={s} type="button" onClick={() => void send(s, Date.now())} className={PILL}>
                   {s}
                 </button>
@@ -166,8 +218,8 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
                   void send(text, Date.now());
                 }
               }}
-              rows={2}
-              placeholder={t.plan.advisorPlaceholder}
+              rows={3}
+              placeholder={planEmpty ? t.plan.startPrompt : t.plan.advisorPlaceholder}
               disabled={pending !== null}
               className="min-w-0 flex-1 resize-none rounded-lg border border-line bg-surface px-3 py-2 text-[12.5px] text-ink focus:border-accent focus:outline-none"
             />
@@ -177,6 +229,19 @@ export function AdvisorDrawer({ todayKey, onClose, onApplied }: { todayKey: stri
           </form>
         </footer>
       </aside>
+      <ConfirmDialog
+        open={confirmNew}
+        title={t.plan.advisorNew}
+        warning={t.plan.advisorNewConfirm}
+        confirmLabel={t.plan.advisorNew}
+        onConfirm={async () => {
+          setConfirmNew(false);
+          const res = await clearAdvisorAction();
+          if ("error" in res) setError(res.error);
+          else setMessages([]);
+        }}
+        onCancel={() => setConfirmNew(false)}
+      />
     </div>
   );
 }
@@ -212,6 +277,89 @@ function Proposal({ message, busy, onApply, onDismiss }: { message: AdvisorMessa
         <div className="flex gap-2">
           <button type="button" onClick={onApply} disabled={busy} className={PRIMARY}>
             {busy ? t.plan.advisorApplying : t.plan.advisorApply}
+          </button>
+          <button type="button" onClick={onDismiss} disabled={busy} className={PILL}>
+            {t.plan.advisorDismiss}
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** A plan written out whole: read it, save it, or apply it through the import. */
+function DocumentProposal({
+  message,
+  todayKey,
+  goalCount,
+  busy,
+  onApplied,
+  onDismiss,
+}: {
+  message: AdvisorMessageView;
+  todayKey: string;
+  goalCount: number;
+  busy: boolean;
+  onApplied: (r: { overview: PlanOverview; messages: AdvisorMessageView[] | null }) => void;
+  onDismiss: () => void;
+}) {
+  const { t } = useI18n();
+  const doc = message.proposal!.document!;
+  const title = documentTitle(doc) || t.plan.documentHeading;
+  const headings = documentHeadings(doc);
+  const [full, setFull] = useState(false);
+  const [applying, setApplying] = useState(false);
+  const [done, setDone] = useState<string | null>(null);
+  const settled = message.applied || message.dismissed;
+
+  return (
+    <div className={`flex flex-col gap-2 rounded-xl border p-3 ${settled ? "border-line opacity-80" : "border-accent/60 bg-accent/5"}`}>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="font-mono text-[10px] font-semibold tracking-wider text-accent">{t.plan.advisorDocument}</span>
+        <span className="font-mono text-[9.5px] text-ink-faint">{t.plan.advisorDocumentChars(doc.length)}</span>
+        <button type="button" onClick={() => downloadMarkdown(doc, title)} className={`${PILL} ml-auto`}>
+          {t.plan.download}
+        </button>
+      </div>
+      <p className="text-[13px] font-bold text-ink">{title}</p>
+      {headings.length > 0 && (
+        <ol className="flex flex-col gap-0.5 border-l-2 border-accent/40 pl-2">
+          {headings.map((h, i) => (
+            <li key={i} className="text-[11px] text-ink-soft">
+              {h}
+            </li>
+          ))}
+        </ol>
+      )}
+      <button type="button" onClick={() => setFull((v) => !v)} className="w-fit font-mono text-[10px] text-ink-faint hover:text-accent">
+        {full ? `▲ ${t.plan.hideFull}` : `▼ ${t.plan.showFull}`}
+      </button>
+      {full && (
+        <pre className="max-h-96 overflow-auto rounded-md border border-line bg-surface p-2.5 font-mono text-[10.5px] leading-relaxed whitespace-pre-wrap text-ink">{doc}</pre>
+      )}
+      {message.applied ? (
+        <p className="font-mono text-[10px] text-ink-soft">✓ {done ?? t.plan.advisorApplied}</p>
+      ) : message.dismissed ? (
+        <p className="font-mono text-[10px] text-ink-faint">{t.plan.advisorDismissed}</p>
+      ) : applying ? (
+        <PlanDocumentApply
+          markdown={doc}
+          messageId={message.id}
+          todayKey={todayKey}
+          goalCount={goalCount}
+          defaultMode="replace"
+          autoRead
+          onApplied={(r) => {
+            setDone(r.message);
+            setApplying(false);
+            onApplied(r);
+          }}
+          onCancel={() => setApplying(false)}
+        />
+      ) : (
+        <div className="flex gap-2">
+          <button type="button" onClick={() => setApplying(true)} disabled={busy} className={PRIMARY}>
+            {t.plan.advisorDocumentRead}
           </button>
           <button type="button" onClick={onDismiss} disabled={busy} className={PILL}>
             {t.plan.advisorDismiss}

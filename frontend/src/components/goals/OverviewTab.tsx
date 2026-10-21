@@ -101,6 +101,21 @@ export function OverviewTab(props: TabProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      {active.length === 0 && (
+        <section className="flex flex-col gap-3 rounded-xl border border-accent/50 bg-accent/5 p-5">
+          <h2 className="text-[16px] font-bold text-ink">{t.plan.startHeading}</h2>
+          <p className="text-[12px] leading-relaxed text-ink-soft">{t.plan.startIntro}</p>
+          <div className="flex flex-wrap gap-2">
+            <button type="button" onClick={() => props.openAdvisor(t.plan.startPrompt)} className={`${PRIMARY} flex items-center gap-1.5 px-4 py-2`}>
+              <span aria-hidden="true">✦</span>
+              {t.plan.startChat}
+            </button>
+            <button type="button" onClick={props.openImport} className={`${PILL} px-4 py-1.5`}>
+              {t.plan.startImport}
+            </button>
+          </div>
+        </section>
+      )}
       <div className="grid gap-4 md:grid-cols-2">
         <Card title={t.plan.visionHeading}>
           <BlurText key={`v:${generation}`} value={ov.plan.vision} rows={3} placeholder={t.plan.visionEmpty} onSave={(v) => savePlanField("vision", v)} />
@@ -110,6 +125,7 @@ export function OverviewTab(props: TabProps) {
         </Card>
       </div>
 
+      {(active.length > 0 || ov.events.length > 0) && (
       <Card title={t.plan.roadmapHeading}>
         <GoalGantt
           goals={active}
@@ -137,6 +153,7 @@ export function OverviewTab(props: TabProps) {
           />
         )}
       </Card>
+      )}
 
       <div className="flex flex-col gap-4">
         <h2 className="font-mono text-[10px] font-semibold tracking-[0.2em] text-ink-soft">{t.plan.goalsHeading}</h2>

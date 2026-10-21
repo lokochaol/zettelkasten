@@ -1577,3 +1577,21 @@ model GoalAdvisorMessage {
   @@index([ownerSub, createdAt])
   @@map("goal_advisor_message")
 }
+
+/// The plan written out as one document (the kind of Markdown the owner's
+/// roadmap is), one row per version: written in the advisor's planning
+/// conversation, imported from a file, or edited by hand. The newest is the
+/// plan's 計画書; the rows before it are its earlier versions.
+model GoalPlanDocument {
+  id        String   @id @default(uuid())
+  ownerSub  String   @map("owner_sub")
+  markdown  String
+  /// ADVISOR | IMPORT | MANUAL
+  source    String   @default("MANUAL")
+  /// How it was applied: FULL (the plan rewritten from it) or MERGE.
+  applied   String   @default("")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([ownerSub, createdAt])
+  @@map("goal_plan_document")
+}

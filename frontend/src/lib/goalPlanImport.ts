@@ -6,7 +6,7 @@ import { partialString } from "@/lib/chatProgress";
 import { ValidationError } from "@/lib/errors";
 import { GOAL_COLORS } from "@/lib/goalColors";
 import { titleKey } from "@/lib/goals";
-import { addChange, EVENT_KINDS, phasesFor, PLAN_DATE_KEY, PLAN_TIME, type CyclePhase, type LifeBudgetLine } from "@/lib/goalPlan";
+import { addChange, EVENT_KINDS, phasesFor, PLAN_DATE_KEY, PLAN_TIME, savePlanDocument, type CyclePhase, type LifeBudgetLine } from "@/lib/goalPlan";
 
 /**
  * Reading a goals document (Markdown, a pasted page) into the plan.
@@ -396,8 +396,23 @@ export interface ImportCounts {
  *     already here.
  *   - The change log records the import.
  */
-export async function applyPlanImport(ownerSub: string, input: unknown, todayKey: string, options: { archiveOthers: boolean }): Promise<ImportCounts> {
+export interface ApplyOptions {
+  archiveOthers: boolean;
+  /**
+   * The document is the whole plan from now on (a rewrite): goals it doesn't
+   * name are archived, and the unfinished phases, tasks, open questions and
+   * coming dates it no longer has are replaced by its own. What's done and
+   * what's recorded stays.
+   */
+  replace?: boolean;
+  /** The document it was read from, kept as a version of the 計画書. */
+  document?: { markdown: string; source: "ADVISOR" | "IMPORT" };
+}
+
+export async function applyPlanImport(ownerSub: string, input: unknown, todayKey: string, options: ApplyOptions): Promise<ImportCounts> {
   const draft = parsePlanDraft(input);
+  const replace = options.replace === true;
+  const archiveOthers = options.archiveOthers || replace;
   const counts: ImportCounts = { goalsCreated: 0, goalsUpdated: 0, phases: 0, slots: 0, events: 0, checks: 0, tasks: 0, archived: 0 };
   await prisma.$transaction(async (tx) => {
     const planData = {
@@ -436,6 +451,11 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
       if (found) {
         goalId = found.id;
         have = found.milestones;
+        if (replace && g.phases.length > 0) {
+          // The document's phases stand in for the open ones; finished ones are history.
+          await tx.goalMilestone.deleteMany({ where: { goalId, doneAt: null } });
+          have = found.milestones.filter((m) => m.doneAt !== null);
+        }
         // Only what the document says; a blank there leaves the field.
         const set = Object.fromEntries(Object.entries(fields).filter(([, v]) => (typeof v === "number" ? v > 0 : v !== "")));
         await tx.goal.update({ where: { id: goalId }, data: { ...set, status: "ACTIVE", ...(found.color ? {} : { color: nextColor() }) } });
@@ -461,7 +481,7 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
         counts.phases += fresh.length;
       }
     }
-    if (options.archiveOthers) {
+    if (archiveOthers) {
       const others = existing.filter((g) => g.status === "ACTIVE" && !named.has(g.id)).map((g) => g.id);
       if (others.length > 0) {
         await tx.goal.updateMany({ where: { id: { in: others } }, data: { status: "ARCHIVED" } });
@@ -511,6 +531,15 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
       counts.slots = draft.slots.length;
     }
 
+    if (replace) {
+      const keepEvent = (e: { title: string; dateKey: string }) => draft.events.some((x) => x.title === e.title && x.dateKey === e.dateKey);
+      const future = await tx.goalEvent.findMany({ where: { ownerSub, done: false, dateKey: { gte: todayKey } }, select: { id: true, title: true, dateKey: true } });
+      const dropEvents = future.filter((e) => !keepEvent(e)).map((e) => e.id);
+      if (dropEvents.length > 0) await tx.goalEvent.deleteMany({ where: { id: { in: dropEvents } } });
+      if (draft.tasks.length > 0) await tx.goalTask.deleteMany({ where: { ownerSub, doneAt: null, text: { notIn: draft.tasks.map((t) => t.text) } } });
+      if (draft.checks.length > 0) await tx.goalCheck.deleteMany({ where: { ownerSub, doneAt: null, question: { notIn: draft.checks.map((c) => c.question) } } });
+    }
+
     const [events, checks, tasks] = await Promise.all([
       tx.goalEvent.findMany({ where: { ownerSub }, select: { title: true, dateKey: true } }),
       tx.goalCheck.findMany({ where: { ownerSub }, select: { question: true } }),
@@ -544,13 +573,14 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
       {
         dateKey: todayKey,
         before: "",
-        after: `文書から取り込み: 目標 新規${counts.goalsCreated}・更新${counts.goalsUpdated}、段階${counts.phases}、時間枠${counts.slots}、日付${counts.events}、確認事項${counts.checks}、タスク${counts.tasks}${counts.archived ? `、アーカイブ${counts.archived}` : ""}`,
+        after: `${replace ? "計画を全体で書き換え" : "文書から取り込み"}: 目標 新規${counts.goalsCreated}・更新${counts.goalsUpdated}、段階${counts.phases}、時間枠${counts.slots}、日付${counts.events}、確認事項${counts.checks}、タスク${counts.tasks}${counts.archived ? `、アーカイブ${counts.archived}` : ""}`,
         reason: draft.title || draft.summary,
         checkDateKey: null,
       },
-      "IMPORT",
+      options.document?.source === "ADVISOR" ? "ADVISOR" : "IMPORT",
       tx,
     );
+    if (options.document) await savePlanDocument(ownerSub, options.document.markdown, options.document.source, replace ? "FULL" : "MERGE", tx);
   }, TRANSACTION_OPTIONS);
   return counts;
 }

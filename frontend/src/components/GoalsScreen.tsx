@@ -43,7 +43,8 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
   const [generation, setGeneration] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [importOpen, setImportOpen] = useState(false);
-  const [advisorOpen, setAdvisorOpen] = useState(false);
+  // Open, perhaps with a first message (starting a plan, reviewing the 計画書).
+  const [advisor, setAdvisor] = useState<{ startWith?: string } | null>(null);
 
   useEffect(() => {
     try {
@@ -85,7 +86,17 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
   // Colours by position among all goals, so archiving one doesn't recolour the rest.
   const hexes = useMemo(() => goalHexes(ov.goals), [ov.goals]);
 
-  const props: TabProps = { ov, setOv: (u) => setOvState(u), todayKey, active, hexes, generation, onError: setError };
+  const props: TabProps = {
+    ov,
+    setOv: (u) => setOvState(u),
+    todayKey,
+    active,
+    hexes,
+    generation,
+    onError: setError,
+    openAdvisor: (startWith) => setAdvisor({ startWith }),
+    openImport: () => setImportOpen(true),
+  };
 
   return (
     <div className="flex flex-col gap-5">
@@ -119,7 +130,7 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
           </button>
           <button
             type="button"
-            onClick={() => setAdvisorOpen(true)}
+            onClick={() => setAdvisor({})}
             className="flex items-center gap-1.5 rounded-full bg-ink px-3 py-1 font-mono text-[10.5px] font-semibold text-surface hover:bg-accent hover:text-on-accent"
           >
             <span aria-hidden="true">✦</span>
@@ -153,7 +164,16 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
       {tab === "observe" && <ObserveTab {...props} />}
       {tab === "compass" && <CompassTab {...props} />}
 
-      {advisorOpen && <AdvisorDrawer todayKey={todayKey} onClose={() => setAdvisorOpen(false)} onApplied={replaceAll} />}
+      {advisor && (
+        <AdvisorDrawer
+          todayKey={todayKey}
+          goalCount={ov.goals.length}
+          planEmpty={active.length === 0}
+          startWith={advisor.startWith}
+          onClose={() => setAdvisor(null)}
+          onApplied={replaceAll}
+        />
+      )}
     </div>
   );
 }

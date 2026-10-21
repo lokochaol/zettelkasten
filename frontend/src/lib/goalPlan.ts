@@ -128,8 +128,21 @@ export interface ChangeLogView {
   source: string;
 }
 
+/** The plan written out whole (計画書), one version. */
+export interface PlanDocumentView {
+  id: string;
+  markdown: string;
+  source: string;
+  /** FULL, MERGE, or "" when it was only kept. */
+  applied: string;
+  createdOn: string;
+}
+export type PlanDocumentMeta = Omit<PlanDocumentView, "markdown"> & { chars: number };
 export interface PlanOverview extends goals.GoalsOverview {
   plan: PlanView;
+  /** The newest version of the 計画書, and the versions before it (newest first). */
+  document: PlanDocumentView | null;
+  documentVersions: PlanDocumentMeta[];
   cycles: CycleView[];
   /** The cycle covering today, else the latest one, else null. */
   currentCycleId: string | null;
@@ -235,7 +248,7 @@ export function currentCycleOf<C extends { id: string; fromDateKey: string; toDa
 }
 
 export async function getPlanOverview(ownerSub: string, todayKey: string): Promise<PlanOverview> {
-  const [base, plan, cycles, slots, events, checks, tasks, changeLog] = await Promise.all([
+  const [base, plan, cycles, slots, events, checks, tasks, changeLog, docs] = await Promise.all([
     goals.getOverview(ownerSub),
     prisma.goalPlan.findUnique({ where: { ownerSub } }),
     prisma.goalCycle.findMany({ where: { ownerSub }, include: { outcomes: true }, orderBy: { fromDateKey: "asc" } }),
@@ -244,6 +257,12 @@ export async function getPlanOverview(ownerSub: string, todayKey: string): Promi
     prisma.goalCheck.findMany({ where: { ownerSub }, orderBy: { createdAt: "asc" } }),
     prisma.goalTask.findMany({ where: { ownerSub }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
     prisma.goalChangeLog.findMany({ where: { ownerSub }, orderBy: { createdAt: "desc" }, take: 100 }),
+    prisma.goalPlanDocument.findMany({
+      where: { ownerSub },
+      orderBy: { createdAt: "desc" },
+      take: MAX_DOCUMENT_VERSIONS,
+      select: { id: true, source: true, applied: true, createdAt: true, markdown: true },
+    }),
   ]);
   const cycleViews = cycles.map(toCycleView);
   return {
@@ -256,7 +275,47 @@ export async function getPlanOverview(ownerSub: string, todayKey: string): Promi
     checks: checks.map(toCheck),
     tasks: tasks.map(toTask),
     changeLog: changeLog.map(toChange),
+    document: docs[0] ? toDocument(docs[0]) : null,
+    documentVersions: docs.slice(1).map((d) => ({ id: d.id, source: d.source, applied: d.applied, createdOn: d.createdAt.toISOString().slice(0, 10), chars: d.markdown.length })),
   };
+}
+
+/* ---------- the plan document ---------- */
+
+const MAX_DOCUMENT_VERSIONS = 30;
+export const MAX_DOCUMENT_CHARS = 80_000;
+
+function toDocument(d: { id: string; markdown: string; source: string; applied: string; createdAt: Date }): PlanDocumentView {
+  return { id: d.id, markdown: d.markdown, source: d.source, applied: d.applied, createdOn: d.createdAt.toISOString().slice(0, 10) };
+}
+
+/**
+ * Keeps a version of the 計画書. The same text as the newest version only
+ * updates how it was applied; older versions past the limit are dropped.
+ */
+export async function savePlanDocument(
+  ownerSub: string,
+  markdown: string,
+  source: "ADVISOR" | "IMPORT" | "MANUAL",
+  applied: "" | "FULL" | "MERGE",
+  tx: Prisma.TransactionClient = prisma,
+): Promise<PlanDocumentView> {
+  const text = cleanText(markdown, MAX_DOCUMENT_CHARS).trim();
+  if (!text) throw new ValidationError("goalInvalid", "empty document");
+  const latest = await tx.goalPlanDocument.findFirst({ where: { ownerSub }, orderBy: { createdAt: "desc" } });
+  if (latest && latest.markdown === text) {
+    return toDocument(applied ? await tx.goalPlanDocument.update({ where: { id: latest.id }, data: { applied } }) : latest);
+  }
+  const row = await tx.goalPlanDocument.create({ data: { ownerSub, markdown: text, source, applied } });
+  const stale = await tx.goalPlanDocument.findMany({ where: { ownerSub }, orderBy: { createdAt: "desc" }, skip: MAX_DOCUMENT_VERSIONS, select: { id: true } });
+  if (stale.length > 0) await tx.goalPlanDocument.deleteMany({ where: { id: { in: stale.map((x) => x.id) } } });
+  return toDocument(row);
+}
+
+export async function getPlanDocument(ownerSub: string, id: string): Promise<PlanDocumentView> {
+  const row = await prisma.goalPlanDocument.findFirst({ where: { id, ownerSub } });
+  if (!row) notFound();
+  return toDocument(row);
 }
 
 /* ---------- plan ---------- */

@@ -26,6 +26,9 @@ export interface TabProps {
   /** Bumped when everything is re-read, so editors start over. */
   generation: number;
   onError: (message: string | null) => void;
+  /** Opens the advisor, optionally sending a first message. */
+  openAdvisor: (startWith?: string) => void;
+  openImport: () => void;
 }
 
 /** An action's result, or null after reporting its error. */

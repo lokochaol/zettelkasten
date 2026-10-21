@@ -6,6 +6,7 @@ import { addChangeAction, createCheckAction, deleteChangeAction, deleteCheckActi
 import type { ChangeInput, CheckInput, CheckView } from "@/lib/goalPlan";
 import type { CompassField } from "@/lib/goals";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
+import { PlanDocumentCard } from "@/components/goals/PlanDocumentCard";
 import { BlurText, Card, DateInput, GoalChip, INPUT, LABEL, NO_GOAL_HEX, PILL, PRIMARY, okOr, useDay, type TabProps } from "@/components/goals/ui";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
@@ -16,7 +17,8 @@ const COMPASS_ORDER: CompassField[] = ["principles", "happiness", "essentials", 
 const SOURCE_COLOR: Record<string, string> = { MANUAL: "#64748b", ADVISOR: "#8b5cf6", IMPORT: "#3b6fe0" };
 
 /**
- * 指針 — what steers the plan when it has to change: the rules (when this
+ * 指針 — what steers the plan when it has to change: the plan document
+ * it all came from, the rules (when this
  * is observed, change that), what's still to be confirmed, the log of every
  * change and why, and under it all the compass the goals stand on.
  */
@@ -25,6 +27,7 @@ export function CompassTab(props: TabProps) {
   const { t } = useI18n();
   return (
     <div className="flex flex-col gap-5">
+      <PlanDocumentCard {...props} />
       <Card title={t.plan.rulesHeading} intro={t.plan.rulesIntro}>
         <BlurText
           key={`rules:${generation}`}
