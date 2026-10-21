@@ -9,6 +9,7 @@ import { Card, GoalSelect, HoursInput, INPUT, LABEL, NO_GOAL_HEX, PILL, PRIMARY,
 import { currentCycle } from "@/components/goals/cycleMath";
 import { GOAL_COLORS, tint } from "@/lib/goalColors";
 import { dayKindOf, periodFor } from "@/lib/goalFocus";
+import { sleepHours, type Routine } from "@/lib/routine";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 
 /**
@@ -24,6 +25,7 @@ export function WeekTab(props: TabProps) {
 
   return (
     <div className="flex flex-col gap-5">
+      <RoutineCard key={`routine:${generation}`} {...props} />
       <div className="grid items-start gap-5 lg:grid-cols-2">
         <BudgetCard {...props} />
         <LifeCard key={`life:${generation}`} {...props} />
@@ -374,6 +376,100 @@ function Timetable({ ov, setOv, active, hexes, todayKey, onError }: TabProps) {
           {t.plan.slotCommute}
         </span>
       </div>
+    </Card>
+  );
+}
+
+/**
+ * 生活の基本 — when the day starts and ends, and each weekday's work: the
+ * frame the calendar's day plan is drafted in.
+ */
+function RoutineCard({ ov, setOv, onError }: TabProps) {
+  const { t } = useI18n();
+  const r = t.plan.routine;
+  const [routine, setRoutine] = useState<Routine>(ov.plan.routine);
+  const [dirty, setDirty] = useState(false);
+  const edit = (next: Routine) => {
+    setRoutine(next);
+    setDirty(true);
+  };
+  const day = (weekday: number, p: Partial<Routine["days"][number]>) => edit({ ...routine, days: routine.days.map((d) => (d.weekday === weekday ? { ...d, ...p } : d)) });
+  async function save() {
+    const res = okOr(await savePlanAction({ routine }), onError);
+    if (!res) return;
+    setOv((o) => ({ ...o, plan: res.plan }));
+    setRoutine(res.plan.routine);
+    setDirty(false);
+  }
+  const order = [1, 2, 3, 4, 5, 6, 0];
+  return (
+    <Card title={r.heading} intro={r.intro} action={<span className="font-mono text-[10px] text-ink-faint">{r.sleep(sleepHours(routine))}</span>}>
+      <div className="flex flex-wrap items-center gap-3 font-mono text-[10.5px] text-ink-soft">
+        <label className="flex items-center gap-1.5">
+          {r.bed}
+          <input type="time" value={routine.bed} onChange={(e) => edit({ ...routine, bed: e.target.value })} className={INPUT} />
+        </label>
+        <label className="flex items-center gap-1.5">
+          {r.wake}
+          <input type="time" value={routine.wake} onChange={(e) => edit({ ...routine, wake: e.target.value })} className={INPUT} />
+        </label>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[520px] border-collapse text-[11.5px]">
+          <thead>
+            <tr className="text-left font-mono text-[9.5px] text-ink-faint">
+              <th className="py-1 font-normal" />
+              <th className="py-1 font-normal">{r.work}</th>
+              <th className="py-1 font-normal">{r.hours}</th>
+              <th className="py-1 font-normal">{r.office}</th>
+              <th className="py-1 font-normal">{r.commute}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {order.map((w) => {
+              const d = routine.days.find((x) => x.weekday === w)!;
+              return (
+                <tr key={w} className="border-t border-line">
+                  <td className="py-1 pr-2 font-mono font-semibold">{t.plan.weekdayShort[w]}</td>
+                  <td className="py-1">
+                    <input type="checkbox" checked={d.work} onChange={(e) => day(w, { work: e.target.checked })} className="accent-[var(--color-accent)]" aria-label={r.work} />
+                  </td>
+                  <td className="py-1">
+                    <span className={`flex items-center gap-1 ${d.work ? "" : "opacity-40"}`}>
+                      <input type="time" value={d.start} disabled={!d.work} onChange={(e) => day(w, { start: e.target.value })} className={INPUT} />
+                      〜
+                      <input type="time" value={d.end} disabled={!d.work} onChange={(e) => day(w, { end: e.target.value })} className={INPUT} />
+                    </span>
+                  </td>
+                  <td className="py-1">
+                    <input type="checkbox" checked={d.office} disabled={!d.work} onChange={(e) => day(w, { office: e.target.checked })} className="accent-[var(--color-accent)]" aria-label={r.office} />
+                  </td>
+                  <td className="py-1">
+                    <span className={`flex items-center gap-1 ${d.work && d.office ? "" : "opacity-40"}`}>
+                      <input
+                        type="number"
+                        min={0}
+                        max={300}
+                        step={5}
+                        value={d.commuteMinutes || ""}
+                        disabled={!d.work || !d.office}
+                        onChange={(e) => day(w, { commuteMinutes: Number(e.target.value) || 0 })}
+                        className={`${INPUT} w-16 text-right`}
+                      />
+                      <span className="font-mono text-[9.5px] text-ink-faint">{r.minutes}</span>
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      {dirty && (
+        <button type="button" onClick={() => void save()} className={`${PRIMARY} w-fit`}>
+          {t.plan.save}
+        </button>
+      )}
     </Card>
   );
 }

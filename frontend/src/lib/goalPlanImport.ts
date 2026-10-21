@@ -6,6 +6,7 @@ import { partialString } from "@/lib/chatProgress";
 import { ValidationError } from "@/lib/errors";
 import { GOAL_COLORS } from "@/lib/goalColors";
 import { titleKey } from "@/lib/goals";
+import { toRoutine, type Routine } from "@/lib/routine";
 import { ITEM_STATUSES, STEP_KINDS, type DayRow, type WeekRow } from "@/lib/goalSubPlan";
 import { addChange, EVENT_KINDS, phasesFor, PLAN_DATE_KEY, PLAN_TIME, savePlanDocument, type CyclePhase, type LifeBudgetLine } from "@/lib/goalPlan";
 
@@ -145,6 +146,8 @@ export interface PlanDraft {
   baseline: string;
   decisionRules: string;
   lifeBudget: LifeBudgetLine[];
+  /** The daily frame, when the document gives one. */
+  routine: Routine | null;
   goals: DraftGoal[];
   cycle: DraftCycle | null;
   slots: DraftSlot[];
@@ -180,10 +183,11 @@ const SHAPE_PROMPT = `${COMMON}
   - improveCheck: 4〜12週で確認する改善
   - phases: ロードマップの段階。ガントチャートの棒と、年度ごとの表の各列を、その領域の段階にする。{ "label", "startDateKey", "dueDateKey", "condition"（次へ進む条件。無ければ空） }。ガントの section が複数の領域をまとめている場合（例:「IT・経済的安定」）は、内容に合う領域へ振り分ける
 - lifeBudget: 1週間168時間の内訳 [{ "label", "hours", "note" }]
+- routine: 生活の基本。書いてあれば { "bed": 就寝 "HH:MM", "wake": 起床 "HH:MM", "days": [{ "weekday", "work": 仕事の日なら true, "start", "end": 勤務時間, "office": 出社なら true, "commuteMinutes": 片道の通勤分 }] }（7曜日分）。無ければ null
 - decisionRules: 「何が起きたら、何を変えるか」の判断ルールと、改善の実験の進め方（Markdown）
 
 出力:
-{ "scope": "plan", "area": null, "summary": "読み取った内容を一文で", "title": "", "vision": "", "baseline": "", "goals": [ { "title": "", "statement": "", "approach": "", "weeklyHours": 0, "commuteHours": 0, "budgetNote": "", "keepRecord": "", "improveCheck": "", "phases": [ { "label": "", "startDateKey": "YYYY-MM-DD", "dueDateKey": "YYYY-MM-DD", "condition": "" } ] } ], "lifeBudget": [ { "label": "", "hours": 0, "note": "" } ], "decisionRules": "" }`;
+{ "scope": "plan", "area": null, "summary": "読み取った内容を一文で", "title": "", "vision": "", "baseline": "", "goals": [ { "title": "", "statement": "", "approach": "", "weeklyHours": 0, "commuteHours": 0, "budgetNote": "", "keepRecord": "", "improveCheck": "", "phases": [ { "label": "", "startDateKey": "YYYY-MM-DD", "dueDateKey": "YYYY-MM-DD", "condition": "" } ] } ], "lifeBudget": [ { "label": "", "hours": 0, "note": "" } ], "routine": null, "decisionRules": "" }`;
 
 const RUN_PROMPT = `${COMMON}
 
@@ -278,6 +282,7 @@ function parseShape(value: unknown) {
     baseline: s(o.baseline),
     decisionRules: s(o.decisionRules, 50_000),
     lifeBudget,
+    routine: o.routine && typeof o.routine === "object" ? toRoutine(o.routine) : null,
     goals,
   };
 }
@@ -572,6 +577,7 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
       ...(draft.baseline ? { baseline: draft.baseline } : {}),
       ...(draft.decisionRules ? { decisionRules: draft.decisionRules } : {}),
       ...(draft.lifeBudget.length > 0 ? { lifeBudget: draft.lifeBudget as unknown as Prisma.InputJsonValue } : {}),
+      ...(draft.routine ? { routine: draft.routine as unknown as Prisma.InputJsonValue } : {}),
     };
     await tx.goalPlan.upsert({ where: { ownerSub }, create: { ownerSub, ...planData }, update: planData });
 

@@ -851,6 +851,9 @@ model TimeBlock {
   startMinutes    Int      @map("start_minutes")
   durationMinutes Int      @map("duration_minutes")
   title           String
+  /// "DAY_PLAN" for one written from the day's plan (GoalDayPlan) when the
+  /// calendar isn't linked; replaced whole when the plan is written again.
+  source          String   @default("")
   createdAt       DateTime @default(now()) @map("created_at")
 
   @@index([ownerSub, dateKey])
@@ -1337,6 +1340,9 @@ model GoalPlan {
   lifeBudget    Json     @default("[]") @map("life_budget")
   /// 何が起きたら、何を変えるか — markdown, read by the advisor too.
   decisionRules String   @default("") @map("decision_rules")
+  /// The day's fixed frame: { bed, wake, days: [{ weekday, work, start, end,
+  /// office, commuteMinutes }] } — what a day's plan is built around.
+  routine       Json     @default("{}")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
   @@map("goal_plan")
@@ -1684,4 +1690,45 @@ model GoalItemStep {
 
   @@index([subPlanId, dateKey])
   @@map("goal_item_step")
+}
+
+/// One day's plan: the day laid out in blocks — sleep, work and commute,
+/// the goals' blocks, meals, fixed appointments — drafted from the routine
+/// and the plan, talked over with the advisor, then written into the
+/// calendar (src/lib/dayPlan.ts).
+model GoalDayPlan {
+  id        String    @id @default(uuid())
+  ownerSub  String    @map("owner_sub")
+  dateKey   String    @map("date_key")
+  /// [{ id, start, end, title, kind, goalId, note, fixed, push }].
+  blocks    Json      @default("[]")
+  note      String    @default("")
+  /// Events written to the calendar: [{ key, eventId }] — kept so writing
+  /// again updates them instead of adding a second set.
+  pushed    Json      @default("[]")
+  /// "google" or "app": where it was last written.
+  pushedTo  String    @default("") @map("pushed_to")
+  pushedAt  DateTime? @map("pushed_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+  updatedAt DateTime  @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, dateKey])
+  @@map("goal_day_plan")
+}
+
+/// The conversation about one day's plan. An assistant message may carry a
+/// proposed day (blocks); nothing changes until it's applied.
+model GoalDayPlanMessage {
+  id          String    @id @default(uuid())
+  ownerSub    String    @map("owner_sub")
+  dateKey     String    @map("date_key")
+  role        String
+  content     String
+  proposal    Json?
+  appliedAt   DateTime? @map("applied_at")
+  dismissedAt DateTime? @map("dismissed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([ownerSub, dateKey, createdAt])
+  @@map("goal_day_plan_message")
 }

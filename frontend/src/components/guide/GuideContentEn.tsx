@@ -383,6 +383,10 @@ export function GuideContentEn() {
           <Points
             items={[
               {
+                title: "The day's plan",
+                body: "Today and the days ahead have a day plan. It's drafted from your routine (bed, wake, work, office days, commute — set under Goals › Week), the standard week's blocks, the calendar's appointments, meals, and the detailed plans' row and steps for that day. Plan it together with the advisor to rearrange it and apply, then Write to calendar puts it into Google Calendar (or the app's own schedule when it isn't linked); writing again updates the same events. In the evening it offers to plan tomorrow; in the morning it reminds you to write today in.",
+              },
+              {
                 title: "The day's timeline",
                 body: "A 24-hour axis with your Google Calendar events, the meal slots from the meal plan, and time you've blocked out. On today, a line marks the current time.",
               },

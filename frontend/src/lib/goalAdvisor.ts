@@ -197,6 +197,10 @@ export function briefOf(ov: PlanOverview, extra: { observation: string; logs: st
       lines.push(`- ${r} ${g(o.goalId) || o.area}: 目指すもの: ${o.target.slice(0, 300)} ／ 証拠: ${o.evidence.slice(0, 200)} ／ 時間: ${o.hoursNote} ／ 区切りごと: ${o.phaseTexts.join(" | ").slice(0, 400)}`);
     });
   }
+  if (ov.plan.routineSet) {
+    const r = ov.plan.routine;
+    lines.push("", `生活の基本: 就寝${r.bed} 起床${r.wake} ／ ${r.days.filter((d) => d.work).map((d) => `${WEEKDAY[d.weekday]} ${d.start}〜${d.end}${d.office ? `出社(片道${d.commuteMinutes}分)` : "在宅"}`).join("、") || "仕事なし"}`);
+  }
   lines.push("", "標準の1週間:");
   for (let d = 0; d < 7; d++) {
     const day = ov.slots.filter((x) => x.weekday === d);
