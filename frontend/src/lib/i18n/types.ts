@@ -1,3 +1,5 @@
+import type { PlanDictionary } from "@/lib/i18n/dictionaries/planJa";
+
 export type Locale = "ja" | "en";
 
 export const LOCALE_COOKIE = "locale";
@@ -16,6 +18,8 @@ export function isLocale(value: string | undefined | null): value is Locale {
  * so both languages can order/word the sentence however they need to.
  */
 export interface Dictionary {
+  /** The goals plan (src/components/goals); its own module, see planJa.ts. */
+  plan: PlanDictionary;
   brand: {
     /** The app-name slot in the top-left of a page header — depends on
      * which of the two main screens it's shown on (see AppBrand). */
@@ -910,6 +914,7 @@ export interface Dictionary {
     goalNotFound: string;
     goalImportEmpty: string;
     goalImportTooLong: string;
+    goalDeliverableLimit: string;
     purchaseListInvalid: string;
     purchaseListNoMeals: string;
     mealChatInvalid: string;

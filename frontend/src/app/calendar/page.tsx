@@ -3,6 +3,7 @@ import { NewDayReload } from "@/components/NewDayReload";
 import { requireSession } from "@/lib/session";
 import * as projectTaskNotes from "@/lib/projectTaskNotes";
 import * as goals from "@/lib/goals";
+import * as goalPlan from "@/lib/goalPlan";
 import { TodayGoalsStrip } from "@/components/TodayGoalsStrip";
 import { CalendarViewSwitch } from "@/components/CalendarViewSwitch";
 import { CalendarMonthNav } from "@/components/CalendarMonthNav";
@@ -57,6 +58,8 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
   const todayNotes =
     !selectedDate && topView === "today" ? await projectTaskNotes.listAllProjectsTodayNotes(ownerSub, todayKey) : [];
   const focus = !selectedDate && topView === "today" ? await goals.todayFocus(ownerSub, todayKey) : null;
+  const todayPlan = !selectedDate && topView === "today" ? await goalPlan.todayPlan(ownerSub, todayKey) : null;
+  const hasPlan = todayPlan !== null && (todayPlan.slots.length > 0 || todayPlan.events.length > 0);
   const timelineMarks =
     !selectedDate && topView === "timeline"
       ? await projectTaskNotes.listTimelineMarks(ownerSub, viewedYear, viewedMonth, todayKey)
@@ -86,7 +89,7 @@ export default async function CalendarPage(props: PageProps<"/calendar">) {
             initialNotes={todayNotes}
             initialNotesDateKey={todayKey}
             headerRight={<CalendarViewSwitch view={topView} />}
-            todayAside={focus && <TodayGoalsStrip focus={focus} />}
+            todayAside={(focus || hasPlan) && <TodayGoalsStrip focus={focus} plan={hasPlan ? todayPlan : null} todayKey={todayKey} />}
           />
         ) : (
           <>

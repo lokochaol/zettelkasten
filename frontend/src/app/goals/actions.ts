@@ -78,8 +78,9 @@ export async function addMilestoneAction(
   goalId: string,
   label: string,
   dueDateKey: string | null,
+  extra: { startDateKey?: string | null; condition?: string } = {},
 ): Promise<Result<{ milestone: MilestoneView }>> {
-  return run(async (ownerSub) => ({ milestone: await goals.addMilestone(ownerSub, goalId, label, dueDateKey) }));
+  return run(async (ownerSub) => ({ milestone: await goals.addMilestone(ownerSub, goalId, label, dueDateKey, extra) }));
 }
 
 export async function updateMilestoneAction(milestoneId: string, patch: goals.MilestonePatch): Promise<Result<{ milestone: MilestoneView }>> {

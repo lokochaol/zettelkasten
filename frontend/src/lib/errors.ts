@@ -59,7 +59,8 @@ export type DomainErrorCode =
   | "goalInvalid"
   | "goalNotFound"
   | "goalImportEmpty"
-  | "goalImportTooLong";
+  | "goalImportTooLong"
+  | "goalDeliverableLimit";
 
 export class DomainError extends Error {
   code: DomainErrorCode;
