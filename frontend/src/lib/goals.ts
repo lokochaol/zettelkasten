@@ -48,7 +48,11 @@ export interface FocusLine {
 export interface MilestoneView {
   id: string;
   label: string;
+  /** With dueDateKey, a phase bar on the roadmap; without, a point. */
+  startDateKey: string | null;
   dueDateKey: string | null;
+  /** 次へ進む条件. */
+  condition: string;
   body: string;
   done: boolean;
 }
@@ -72,6 +76,14 @@ export interface GoalView {
   statement: string;
   reviewedOnDateKey: string | null;
   status: GoalStatus;
+  /** Palette name (src/lib/goalColors.ts); "" = by position. */
+  color: string;
+  approach: string;
+  weeklyHours: number;
+  commuteHours: number;
+  budgetNote: string;
+  keepRecord: string;
+  improveCheck: string;
   milestones: MilestoneView[];
   /** Newest first. */
   revisions: RevisionView[];
@@ -108,7 +120,15 @@ const goalInclude = {
 type GoalRow = Prisma.GoalGetPayload<{ include: typeof goalInclude }>;
 
 function toMilestoneView(m: GoalRow["milestones"][number]): MilestoneView {
-  return { id: m.id, label: m.label, dueDateKey: m.dueDateKey, body: m.body, done: m.doneAt !== null };
+  return {
+    id: m.id,
+    label: m.label,
+    startDateKey: m.startDateKey,
+    dueDateKey: m.dueDateKey,
+    condition: m.condition,
+    body: m.body,
+    done: m.doneAt !== null,
+  };
 }
 
 function toSnapshot(value: unknown): GoalSnapshot {
@@ -132,6 +152,13 @@ function toGoalView(g: GoalRow): GoalView {
     statement: g.statement,
     reviewedOnDateKey: g.reviewedOnDateKey,
     status: g.status,
+    color: g.color,
+    approach: g.approach,
+    weeklyHours: g.weeklyHours,
+    commuteHours: g.commuteHours,
+    budgetNote: g.budgetNote,
+    keepRecord: g.keepRecord,
+    improveCheck: g.improveCheck,
     milestones: g.milestones.map(toMilestoneView),
     revisions: g.revisions.map((r) => ({ id: r.id, dateKey: r.dateKey, snapshot: toSnapshot(r.snapshot) })),
   };
@@ -193,33 +220,33 @@ function pickCompass(row: CompassView): CompassView {
 
 /* ---------- validation helpers ---------- */
 
-function str(v: unknown): string {
+export function str(v: unknown): string {
   return typeof v === "string" ? v : "";
 }
 
-function dateKeyOrNull(v: unknown): string | null {
+export function dateKeyOrNull(v: unknown): string | null {
   return typeof v === "string" && DATE_KEY.test(v) ? v : null;
 }
 
-function cleanText(v: unknown, max = MAX_TEXT): string {
+export function cleanText(v: unknown, max = MAX_TEXT): string {
   if (typeof v !== "string") throw new ValidationError("goalInvalid", "text is not a string");
   if (v.length > max) throw new ValidationError("goalInvalid", "text too long");
   return v;
 }
 
-function cleanTitle(v: unknown): string {
+export function cleanTitle(v: unknown): string {
   const title = cleanText(v, MAX_TITLE).trim();
   if (!title) throw new ValidationError("goalInvalid", "title is empty");
   return title;
 }
 
-function cleanDateKey(v: unknown): string | null {
+export function cleanDateKey(v: unknown): string | null {
   if (v === null || v === undefined || v === "") return null;
   if (typeof v !== "string" || !DATE_KEY.test(v)) throw new ValidationError("goalInvalid", "bad date");
   return v;
 }
 
-async function requireGoal(ownerSub: string, goalId: string) {
+export async function requireGoal(ownerSub: string, goalId: string) {
   const goal = await prisma.goal.findFirst({ where: { id: goalId, ownerSub }, include: goalInclude });
   if (!goal) throw new NotFoundError("goalNotFound", "goal not found");
   return goal;
@@ -268,6 +295,20 @@ export interface GoalPatch {
   statement?: string;
   reviewedOnDateKey?: string | null;
   status?: GoalStatus;
+  color?: string;
+  approach?: string;
+  weeklyHours?: number;
+  commuteHours?: number;
+  budgetNote?: string;
+  keepRecord?: string;
+  improveCheck?: string;
+}
+
+/** Hours in a week's budget: 0–168, to a quarter hour. */
+export function cleanHours(v: unknown): number {
+  const n = typeof v === "number" ? v : Number(v);
+  if (!Number.isFinite(n) || n < 0 || n > 168) throw new ValidationError("goalInvalid", "bad hours");
+  return Math.round(n * 4) / 4;
 }
 
 export async function updateGoal(ownerSub: string, goalId: string, patch: GoalPatch): Promise<GoalView> {
@@ -276,6 +317,13 @@ export async function updateGoal(ownerSub: string, goalId: string, patch: GoalPa
   if (patch.title !== undefined) data.title = cleanTitle(patch.title);
   if (patch.statement !== undefined) data.statement = cleanText(patch.statement);
   if (patch.reviewedOnDateKey !== undefined) data.reviewedOnDateKey = cleanDateKey(patch.reviewedOnDateKey);
+  if (patch.color !== undefined) data.color = cleanText(patch.color, 20);
+  if (patch.approach !== undefined) data.approach = cleanText(patch.approach);
+  if (patch.weeklyHours !== undefined) data.weeklyHours = cleanHours(patch.weeklyHours);
+  if (patch.commuteHours !== undefined) data.commuteHours = cleanHours(patch.commuteHours);
+  if (patch.budgetNote !== undefined) data.budgetNote = cleanText(patch.budgetNote, 2000);
+  if (patch.keepRecord !== undefined) data.keepRecord = cleanText(patch.keepRecord, 2000);
+  if (patch.improveCheck !== undefined) data.improveCheck = cleanText(patch.improveCheck, 2000);
   if (patch.status !== undefined) {
     if (patch.status !== "ACTIVE" && patch.status !== "ARCHIVED") throw new ValidationError("goalInvalid", "bad status");
     data.status = patch.status;
@@ -331,17 +379,34 @@ export async function deleteRevision(ownerSub: string, revisionId: string): Prom
 
 /* ---------- milestones ---------- */
 
-export async function addMilestone(ownerSub: string, goalId: string, label: string, dueDateKey: string | null = null): Promise<MilestoneView> {
+export async function addMilestone(
+  ownerSub: string,
+  goalId: string,
+  label: string,
+  dueDateKey: string | null = null,
+  /** For a roadmap phase: where it starts and what lets the next begin. */
+  extra: { startDateKey?: string | null; condition?: string; body?: string } = {},
+): Promise<MilestoneView> {
   await requireGoal(ownerSub, goalId);
   const last = await prisma.goalMilestone.findFirst({ where: { goalId }, orderBy: { sortOrder: "desc" }, select: { sortOrder: true } });
   const milestone = await prisma.goalMilestone.create({
-    data: { goalId, label: cleanText(label, MAX_LABEL).trim(), dueDateKey: cleanDateKey(dueDateKey), sortOrder: (last?.sortOrder ?? -1) + 1 },
+    data: {
+      goalId,
+      label: cleanText(label, MAX_LABEL).trim(),
+      dueDateKey: cleanDateKey(dueDateKey),
+      startDateKey: cleanDateKey(extra.startDateKey ?? null),
+      condition: cleanText(extra.condition ?? "", 2000),
+      body: cleanText(extra.body ?? ""),
+      sortOrder: (last?.sortOrder ?? -1) + 1,
+    },
   });
   return toMilestoneView(milestone);
 }
 
 export interface MilestonePatch {
   label?: string;
+  startDateKey?: string | null;
+  condition?: string;
   dueDateKey?: string | null;
   body?: string;
   done?: boolean;
@@ -352,6 +417,8 @@ export async function updateMilestone(ownerSub: string, milestoneId: string, pat
   const data: Prisma.GoalMilestoneUpdateInput = {};
   if (patch.label !== undefined) data.label = cleanText(patch.label, MAX_LABEL).trim();
   if (patch.dueDateKey !== undefined) data.dueDateKey = cleanDateKey(patch.dueDateKey);
+  if (patch.startDateKey !== undefined) data.startDateKey = cleanDateKey(patch.startDateKey);
+  if (patch.condition !== undefined) data.condition = cleanText(patch.condition, 2000);
   if (patch.body !== undefined) data.body = cleanText(patch.body);
   if (patch.done !== undefined) data.doneAt = patch.done ? new Date() : null;
   return toMilestoneView(await prisma.goalMilestone.update({ where: { id: milestoneId }, data }));

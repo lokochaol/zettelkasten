@@ -73,6 +73,8 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.goalImportEmpty;
     case "goalImportTooLong":
       return dict.goalImportTooLong;
+    case "goalDeliverableLimit":
+      return dict.goalDeliverableLimit;
     case "purchaseListInvalid":
       return dict.purchaseListInvalid;
     case "purchaseListNoMeals":

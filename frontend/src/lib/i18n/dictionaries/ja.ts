@@ -1,6 +1,8 @@
 import type { Dictionary } from "@/lib/i18n/types";
+import { planJa } from "@/lib/i18n/dictionaries/planJa";
 
 export const ja: Dictionary = {
+  plan: planJa,
   brand: {
     scratch: "走り書き",
     zettelkasten: "ツェッテルカステン",
@@ -15,7 +17,7 @@ export const ja: Dictionary = {
       literature: { name: "文献メモ", note: "本や論文を自分の言葉で要約して残す。Zoteroから取り込める。" },
       projects: { name: "プロジェクト", note: "最終目標から1日の目標までの梯子と、日毎のタスクメモ。" },
       calendar: { name: "カレンダー", note: "今日の流れ、未完了のタスク、食事、支出。月のタイムラインにも切り替わる。" },
-      goals: { name: "目標", note: "🚩目標とそこへ向かう段階、期間ごとに平日・休日に意識する目標、生き方の指針。今日の分はカレンダーにも出る。" },
+      goals: { name: "目標", note: "ロードマップ（ガントチャート）、12週間の実行期間、標準の1週間、日々の記録とレビュー、観測、アドバイザー。今日の枠はカレンダーにも出る。" },
       training: { name: "運動", note: "目標の体組成と現在の比較、週ごとの推移、AIトレーナーが組む週のトレーニングと記録。" },
       meals: { name: "献立", note: "1週間の献立、購入予定リストと在庫リスト、作り置きの配分。" },
       money: { name: "家計", note: "今月の計画と実績、1年の見通し、週1回の助言、明細（CSV・PDF）の取り込み。" },
@@ -946,6 +948,7 @@ export const ja: Dictionary = {
     goalNotFound: "この目標は見つかりません（削除された可能性があります）",
     goalImportEmpty: "取り込む文章を貼り付けてください",
     goalImportTooLong: "文章が長すぎます。いくつかに分けて取り込んでください",
+    goalDeliverableLimit: "今週の優先成果は3件までです。どれかを持ち越すか、やめてから追加してください",
     purchaseListInvalid: "日数は1〜7日で選んでください",
     purchaseListNoMeals: "その期間に予定の献立がありません。先に献立を作ってください。",
     mealChatInvalid: "メッセージを入力してください",

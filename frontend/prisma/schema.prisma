@@ -1179,11 +1179,34 @@ model Goal {
   reviewedOnDateKey String?    @map("reviewed_on_date_key")
   status            GoalStatus @default(ACTIVE)
   sortOrder         Int        @default(0) @map("sort_order")
+  /// One of the palette names in src/lib/goalColors.ts; "" picks one by
+  /// position. The goal's colour everywhere: Gantt rows, the week's slots,
+  /// the records.
+  color             String     @default("")
+  /// 当面の進め方 — how it's being worked on for now.
+  approach          String     @default("")
+  /// The week's time budget for it (desk + commute). 0 = not budgeted.
+  weeklyHours       Float      @default(0) @map("weekly_hours")
+  /// Of weeklyHours, how much is done while commuting.
+  commuteHours      Float      @default(0) @map("commute_hours")
+  /// What the budgeted time includes (課題、制作、読書…).
+  budgetNote        String     @default("") @map("budget_note")
+  /// 継続して残す最小限の記録.
+  keepRecord        String     @default("") @map("keep_record")
+  /// 4〜12週で確認する改善.
+  improveCheck      String     @default("") @map("improve_check")
   createdAt         DateTime   @default(now()) @map("created_at")
   updatedAt         DateTime   @updatedAt @map("updated_at")
 
-  milestones GoalMilestone[]
-  revisions  GoalRevision[]
+  milestones   GoalMilestone[]
+  revisions    GoalRevision[]
+  outcomes     GoalCycleOutcome[]
+  slots        GoalWeekSlot[]
+  events       GoalEvent[]
+  checks       GoalCheck[]
+  tasks        GoalTask[]
+  deliverables GoalDeliverable[]
+  experiments  GoalExperiment[]
 
   @@index([ownerSub, status, sortOrder])
   @@map("goal")
@@ -1198,7 +1221,12 @@ model GoalMilestone {
   goalId     String    @map("goal_id")
   goal       Goal      @relation(fields: [goalId], references: [id], onDelete: Cascade)
   label      String    @default("")
+  /// With a due date, a phase on the roadmap's Gantt chart from this day
+  /// to that one; without, a horizon that's only a point.
+  startDateKey String?   @map("start_date_key")
   dueDateKey String?   @map("due_date_key")
+  /// 次へ進む条件 — what has to be true before the next phase.
+  condition  String    @default("")
   /// The steps themselves and their notes — markdown.
   body       String    @default("")
   doneAt     DateTime? @map("done_at")
@@ -1292,4 +1320,260 @@ model DiscoveryTopicFinding {
   @@index([topicId, createdAt])
   @@index([ownerSub, seenAt])
   @@map("discovery_topic_finding")
+}
+
+/// The plan as a whole, one per owner: the vision the goals serve, the
+/// assumptions it was made on, where the week's 168 hours go, and the rules
+/// for what to change when something is observed (src/lib/goalPlan.ts).
+model GoalPlan {
+  ownerSub      String   @id @map("owner_sub")
+  title         String   @default("")
+  /// 目指す姿 — markdown.
+  vision        String   @default("")
+  /// 基準・性格 — the plan's version, basis and how provisional it is.
+  baseline      String   @default("")
+  /// The week's 168 hours: [{ label, hours, note }].
+  lifeBudget    Json     @default("[]") @map("life_budget")
+  /// 何が起きたら、何を変えるか — markdown, read by the advisor too.
+  decisionRules String   @default("") @map("decision_rules")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@map("goal_plan")
+}
+
+/// A run of weeks with its own targets — "最初の12週間". `phases` splits it
+/// into stretches ([{ label, fromDateKey, toDateKey }], e.g. 4 weeks each);
+/// each outcome has a line per phase.
+model GoalCycle {
+  id          String   @id @default(uuid())
+  ownerSub    String   @map("owner_sub")
+  label       String   @default("")
+  fromDateKey String   @map("from_date_key")
+  toDateKey   String   @map("to_date_key")
+  note        String   @default("")
+  phases      Json     @default("[]")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  outcomes GoalCycleOutcome[]
+
+  @@index([ownerSub, fromDateKey])
+  @@map("goal_cycle")
+}
+
+/// What one goal is to reach in a cycle, the evidence that says it did,
+/// and what each phase of the cycle does towards it.
+model GoalCycleOutcome {
+  id         String    @id @default(uuid())
+  cycleId    String    @map("cycle_id")
+  cycle      GoalCycle @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  goalId     String?   @map("goal_id")
+  goal       Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  /// For a row that isn't one goal's ("管理").
+  area       String    @default("")
+  target     String    @default("")
+  evidence   String    @default("")
+  hoursNote  String    @default("") @map("hours_note")
+  /// One line per cycle phase, in order.
+  phaseTexts Json      @default("[]") @map("phase_texts")
+  sortOrder  Int       @default(0) @map("sort_order")
+
+  @@index([cycleId, sortOrder])
+  @@map("goal_cycle_outcome")
+}
+
+/// One block of the standard week — "火 06:00〜07:00 IT：問い・設計案".
+model GoalWeekSlot {
+  id        String  @id @default(uuid())
+  ownerSub  String  @map("owner_sub")
+  /// 0 = Sunday … 6 = Saturday.
+  weekday   Int
+  startTime String  @map("start_time")
+  endTime   String  @map("end_time")
+  goalId    String? @map("goal_id")
+  goal      Goal?   @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  label     String  @default("")
+  /// Done on the commute rather than at a desk.
+  commute   Boolean @default(false)
+
+  @@index([ownerSub, weekday])
+  @@map("goal_week_slot")
+}
+
+/// A dated thing the plan has to meet: a deadline, an application window
+/// (dateKey〜endDateKey), a class day, a review.
+model GoalEvent {
+  id         String   @id @default(uuid())
+  ownerSub   String   @map("owner_sub")
+  goalId     String?  @map("goal_id")
+  goal       Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  /// DEADLINE / APPLICATION / EVENT / REVIEW.
+  kind       String   @default("EVENT")
+  title      String
+  dateKey    String   @map("date_key")
+  endDateKey String?  @map("end_date_key")
+  /// A candidate until it's booked or confirmed.
+  confirmed  Boolean  @default(false)
+  done       Boolean  @default(false)
+  note       String   @default("")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@index([ownerSub, dateKey])
+  @@map("goal_event")
+}
+
+/// Something the plan rests on that isn't known yet — "卒業設計の最短1年の
+/// 起算点" — with how to find out and what it changes.
+model GoalCheck {
+  id         String    @id @default(uuid())
+  ownerSub   String    @map("owner_sub")
+  goalId     String?   @map("goal_id")
+  goal       Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  question   String
+  method     String    @default("")
+  impact     String    @default("")
+  dueDateKey String?   @map("due_date_key")
+  answer     String    @default("")
+  doneAt     DateTime? @map("done_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([ownerSub, createdAt])
+  @@map("goal_check")
+}
+
+/// A one-off thing to do for the plan — "12月SCの受講要件を確認する".
+model GoalTask {
+  id         String    @id @default(uuid())
+  ownerSub   String    @map("owner_sub")
+  goalId     String?   @map("goal_id")
+  goal       Goal?     @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  text       String
+  dueDateKey String?   @map("due_date_key")
+  doneAt     DateTime? @map("done_at")
+  sortOrder  Int       @default(0) @map("sort_order")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  @@index([ownerSub, sortOrder])
+  @@map("goal_task")
+}
+
+/// The day's 1–2 minute record: hours actually spent per goal
+/// ({ goalId: hours }), how much of it on the commute, what moved, what
+/// stuck, the next step.
+model GoalDailyLog {
+  id           String   @id @default(uuid())
+  ownerSub     String   @map("owner_sub")
+  dateKey      String   @map("date_key")
+  /// A schooling week, a trip — not compared with normal weeks.
+  special      Boolean  @default(false)
+  hours        Json     @default("{}")
+  commuteHours Float    @default(0) @map("commute_hours")
+  progress     String   @default("")
+  blocker      String   @default("")
+  next         String   @default("")
+  life         String   @default("")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, dateKey])
+  @@map("goal_daily_log")
+}
+
+/// A review: WEEKLY (the Sunday 20 minutes), FOUR_WEEK or TWELVE_WEEK.
+/// `dateKey` is the first day of the week it reviews (weekly) or the day it
+/// was held. Its fields are read and written whole (see goalPlan.ts).
+model GoalReview {
+  id        String   @id @default(uuid())
+  ownerSub  String   @map("owner_sub")
+  kind      String
+  dateKey   String   @map("date_key")
+  special   Boolean  @default(false)
+  data      Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([ownerSub, kind, dateKey])
+  @@map("goal_review")
+}
+
+/// One of the week's priority deliverables (at most three a week): what,
+/// the condition for "done this week", its state, the evidence and when to
+/// look again. Carried across weeks while it's still moving.
+model GoalDeliverable {
+  id               String   @id @default(uuid())
+  ownerSub         String   @map("owner_sub")
+  goalId           String?  @map("goal_id")
+  goal             Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  weekStartDateKey String   @map("week_start_date_key")
+  title            String
+  condition        String   @default("")
+  /// NOT_STARTED / IN_PROGRESS / STEP_DONE / SUBMITTED / WAITING /
+  /// NEEDS_FIX / CONFIRMED.
+  status           String   @default("NOT_STARTED")
+  evidence         String   @default("")
+  checkDateKey     String?  @map("check_date_key")
+  statusChangedAt  DateTime @default(now()) @map("status_changed_at")
+  createdAt        DateTime @default(now()) @map("created_at")
+  updatedAt        DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerSub, weekStartDateKey])
+  @@map("goal_deliverable")
+}
+
+/// One improvement tried at a time: observation → hypothesis → the one
+/// change → the evidence that will tell → the day to decide.
+model GoalExperiment {
+  id            String   @id @default(uuid())
+  ownerSub      String   @map("owner_sub")
+  goalId        String?  @map("goal_id")
+  goal          Goal?    @relation(fields: [goalId], references: [id], onDelete: SetNull)
+  observation   String   @default("")
+  hypothesis    String   @default("")
+  change        String   @default("")
+  evidence      String   @default("")
+  reviewDateKey String?  @map("review_date_key")
+  keepIf        String   @default("") @map("keep_if")
+  otherwise     String   @default("")
+  /// RUNNING / KEPT / ADJUSTED / REVERTED.
+  status        String   @default("RUNNING")
+  outcome       String   @default("")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  @@index([ownerSub, createdAt])
+  @@map("goal_experiment")
+}
+
+/// 計画の変更履歴: what changed, from what, on what evidence. Written by hand,
+/// and by every applied advisor proposal and import, so the plan's history
+/// is never rewritten to look better.
+model GoalChangeLog {
+  id           String   @id @default(uuid())
+  ownerSub     String   @map("owner_sub")
+  dateKey      String   @map("date_key")
+  before       String   @default("")
+  after        String   @default("")
+  reason       String   @default("")
+  checkDateKey String?  @map("check_date_key")
+  /// MANUAL / ADVISOR / IMPORT.
+  source       String   @default("MANUAL")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([ownerSub, createdAt])
+  @@map("goal_change_log")
+}
+
+/// The conversation with the goal advisor. An assistant message may carry
+/// a proposal (src/lib/goalAdvisor.ts); nothing changes until it's applied.
+model GoalAdvisorMessage {
+  id          String    @id @default(uuid())
+  ownerSub    String    @map("owner_sub")
+  role        String
+  content     String
+  proposal    Json?
+  appliedAt   DateTime? @map("applied_at")
+  dismissedAt DateTime? @map("dismissed_at")
+  createdAt   DateTime  @default(now()) @map("created_at")
+
+  @@index([ownerSub, createdAt])
+  @@map("goal_advisor_message")
 }

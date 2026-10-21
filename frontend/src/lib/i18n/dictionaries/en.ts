@@ -1,6 +1,8 @@
 import type { Dictionary } from "@/lib/i18n/types";
+import { planEn } from "@/lib/i18n/dictionaries/planEn";
 
 export const en: Dictionary = {
+  plan: planEn,
   brand: {
     scratch: "Dash Off",
     zettelkasten: "Zettelkasten",
@@ -15,7 +17,7 @@ export const en: Dictionary = {
       literature: { name: "Literature notes", note: "Books and papers in your own words. Zotero can fill in the citation." },
       projects: { name: "Projects", note: "The ladder from the final goal down to today's, and each day's task note." },
       calendar: { name: "Calendar", note: "The day's shape, open tasks, meals and spending. A month timeline too." },
-      goals: { name: "Goals", note: "Goals and the steps towards them, which goals each kind of day goes to, and the principles under them. Today's show on the calendar too." },
+      goals: { name: "Goals", note: "A roadmap (Gantt), the 12-week cycle, the standard week, daily records and reviews, observation and an advisor. Today's blocks show on the calendar too." },
       training: { name: "Training", note: "Your target composition against now, the weekly trend, and the week of training the AI trainer writes from it." },
       meals: { name: "Meals", note: "A week of meals, the to-buy list and the inventory, batch cooking." },
       money: { name: "Money", note: "This month's plan against actuals, the year ahead, weekly advice, statement import (CSV or PDF)." },
@@ -947,6 +949,7 @@ export const en: Dictionary = {
     goalNotFound: "This goal no longer exists",
     goalImportEmpty: "Paste the text to import",
     goalImportTooLong: "That's too long — import it in a few parts",
+    goalDeliverableLimit: "At most three priority deliverables a week — carry one over or drop it first",
     purchaseListInvalid: "Choose 1 to 7 days",
     purchaseListNoMeals: "There are no planned meals in those days. Plan the meals first.",
     mealChatInvalid: "Type a message",

@@ -73,7 +73,7 @@ export function GuideContentEn() {
             },
             {
               title: "AI runs on your own key",
-              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — importing a goals page, meal planning, the meal chat and the to-buy list, the training analysis and plan, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
+              body: "The app holds no AI key of its own. It uses the Claude, ChatGPT or Gemini key you add in Settings, and any cost is on that key. Only a few things use it — importing a goals page and the goals advisor, meal planning, the meal chat and the to-buy list, the training analysis and plan, the weekly money advice, reading PDF statements, and discovery — and everything else works without one.",
             },
             {
               title: "Writing works offline",
@@ -151,7 +151,7 @@ export function GuideContentEn() {
                 "The month's budget is made the first time you open it — check it",
                 "Import card statements (CSV or PDF)",
                 "Look at the year ahead for months that get tight",
-                "Review the goals and their steps on /goals, and update what each kind of day goes to",
+                "Do the weekly review in /goals Records, look at Observe, and pick one thing to change next week (ask the advisor if unsure)",
               ],
             },
           ]}
@@ -322,29 +322,41 @@ export function GuideContentEn() {
           id="goals"
           path="/goals"
           name="Goals"
-          lead="Where the goals and the steps towards them are written down. Decide which goals weekdays, days off and spare moments go to for each stretch of days, and that day's share shows at the top of the calendar's Today — in view every day."
+          lead="Where the goals become a plan you can live by: a long roadmap, a 12-week cycle, a standard week, a minute or two of record each day and a weekly review — and the records observed to correct the plan. Each goal (area) has a colour it keeps on every tab."
         >
           <Points
             items={[
               {
-                title: "Goals and steps",
-                body: "Each goal has what it means (and why) and steps at horizons like \"in 2 weeks\", \"in a year\" or \"every day\". Each step is a note of its own, nested lists and all. Preset horizons get a date counted from the review date; steps due within 14 days, or overdue, also show on the calendar's Today.",
+                title: "Overview and roadmap",
+                body: "Write the vision and the baseline, give each area phases (start, end, condition to move on), and they line up on a Gantt chart. Switch the scale between all, one year and the cycle; today, the cycle and deadlines and application windows are on the same chart. Tap a bar to edit it in place.",
               },
               {
-                title: "Review",
-                body: "Review keeps the goal as it stands under Earlier versions and makes today its review date; then rewrite it, and last year's plan stays there to compare. Archive goals that are done or set aside.",
+                title: "Cycle",
+                body: "Create a span like \"the first 12 weeks\" and it gets 4-week phases and a week counter. For each area write the target, the evidence that it's done, the time it takes and what each 4 weeks is for; keep the deadlines, windows, class days, review days and things to start alongside.",
               },
               {
-                title: "Days",
-                body: "For periods like \"until July\" and \"from July\", choose the goals (and a note, e.g. IELTS) for weekdays, days off and spare moments. The period covering today is highlighted and shows on the calendar. Saturday and Sunday count as days off.",
+                title: "Week",
+                body: "Set each area's weekly hours (and commuting share) and the split of the 168 hours. Place blocks on the standard week and the gap between blocks and budget shows in colour. Today's blocks also show on the calendar's Today.",
+              },
+              {
+                title: "Records and reviews",
+                body: "Each day, log hours per area, steps done, what got stuck and the next move. A day with no record counts as unrecorded, not zero. The weekly review puts plan against actual, up to three priorities in seven states, what carries over and one thing to change; 4- and 12-week reviews and experiments (observation → guess → one change → evidence → review date) live here too.",
+              },
+              {
+                title: "Observe",
+                body: "From the records: time realised (recorded weeks only, with the 80% line), hours by week and every deliverable's state, plus notices like \"two weeks under 80%\", \"no movement for 14 days\" or \"a check date has come\", each with what to change.",
               },
               {
                 title: "Compass",
-                body: "Principles, what you already have, all you need, obstacle planning (if this, then that), and looking back on earlier years.",
+                body: "The rules for what changes when, open questions, the change log (before, after, why), and the principles, what you already have and obstacle planning.",
               },
               {
-                title: "Import a page",
-                body: "Paste a goals page from Notion or elsewhere and the AI sorts it into compass, goals with steps, and periods. You check it before it's written, and nothing already here is replaced.",
+                title: "Advisor",
+                body: "Reads the goals, cycle, week and records, talks it through and proposes changes — hours, phase dates, week blocks, deadlines, experiments. Nothing changes until you press Apply, and applied changes are logged with the reason.",
+              },
+              {
+                title: "Import a document",
+                body: "Choose or paste a Markdown file with your goals and roadmap and the AI sorts it into areas, phases, the cycle, the standard week, dates and open questions. You check it first; areas with the same name are updated. The earlier format (compass and focus periods) can still be imported.",
               },
             ]}
           />

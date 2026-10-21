@@ -13,6 +13,8 @@ import {
   type MilestoneView,
 } from "@/app/goals/actions";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
+import { BlurText, HoursInput, LABEL } from "@/components/goals/ui";
+import { GOAL_COLORS, tint } from "@/lib/goalColors";
 import { MarkdownNoteEditor } from "@/components/MarkdownNoteEditor";
 import { HORIZON_PRESETS, horizonDateKey } from "@/lib/goalFocus";
 import { formatDateKey } from "@/lib/dateKey";
@@ -41,6 +43,7 @@ function orThrow<T extends object>(res: T | { error: string }): T {
  */
 export function GoalCard({
   goal,
+  hex,
   todayKey,
   isFirst,
   isLast,
@@ -49,6 +52,8 @@ export function GoalCard({
   onDelete,
 }: {
   goal: GoalView;
+  /** The goal's colour (src/lib/goalColors.ts). */
+  hex: string;
   todayKey: string;
   isFirst: boolean;
   isLast: boolean;
@@ -59,6 +64,7 @@ export function GoalCard({
   const { t, locale } = useI18n();
   const [title, setTitle] = useState(goal.title);
   const [open, setOpen] = useState(true);
+  const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -140,7 +146,11 @@ export function GoalCard({
   const doneCount = goal.milestones.filter((m) => m.done).length;
 
   return (
-    <section className={`flex flex-col gap-3 rounded-xl border bg-surface p-4 ${archived ? "border-line opacity-80" : "border-line-strong"}`}>
+    <section
+      id={`goal-${goal.id}`}
+      className={`flex scroll-mt-20 flex-col gap-3 rounded-xl border border-l-4 bg-surface p-4 ${archived ? "border-line opacity-80" : "border-line-strong"}`}
+      style={{ borderLeftColor: hex }}
+    >
       <div className="flex flex-wrap items-center gap-2">
         <button
           type="button"
@@ -151,9 +161,14 @@ export function GoalCard({
         >
           <span className={`text-[10px] transition-transform ${open ? "rotate-90" : ""}`}>▶</span>
         </button>
-        <span aria-hidden="true" className="text-base">
-          🚩
-        </span>
+        <button
+          type="button"
+          onClick={() => setPicking((v) => !v)}
+          aria-label={t.plan.color}
+          aria-expanded={picking}
+          className="h-4 w-4 shrink-0 rounded-full ring-offset-2 ring-offset-surface hover:ring-2 hover:ring-line-strong"
+          style={{ background: hex }}
+        />
         {/* A textarea so a long goal wraps instead of being cut off on a
             phone; Enter still ends the edit, as in a one-line field. */}
         <textarea
@@ -176,7 +191,30 @@ export function GoalCard({
         )}
       </div>
 
+      {picking && (
+        <div className="flex flex-wrap gap-1.5 sm:pl-8">
+          {GOAL_COLORS.map((c) => (
+            <button
+              key={c.name}
+              type="button"
+              aria-label={c.name}
+              aria-pressed={c.hex === hex}
+              onClick={() => {
+                setPicking(false);
+                void patch({ color: c.name });
+              }}
+              className={`h-5 w-5 rounded-full ${c.hex === hex ? "ring-2 ring-ink ring-offset-2 ring-offset-surface" : ""}`}
+              style={{ background: c.hex }}
+            />
+          ))}
+        </div>
+      )}
       <div className="flex flex-wrap items-center gap-2 sm:pl-8">
+        {goal.weeklyHours > 0 && (
+          <span className="rounded-full px-2 py-0.5 font-mono text-[10px] font-semibold" style={{ background: tint(hex, 0.16), color: hex }}>
+            {t.plan.budget} {goal.weeklyHours}h
+          </span>
+        )}
         <label className="flex items-center gap-1.5 font-mono text-[10px] text-ink-soft">
           {t.goals.reviewedOn}
           <input
@@ -225,13 +263,33 @@ export function GoalCard({
             />
           </div>
 
+          <div className="grid gap-x-4 gap-y-2 rounded-lg bg-surface-alt/60 p-3 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <BlurText label={t.plan.approach} value={goal.approach} rows={2} onSave={(v) => patch({ approach: v })} />
+            </div>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-0.5">
+                <span className={LABEL}>{t.plan.budget}</span>
+                <HoursInput value={goal.weeklyHours} label={t.plan.budget} onSave={(h) => void patch({ weeklyHours: h })} />
+              </label>
+              <label className="flex flex-col gap-0.5">
+                <span className={LABEL}>{t.plan.commute}</span>
+                <HoursInput value={goal.commuteHours} label={t.plan.commute} onSave={(h) => void patch({ commuteHours: h })} />
+              </label>
+            </div>
+            <BlurText label={t.plan.budgetNote} value={goal.budgetNote} onSave={(v) => patch({ budgetNote: v })} />
+            <BlurText label={t.plan.keepRecord} value={goal.keepRecord} rows={2} onSave={(v) => patch({ keepRecord: v })} />
+            <BlurText label={t.plan.improveCheck} value={goal.improveCheck} rows={2} onSave={(v) => patch({ improveCheck: v })} />
+          </div>
+
           {/* The steps, nearest horizon first as the owner orders them. A
               left rule ties them together as one path. */}
-          <div className="flex flex-col gap-3 border-l-2 border-line pl-3">
+          <div className="flex flex-col gap-3 border-l-2 pl-3" style={{ borderColor: tint(hex, 0.45) }}>
             {goal.milestones.map((m, i) => (
               <MilestoneRow
                 key={m.id}
                 milestone={m}
+                hex={hex}
                 todayKey={todayKey}
                 isFirst={i === 0}
                 isLast={i === goal.milestones.length - 1}
@@ -332,6 +390,7 @@ export function GoalCard({
 
 function MilestoneRow({
   milestone,
+  hex,
   todayKey,
   isFirst,
   isLast,
@@ -340,6 +399,7 @@ function MilestoneRow({
   onDelete,
 }: {
   milestone: MilestoneView;
+  hex: string;
   todayKey: string;
   isFirst: boolean;
   isLast: boolean;
@@ -352,7 +412,7 @@ function MilestoneRow({
   const overdue = !milestone.done && milestone.dueDateKey !== null && milestone.dueDateKey < todayKey;
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div id={`phase-${milestone.id}`} className="flex scroll-mt-24 flex-col gap-1.5">
       <div className="flex flex-wrap items-center gap-2">
         <input
           type="checkbox"
@@ -369,10 +429,19 @@ function MilestoneRow({
           placeholder={t.goals.stepLabelPlaceholder}
           aria-label={t.goals.stepLabel}
           className={`min-w-0 flex-1 basis-32 rounded-md border border-transparent bg-transparent px-1 py-0.5 font-mono text-[12px] font-semibold hover:border-line focus:border-accent focus:outline-none ${
-            milestone.done ? "text-ink-faint line-through" : "text-accent"
+            milestone.done ? "text-ink-faint line-through" : ""
           }`}
+          style={milestone.done ? undefined : { color: hex }}
         />
-        <div className="ml-auto flex items-center gap-1.5">
+        <div className="ml-auto flex flex-wrap items-center gap-1.5">
+          <input
+            type="date"
+            value={milestone.startDateKey ?? ""}
+            onChange={(e) => void onPatch({ startDateKey: e.target.value || null })}
+            aria-label={t.plan.phaseStart}
+            className={INPUT}
+          />
+          <span className="font-mono text-[10px] text-ink-faint">→</span>
           <input
             type="date"
             value={milestone.dueDateKey ?? ""}
@@ -391,6 +460,12 @@ function MilestoneRow({
           </button>
         </div>
       </div>
+      <BlurText
+        value={milestone.condition}
+        placeholder={t.plan.phaseCondition}
+        label={milestone.condition ? t.plan.phaseCondition : undefined}
+        onSave={(v) => onPatch({ condition: v })}
+      />
       <MarkdownNoteEditor
         content={milestone.body}
         draftKey={`goal-step:${milestone.id}`}
