@@ -6,6 +6,7 @@ import * as goals from "@/lib/goals";
 import { cleanDateKey, cleanHours, cleanText } from "@/lib/goals";
 import { alertsFor, weekMetric, type Alert, type WeekMetric } from "@/lib/goalMetrics";
 import { goalColor } from "@/lib/goalColors";
+import { listSubPlans, toDays, type DayRow, type SubPlanView } from "@/lib/goalSubPlan";
 
 /**
  * The goals as a plan to live by, not only a list — the way the owner's
@@ -128,8 +129,23 @@ export interface ChangeLogView {
   source: string;
 }
 
+/** The plan written out whole (計画書), one version. */
+export interface PlanDocumentView {
+  id: string;
+  markdown: string;
+  source: string;
+  /** FULL, MERGE, or "" when it was only kept. */
+  applied: string;
+  createdOn: string;
+}
+export type PlanDocumentMeta = Omit<PlanDocumentView, "markdown"> & { chars: number };
 export interface PlanOverview extends goals.GoalsOverview {
   plan: PlanView;
+  /** The newest version of the 計画書, and the versions before it (newest first). */
+  document: PlanDocumentView | null;
+  documentVersions: PlanDocumentMeta[];
+  /** Areas' detailed plans (goalSubPlan). */
+  subPlans: SubPlanView[];
   cycles: CycleView[];
   /** The cycle covering today, else the latest one, else null. */
   currentCycleId: string | null;
@@ -235,7 +251,7 @@ export function currentCycleOf<C extends { id: string; fromDateKey: string; toDa
 }
 
 export async function getPlanOverview(ownerSub: string, todayKey: string): Promise<PlanOverview> {
-  const [base, plan, cycles, slots, events, checks, tasks, changeLog] = await Promise.all([
+  const [base, plan, cycles, slots, events, checks, tasks, changeLog, docs, subPlans] = await Promise.all([
     goals.getOverview(ownerSub),
     prisma.goalPlan.findUnique({ where: { ownerSub } }),
     prisma.goalCycle.findMany({ where: { ownerSub }, include: { outcomes: true }, orderBy: { fromDateKey: "asc" } }),
@@ -244,6 +260,13 @@ export async function getPlanOverview(ownerSub: string, todayKey: string): Promi
     prisma.goalCheck.findMany({ where: { ownerSub }, orderBy: { createdAt: "asc" } }),
     prisma.goalTask.findMany({ where: { ownerSub }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
     prisma.goalChangeLog.findMany({ where: { ownerSub }, orderBy: { createdAt: "desc" }, take: 100 }),
+    prisma.goalPlanDocument.findMany({
+      where: { ownerSub, subPlanId: null },
+      orderBy: { createdAt: "desc" },
+      take: MAX_DOCUMENT_VERSIONS,
+      select: { id: true, source: true, applied: true, createdAt: true, markdown: true },
+    }),
+    listSubPlans(ownerSub),
   ]);
   const cycleViews = cycles.map(toCycleView);
   return {
@@ -256,7 +279,51 @@ export async function getPlanOverview(ownerSub: string, todayKey: string): Promi
     checks: checks.map(toCheck),
     tasks: tasks.map(toTask),
     changeLog: changeLog.map(toChange),
+    document: docs[0] ? toDocument(docs[0]) : null,
+    subPlans,
+    documentVersions: docs.slice(1).map((d) => ({ id: d.id, source: d.source, applied: d.applied, createdOn: d.createdAt.toISOString().slice(0, 10), chars: d.markdown.length })),
   };
+}
+
+/* ---------- the plan document ---------- */
+
+const MAX_DOCUMENT_VERSIONS = 30;
+/** A detailed course plan runs past 100,000 characters. */
+export const MAX_DOCUMENT_CHARS = 200_000;
+
+function toDocument(d: { id: string; markdown: string; source: string; applied: string; createdAt: Date }): PlanDocumentView {
+  return { id: d.id, markdown: d.markdown, source: d.source, applied: d.applied, createdOn: d.createdAt.toISOString().slice(0, 10) };
+}
+
+/**
+ * Keeps a version of the 計画書. The same text as the newest version only
+ * updates how it was applied; older versions past the limit are dropped.
+ */
+export async function savePlanDocument(
+  ownerSub: string,
+  markdown: string,
+  source: "ADVISOR" | "IMPORT" | "MANUAL",
+  applied: "" | "FULL" | "MERGE",
+  tx: Prisma.TransactionClient = prisma,
+  /** An area's detailed plan the document belongs to; none for the whole plan. */
+  subPlanId: string | null = null,
+): Promise<PlanDocumentView> {
+  const text = cleanText(markdown, MAX_DOCUMENT_CHARS).trim();
+  if (!text) throw new ValidationError("goalInvalid", "empty document");
+  const latest = await tx.goalPlanDocument.findFirst({ where: { ownerSub, subPlanId }, orderBy: { createdAt: "desc" } });
+  if (latest && latest.markdown === text) {
+    return toDocument(applied ? await tx.goalPlanDocument.update({ where: { id: latest.id }, data: { applied } }) : latest);
+  }
+  const row = await tx.goalPlanDocument.create({ data: { ownerSub, markdown: text, source, applied, subPlanId } });
+  const stale = await tx.goalPlanDocument.findMany({ where: { ownerSub, subPlanId }, orderBy: { createdAt: "desc" }, skip: MAX_DOCUMENT_VERSIONS, select: { id: true } });
+  if (stale.length > 0) await tx.goalPlanDocument.deleteMany({ where: { id: { in: stale.map((x) => x.id) } } });
+  return toDocument(row);
+}
+
+export async function getPlanDocument(ownerSub: string, id: string): Promise<PlanDocumentView> {
+  const row = await prisma.goalPlanDocument.findFirst({ where: { id, ownerSub } });
+  if (!row) notFound();
+  return toDocument(row);
 }
 
 /* ---------- plan ---------- */
@@ -997,7 +1064,7 @@ export async function observe(ownerSub: string, todayKey: string): Promise<Obser
   const weekday = await weekStartWeekday(ownerSub, todayKey);
   const thisWeek = weekStartOn(todayKey, weekday);
   const firstWeek = shiftDateKey(thisWeek, -7 * (OBSERVED_WEEKS - 1));
-  const [goalRows, logs, reviews, deliverables, checks, events, experiments, firstCycle, firstLog] = await Promise.all([
+  const [goalRows, logs, reviews, deliverables, checks, events, experiments, firstCycle, firstLog, steps] = await Promise.all([
     prisma.goal.findMany({ where: { ownerSub, status: "ACTIVE" }, select: { id: true, weeklyHours: true } }),
     prisma.goalDailyLog.findMany({ where: { ownerSub, dateKey: { gte: firstWeek, lte: shiftDateKey(thisWeek, 6) } } }),
     prisma.goalReview.findMany({ where: { ownerSub, kind: "WEEKLY", dateKey: { gte: firstWeek } } }),
@@ -1011,6 +1078,12 @@ export async function observe(ownerSub: string, todayKey: string): Promise<Obser
     prisma.goalExperiment.findMany({ where: { ownerSub, status: "RUNNING" } }),
     prisma.goalCycle.findFirst({ where: { ownerSub }, orderBy: { fromDateKey: "asc" }, select: { fromDateKey: true } }),
     prisma.goalDailyLog.findFirst({ where: { ownerSub }, orderBy: { dateKey: "asc" }, select: { dateKey: true } }),
+    prisma.goalItemStep.findMany({
+      where: { subPlan: { ownerSub }, doneAt: null, dateKey: { gte: shiftDateKey(todayKey, -60), lte: shiftDateKey(todayKey, 7) } },
+      include: { item: { select: { title: true } } },
+      orderBy: { dateKey: "asc" },
+      take: 80,
+    }),
   ]);
   const starts = [firstCycle?.fromDateKey, firstLog?.dateKey].filter((d): d is string => !!d).sort();
   const metricLogs = logs.map((l) => ({ dateKey: l.dateKey, special: l.special, hours: toHours(l.hours) }));
@@ -1034,6 +1107,7 @@ export async function observe(ownerSub: string, todayKey: string): Promise<Obser
     // An application window is due when it closes.
     events: events.map((e) => ({ id: e.id, title: e.title, dateKey: e.kind === "APPLICATION" ? (e.endDateKey ?? e.dateKey) : e.dateKey, done: e.done, kind: e.kind })),
     experiments: experimentViews.map((x) => ({ id: x.id, title: x.change, dateKey: x.reviewDateKey, done: false })),
+    steps: steps.map((x) => ({ id: x.id, label: x.label, itemTitle: x.item?.title ?? "", kind: x.kind, dateKey: x.dateKey, backupDateKey: x.backupDateKey, done: false })),
   });
   return { todayKey, weekStartDateKey: thisWeek, weeks, alerts, deliverables: deliverableViews, experiments: experimentViews };
 }
@@ -1043,6 +1117,10 @@ export async function observe(ownerSub: string, todayKey: string): Promise<Obser
 export interface TodayPlan {
   slots: SlotView[];
   events: EventView[];
+  /** Detailed plans' steps within the week (and targets passed, still open). */
+  steps: { id: string; goalId: string | null; label: string; itemTitle: string; kind: string; dateKey: string; backupDateKey: string | null }[];
+  /** Today's row of a detailed plan's day-by-day table. */
+  dayRows: { title: string; goalId: string | null; row: DayRow }[];
   /** The goals the slots and events name, with the colour /goals gives them. */
   goals: { id: string; title: string; hex: string }[];
 }
@@ -1050,7 +1128,7 @@ export interface TodayPlan {
 export async function todayPlan(ownerSub: string, todayKey: string): Promise<TodayPlan> {
   const weekday = new Date(`${todayKey}T00:00:00Z`).getUTCDay();
   const horizon = shiftDateKey(todayKey, 14);
-  const [goalRows, slots, events] = await Promise.all([
+  const [goalRows, slots, events, subPlans] = await Promise.all([
     prisma.goal.findMany({ where: { ownerSub }, select: { id: true, title: true, color: true, status: true }, orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }] }),
     prisma.goalWeekSlot.findMany({ where: { ownerSub, weekday }, orderBy: { startTime: "asc" } }),
     prisma.goalEvent.findMany({
@@ -1065,6 +1143,19 @@ export async function todayPlan(ownerSub: string, todayKey: string): Promise<Tod
       },
       orderBy: { dateKey: "asc" },
     }),
+    prisma.goalSubPlan.findMany({
+      where: { ownerSub },
+      select: {
+        title: true,
+        goalId: true,
+        days: true,
+        steps: {
+          where: { doneAt: null, kind: { not: "WORK" }, dateKey: { lte: shiftDateKey(todayKey, 7) }, OR: [{ dateKey: { gte: todayKey } }, { kind: "DUE", dateKey: { gte: shiftDateKey(todayKey, -14) } }] },
+          include: { item: { select: { title: true } } },
+          orderBy: { dateKey: "asc" },
+        },
+      },
+    }),
   ]);
   // Coloured by place among all goals, active first — as goals.getOverview orders them.
   const ordered = [...goalRows.filter((g) => g.status === "ACTIVE"), ...goalRows.filter((g) => g.status !== "ACTIVE")];
@@ -1072,6 +1163,11 @@ export async function todayPlan(ownerSub: string, todayKey: string): Promise<Tod
     slots: slots.map(toSlot),
     events: events.map(toEvent),
     goals: ordered.map((g, i) => ({ id: g.id, title: g.title, hex: goalColor(g.color, i).hex })),
+    steps: subPlans
+      .flatMap((p) => p.steps.map((x) => ({ id: x.id, goalId: p.goalId, label: x.label, itemTitle: x.item?.title ?? "", kind: x.kind, dateKey: x.dateKey, backupDateKey: x.backupDateKey })))
+      .sort((a, b) => a.dateKey.localeCompare(b.dateKey))
+      .slice(0, 12),
+    dayRows: subPlans.flatMap((p) => toDays(p.days).filter((d) => d.dateKey === todayKey).map((row) => ({ title: p.title, goalId: p.goalId, row }))),
   };
 }
 

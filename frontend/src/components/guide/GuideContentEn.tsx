@@ -327,12 +327,20 @@ export function GuideContentEn() {
           <Points
             items={[
               {
+                title: "Plan it in the chat",
+                body: "With no goals yet, start from \"Plan it in the chat\". The advisor asks two to four questions at a time, in order: the vision and big goals, where things stand (work, commute, study, sleep), what's fixed, each area's long-term phases, the first 12 weeks, the week's hours and standard week, and how to measure and review. Once it's settled it writes the plan out as a document; Apply reads it in and shows what it found, and you choose to rewrite the whole plan or add to it.",
+              },
+              {
                 title: "Overview and roadmap",
                 body: "Write the vision and the baseline, give each area phases (start, end, condition to move on), and they line up on a Gantt chart. Switch the scale between all, one year and the cycle; today, the cycle and deadlines and application windows are on the same chart. Tap a bar to edit it in place.",
               },
               {
                 title: "Cycle",
                 body: "Create a span like \"the first 12 weeks\" and it gets 4-week phases and a week counter. For each area write the target, the evidence that it's done, the time it takes and what each 4 weeks is for; keep the deadlines, windows, class days, review days and things to start alongside.",
+              },
+              {
+                title: "Detailed plans",
+                body: "An area's finer plan. Like a course plan: a ledger of courses or assignments (size, state, what's on record, when it's aimed at), each assignment's draft, check, submission target and fallback, session dates, a week-by-week execution table and day-by-day plans for the first days. Steps line up on a timeline — work periods as bars, the rest as marks by kind — and those coming up also show under Observe and on the calendar's Today. Importing a course-plan document touches only that area; you can also build one with the advisor, or tell it what you've submitted to update the states.",
               },
               {
                 title: "Week",
@@ -352,7 +360,11 @@ export function GuideContentEn() {
               },
               {
                 title: "Advisor",
-                body: "Reads the goals, cycle, week and records, talks it through and proposes changes — hours, phase dates, week blocks, deadlines, experiments. Nothing changes until you press Apply, and applied changes are logged with the reason.",
+                body: "Reads the goals, cycle, week and records and talks it through. For a partial change it proposes edits (hours, phase dates, week blocks, deadlines, experiments); for a wholesale review it writes a revised plan document. Nothing changes until you press Apply, and what's applied is logged with the reason. New conversation starts the chat over.",
+              },
+              {
+                title: "Plan document",
+                body: "The plan as one document is kept under Compass. What the advisor wrote, what was imported and what you edited are kept as versions; save one as .md, or rebuild the plan from an edited document.",
               },
               {
                 title: "Import a document",

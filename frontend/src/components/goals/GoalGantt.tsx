@@ -107,6 +107,7 @@ export function GoalGantt({
   selectedId,
   onSelect,
   onAddPhase,
+  marks = [],
 }: {
   goals: GoalView[];
   hexes: Map<string, string>;
@@ -116,6 +117,8 @@ export function GoalGantt({
   selectedId: string | null;
   onSelect: (goalId: string, milestoneId: string) => void;
   onAddPhase: (goalId: string) => void;
+  /** Submission targets from the detailed plans, as ticks on their goal's row. */
+  marks?: { goalId: string; dateKey: string; label: string; done: boolean }[];
 }) {
   const { t, locale } = useI18n();
   const [range, setRange] = useState<Range>("all");
@@ -391,6 +394,16 @@ export function GoalGantt({
                       style={{ left: `${x(lo)}%`, width: `${Math.max(0.3, x(hi + 1) - x(lo))}%`, background: tint(hex, 0.5) }}
                     />
                   )}
+                  {marks
+                    .filter((m) => m.goalId === goal.id && dayNum(m.dateKey) >= from && dayNum(m.dateKey) <= to)
+                    .map((m, mi) => (
+                      <span
+                        key={mi}
+                        title={`${m.dateKey} ${m.label}`}
+                        className="absolute top-[3px] z-[2] h-1.5 w-1.5 -translate-x-1/2 rotate-45"
+                        style={{ left: `${x(dayNum(m.dateKey))}%`, background: m.done ? tint(hex, 0.4) : hex }}
+                      />
+                    ))}
                   {/* closed, the phases still show — packed on the one row */}
                   {!open && phases.map((p) => bar(goal, hex, p, false))}
                 </Row>

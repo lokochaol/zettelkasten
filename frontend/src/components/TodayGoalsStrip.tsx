@@ -63,6 +63,42 @@ export function TodayGoalsStrip({ focus, plan, todayKey }: { focus: TodayFocus |
           </ul>
         </div>
       )}
+      {plan && plan.dayRows.length > 0 && (
+        <div className="flex flex-col gap-1">
+          {plan.dayRows.map((d, i) => {
+            const g = goal(d.goalId);
+            return (
+              <div key={i} className="rounded-md border-l-[3px] px-2 py-1.5" style={{ borderColor: g?.hex ?? "#94a3b8", background: tint(g?.hex ?? "#94a3b8", 0.08) }}>
+                <p className="font-mono text-[9.5px] text-ink-faint">
+                  {t.plan.todayDay} · {d.title} · {d.row.time}
+                </p>
+                <p className="text-[12px] leading-relaxed text-ink">{d.row.work}</p>
+                {d.row.output && <p className="text-[10.5px] text-ink-soft">→ {d.row.output}</p>}
+              </div>
+            );
+          })}
+        </div>
+      )}
+      {plan && plan.steps.length > 0 && (
+        <ul className="flex flex-col gap-0.5">
+          {plan.steps.map((s) => {
+            const overdue = s.dateKey < todayKey;
+            return (
+              <li key={s.id} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
+                <span className={`font-mono text-[10px] ${overdue ? "font-semibold text-accent" : "text-ink-soft"}`}>{day(s.dateKey)}</span>
+                <span className="rounded px-1 font-mono text-[9px] text-ink-soft" style={{ background: tint(goal(s.goalId)?.hex ?? "#94a3b8", 0.16) }}>
+                  {t.plan.stepKind[s.kind] ?? s.kind}
+                </span>
+                <span className="text-ink">
+                  {s.itemTitle && <span className="font-semibold">{s.itemTitle} </span>}
+                  {s.label}
+                </span>
+                {overdue && <span className="font-mono text-[9.5px] text-accent">{t.plan.overdueTag}</span>}
+              </li>
+            );
+          })}
+        </ul>
+      )}
       {plan && plan.events.length > 0 && (
         <ul className="flex flex-col gap-0.5">
           {plan.events.map((e) => {

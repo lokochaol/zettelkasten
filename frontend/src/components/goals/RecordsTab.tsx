@@ -50,6 +50,7 @@ import {
   type TabProps,
 } from "@/components/goals/ui";
 import { currentCycle } from "@/components/goals/cycleMath";
+import { WeekInPlans } from "@/components/goals/DetailTab";
 import { shiftDateKey } from "@/lib/dateKey";
 import { tint } from "@/lib/goalColors";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
@@ -148,6 +149,7 @@ export function RecordsTab(props: TabProps) {
       ) : (
         <>
           <WeekSummary {...props} rec={rec} />
+          <WeekInPlans ov={props.ov} hexes={props.hexes} weekStart={weekStart} />
           <DailyCard
             {...props}
             days={days}

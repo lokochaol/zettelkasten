@@ -69,7 +69,19 @@ export type Alert =
   | { kind: "missingLogs"; dateKeys: string[] }
   | { kind: "reviewDue"; eventId: string; title: string; dateKey: string }
   | { kind: "deadlineSoon"; eventId: string; title: string; dateKey: string }
-  | { kind: "experimentDue"; experimentId: string; title: string; dateKey: string };
+  | { kind: "experimentDue"; experimentId: string; title: string; dateKey: string }
+  | { kind: "stepSoon"; stepId: string; title: string; itemTitle: string; stepKind: string; dateKey: string }
+  | { kind: "stepOverdue"; stepId: string; title: string; itemTitle: string; dateKey: string; backupDateKey: string | null };
+
+export interface MetricStep {
+  id: string;
+  label: string;
+  itemTitle: string;
+  kind: string;
+  dateKey: string;
+  backupDateKey: string | null;
+  done: boolean;
+}
 
 const round2 = (n: number) => Math.round(n * 100) / 100;
 
@@ -134,6 +146,8 @@ export function alertsFor(input: {
   checks: MetricDated[];
   events: MetricDated[];
   experiments: MetricDated[];
+  /** Detailed plans' steps (goalSubPlan). */
+  steps?: MetricStep[];
 }): Alert[] {
   const { todayKey } = input;
   const alerts: Alert[] = [];
@@ -182,6 +196,16 @@ export function alertsFor(input: {
 
   for (const x of input.experiments) {
     if (!x.done && x.dateKey && x.dateKey <= todayKey) alerts.push({ kind: "experimentDue", experimentId: x.id, title: x.title, dateKey: x.dateKey });
+  }
+
+  // Detailed plans: a target passed without being marked done, and what's due within the week.
+  for (const st of input.steps ?? []) {
+    if (st.done || st.kind === "WORK") continue;
+    if (st.kind === "DUE" && st.dateKey < todayKey) {
+      alerts.push({ kind: "stepOverdue", stepId: st.id, title: st.label, itemTitle: st.itemTitle, dateKey: st.dateKey, backupDateKey: st.backupDateKey });
+    } else if (st.dateKey >= todayKey && st.dateKey <= soon && st.kind !== "OTHER") {
+      alerts.push({ kind: "stepSoon", stepId: st.id, title: st.label, itemTitle: st.itemTitle, stepKind: st.kind, dateKey: st.dateKey });
+    }
   }
   return alerts;
 }
