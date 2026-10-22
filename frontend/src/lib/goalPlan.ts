@@ -6,6 +6,7 @@ import * as goals from "@/lib/goals";
 import { cleanDateKey, cleanHours, cleanText } from "@/lib/goals";
 import { alertsFor, weekMetric, type Alert, type WeekMetric } from "@/lib/goalMetrics";
 import { goalColor } from "@/lib/goalColors";
+import { hasRoutine, toRoutine, DEFAULT_ROUTINE, type Routine } from "@/lib/routine";
 import { listSubPlans, toDays, type DayRow, type SubPlanView } from "@/lib/goalSubPlan";
 
 /**
@@ -45,6 +46,9 @@ export interface LifeBudgetLine {
 }
 
 export interface PlanView {
+  /** The daily frame (src/lib/routine.ts); `routineSet` says whether it was ever filled in. */
+  routine: Routine;
+  routineSet: boolean;
   title: string;
   vision: string;
   baseline: string;
@@ -183,11 +187,11 @@ function toStrings(value: unknown, max = 2000): string[] {
   return (Array.isArray(value) ? value : []).map((v) => s(v, max));
 }
 
-const EMPTY_PLAN: PlanView = { title: "", vision: "", baseline: "", lifeBudget: [], decisionRules: "" };
+const EMPTY_PLAN: PlanView = { routine: DEFAULT_ROUTINE, routineSet: false, title: "", vision: "", baseline: "", lifeBudget: [], decisionRules: "" };
 
-function toPlanView(row: { title: string; vision: string; baseline: string; lifeBudget: unknown; decisionRules: string } | null): PlanView {
+function toPlanView(row: { title: string; vision: string; baseline: string; lifeBudget: unknown; decisionRules: string; routine: unknown } | null): PlanView {
   if (!row) return { ...EMPTY_PLAN };
-  return { title: row.title, vision: row.vision, baseline: row.baseline, lifeBudget: toLifeBudget(row.lifeBudget), decisionRules: row.decisionRules };
+  return { routine: toRoutine(row.routine), routineSet: hasRoutine(row.routine), title: row.title, vision: row.vision, baseline: row.baseline, lifeBudget: toLifeBudget(row.lifeBudget), decisionRules: row.decisionRules };
 }
 
 type CycleRow = Prisma.GoalCycleGetPayload<{ include: { outcomes: true } }>;
@@ -334,6 +338,7 @@ export interface PlanPatch {
   baseline?: string;
   lifeBudget?: LifeBudgetLine[];
   decisionRules?: string;
+  routine?: Routine;
 }
 
 export async function savePlan(ownerSub: string, patch: PlanPatch): Promise<PlanView> {
@@ -342,6 +347,7 @@ export async function savePlan(ownerSub: string, patch: PlanPatch): Promise<Plan
   if (patch.vision !== undefined) data.vision = cleanText(patch.vision);
   if (patch.baseline !== undefined) data.baseline = cleanText(patch.baseline);
   if (patch.decisionRules !== undefined) data.decisionRules = cleanText(patch.decisionRules);
+  if (patch.routine !== undefined) data.routine = toRoutine(patch.routine) as unknown as Prisma.InputJsonValue;
   if (patch.lifeBudget !== undefined) data.lifeBudget = toLifeBudget(patch.lifeBudget) as unknown as Prisma.InputJsonValue;
   const row = await prisma.goalPlan.upsert({
     where: { ownerSub },

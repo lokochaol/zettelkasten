@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { CalendarTodayView } from "@/components/CalendarTodayView";
 import { DayScheduleTimeline } from "@/components/DayScheduleTimeline";
+import { DayPlanPanel } from "@/components/DayPlanPanel";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
@@ -172,6 +173,10 @@ export function CalendarTodaySection({
       {/* The schedule sits above the day's project notes — it's what the
           day looks like from the outside (calendar) plus what's still open
           in it (tasks), before the notes themselves. */}
+      {/* The day's plan, for today and the days ahead: drafted, talked over,
+          then written into the calendar below. */}
+      {viewedDateKey >= todayKey && <DayPlanPanel dateKey={viewedDateKey} todayKey={todayKey} onGoToDay={(key) => goToDay(() => key)} />}
+
       <DayScheduleTimeline dateKey={viewedDateKey} timeZone={browserTimeZone} />
 
       {viewedNotes === undefined ? (
