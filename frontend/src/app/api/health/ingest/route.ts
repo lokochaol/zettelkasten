@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import * as health from "@/lib/health";
 import { ValidationError } from "@/lib/errors";
+import { parseHistory, toBodyFatPercent, toNumber } from "@/lib/healthIngest";
 
 /**
  * Where the iPhone Shortcut posts each morning's Health summary.
@@ -25,6 +26,12 @@ import { ValidationError } from "@/lib/errors";
  *
  * Every field but `date` is optional: a day the phone recorded steps but no
  * weight is a normal day, not a malformed request.
+ *
+ * It can also carry the last few weeks of weight / body-fat samples, each
+ * with its own date ("history", or "weightHistory" as lines of text — see
+ * src/lib/healthIngest.ts). Days still missing a figure are filled from
+ * them, so a morning when the scale hadn't synced yet doesn't stay a gap.
+ * What each delivery carried is kept for the settings screen.
  */
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get("authorization") ?? "";
@@ -53,18 +60,13 @@ export async function POST(request: NextRequest) {
   // field as "no information" and leaves whatever is already recorded for
   // that day alone. A Shortcut that sends only steps must not erase the
   // weight another request already filed under the same date.
-  const num = (v: unknown): number | undefined => {
-    if (v === undefined || v === null || v === "") return undefined;
-    const n = typeof v === "number" ? v : Number(String(v).replace(/,/g, ""));
-    return Number.isFinite(n) ? n : undefined;
-  };
+  const num = toNumber;
   const dateKey = typeof payload.date === "string" ? payload.date : String(payload.date ?? "");
   const steps = num(payload.steps);
   // Health stores a body fat percentage as a fraction (0.142), and some
   // scales' own apps write a percentage (14.2). Both arrive here; a
   // figure below 1 is a fraction, since nobody has 0.9% body fat.
-  const rawFat = num(payload.bodyFatPercent);
-  const bodyFatPercent = rawFat === undefined ? undefined : rawFat > 0 && rawFat < 1 ? rawFat * 100 : rawFat;
+  const bodyFatPercent = toBodyFatPercent(num(payload.bodyFatPercent));
 
   try {
     const metric = await health.recordDailyMetric(ownerSub, {
@@ -75,6 +77,12 @@ export async function POST(request: NextRequest) {
       leanBodyMassKg: num(payload.leanBodyMassKg),
       steps: steps === undefined ? undefined : Math.round(steps),
     });
+    const history = parseHistory(payload, metric.dateKey);
+    const filled = await health.backfillMetrics(ownerSub, history);
+    const fields = (["weightKg", "activeEnergyKcal", "bodyFatPercent", "leanBodyMassKg", "steps"] as const).filter(
+      (f) => num(payload[f]) !== undefined,
+    );
+    await health.saveIngestReceipt(ownerSub, { at: new Date().toISOString(), dateKey: metric.dateKey, fields, filled, historyDays: history.length });
     return NextResponse.json({
       ok: true,
       date: metric.dateKey,
@@ -83,6 +91,9 @@ export async function POST(request: NextRequest) {
       bodyFatPercent: metric.bodyFatPercent,
       leanBodyMassKg: metric.leanBodyMassKg,
       steps: metric.steps,
+      // Shown by the Shortcut when it's set to display the result.
+      filled,
+      weightMissing: metric.weightKg === null,
     });
   } catch (e) {
     if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 });

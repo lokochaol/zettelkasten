@@ -1,8 +1,10 @@
 import { randomBytes } from "node:crypto";
+import { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { decryptSecret, encryptSecret } from "@/lib/crypto";
 import { ValidationError } from "@/lib/errors";
 import { shiftDateKey } from "@/lib/dateKey";
+import { toReceipt, type HistoryRow, type IngestReceipt } from "@/lib/healthIngest";
 import { ageFromBirthYear, computeTargets, type NutritionTargets } from "@/lib/nutritionTargets";
 import * as body from "@/lib/bodyComposition";
 import type { ActivityLevel, BiologicalSex, HealthDailyMetric, HealthProfile } from "@/generated/prisma/client";
@@ -153,6 +155,41 @@ export async function recordDailyMetric(ownerSub: string, input: MetricInput): P
   });
 }
 
+/**
+ * Fills earlier days from the history a delivery carried
+ * (src/lib/healthIngest.ts). Only what a day doesn't have yet is written:
+ * a figure that already came in for its own day stays, so a later sample
+ * from the same afternoon can't replace the morning weigh-in.
+ * Returns the days that got something.
+ */
+export async function backfillMetrics(ownerSub: string, rows: HistoryRow[]): Promise<string[]> {
+  if (rows.length === 0) return [];
+  const existing = await prisma.healthDailyMetric.findMany({ where: { ownerSub, dateKey: { in: rows.map((r) => r.dateKey) } } });
+  const byDay = new Map(existing.map((m) => [m.dateKey, m]));
+  const filled: string[] = [];
+  const fresh: Prisma.HealthDailyMetricCreateManyInput[] = [];
+  const updates: { id: string; data: Prisma.HealthDailyMetricUpdateInput }[] = [];
+  for (const r of rows) {
+    const have = byDay.get(r.dateKey);
+    const data = {
+      ...(r.weightKg !== undefined && have?.weightKg == null ? { weightKg: r.weightKg } : {}),
+      ...(r.bodyFatPercent !== undefined && have?.bodyFatPercent == null ? { bodyFatPercent: r.bodyFatPercent } : {}),
+      ...(r.leanBodyMassKg !== undefined && have?.leanBodyMassKg == null ? { leanBodyMassKg: r.leanBodyMassKg } : {}),
+    };
+    if (Object.keys(data).length === 0) continue;
+    filled.push(r.dateKey);
+    if (have) updates.push({ id: have.id, data });
+    else fresh.push({ ownerSub, dateKey: r.dateKey, ...data });
+  }
+  if (fresh.length > 0) await prisma.healthDailyMetric.createMany({ data: fresh, skipDuplicates: true });
+  await Promise.all(updates.map((u) => prisma.healthDailyMetric.update({ where: { id: u.id }, data: u.data })));
+  return filled;
+}
+
+export async function saveIngestReceipt(ownerSub: string, receipt: IngestReceipt): Promise<void> {
+  await prisma.healthIngestToken.update({ where: { ownerSub }, data: { lastReceipt: receipt as unknown as Prisma.InputJsonValue } });
+}
+
 /* ---------- ingest token ---------- */
 
 const TOKEN_PREFIX_LENGTH = 8;
@@ -160,13 +197,14 @@ const TOKEN_PREFIX_LENGTH = 8;
 export interface IngestTokenView {
   token: string;
   lastUsedAt: Date | null;
+  lastReceipt: IngestReceipt | null;
   createdAt: Date;
 }
 
 export async function getIngestToken(ownerSub: string): Promise<IngestTokenView | null> {
   const row = await prisma.healthIngestToken.findUnique({ where: { ownerSub } });
   if (!row) return null;
-  return { token: decryptSecret(row.tokenEncrypted), lastUsedAt: row.lastUsedAt, createdAt: row.createdAt };
+  return { token: decryptSecret(row.tokenEncrypted), lastUsedAt: row.lastUsedAt, lastReceipt: toReceipt(row.lastReceipt), createdAt: row.createdAt };
 }
 
 /** Issues (or replaces) the token the Shortcut sends. Replacing one breaks
@@ -177,9 +215,10 @@ export async function issueIngestToken(ownerSub: string): Promise<IngestTokenVie
     tokenEncrypted: encryptSecret(token),
     tokenPrefix: token.slice(0, TOKEN_PREFIX_LENGTH),
     lastUsedAt: null,
+    lastReceipt: Prisma.DbNull,
   };
   const row = await prisma.healthIngestToken.upsert({ where: { ownerSub }, create: { ownerSub, ...data }, update: data });
-  return { token, lastUsedAt: null, createdAt: row.createdAt };
+  return { token, lastUsedAt: null, lastReceipt: null, createdAt: row.createdAt };
 }
 
 /** Resolves a bearer token to its owner. The prefix is stored in the clear
