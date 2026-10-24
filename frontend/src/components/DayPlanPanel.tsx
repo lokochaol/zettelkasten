@@ -305,26 +305,39 @@ export function DayPlanPanel({ dateKey, todayKey, onGoToDay }: { dateKey: string
   );
 }
 
-/** The whole day as one strip, midnight to midnight, each block in its colour. */
+/**
+ * The whole day as one strip, midnight to midnight, each block in its
+ * colour — as tall as the list beside it, so a
+ * long day isn't squeezed into a strip with empty page beside it. Drawn in
+ * fractions of the day rather than pixels, so it stretches to whatever
+ * height the list takes.
+ */
 function DayRibbon({ blocks, hexOf }: { blocks: DayBlock[]; hexOf: (b: DayBlock) => string }) {
-  const H = 300;
+  const pct = (minutes: number) => `${(minutes / 1440) * 100}%`;
   return (
-    <div className="relative hidden rounded-md bg-surface-alt/60 sm:block" style={{ height: H }} aria-hidden="true">
-      {[0, 6, 12, 18].map((h) => (
-        <span key={h} className="absolute left-0 -translate-y-1/2 font-mono text-[8.5px] text-ink-faint" style={{ top: (h / 24) * H }}>
+    <div className="relative hidden h-full min-h-[300px] rounded-md bg-surface-alt/60 sm:block" aria-hidden="true">
+      {Array.from({ length: 23 }, (_, i) => i + 1).map((h) => (
+        <span key={h} className={`absolute right-0 left-4 border-t ${h % 6 === 0 ? "border-line" : "border-line/40"}`} style={{ top: pct(h * 60) }} />
+      ))}
+      {[0, 3, 6, 9, 12, 15, 18, 21].map((h) => (
+        <span key={h} className={`absolute left-0.5 font-mono text-[8.5px] text-ink-faint ${h === 0 ? "" : "-translate-y-1/2"}`} style={{ top: pct(h * 60) }}>
           {h}
         </span>
       ))}
       {blocks.map((b) => {
-        const top = (minutesOfTime(b.start) / 1440) * H;
-        const height = Math.max(2, ((minutesOfTime(b.end) - minutesOfTime(b.start)) / 1440) * H);
+        const start = minutesOfTime(b.start);
+        const end = Math.max(start + 5, minutesOfTime(b.end));
         const hex = hexOf(b);
         return (
           <div
             key={b.id}
             className="absolute right-0.5 left-4 rounded-sm"
             title={`${b.start}–${b.end} ${b.title}`}
-            style={{ top, height, background: b.kind === "SLEEP" ? tint(hex, 0.25) : b.fixed ? `repeating-linear-gradient(135deg, ${tint(hex, 0.6)} 0 3px, ${tint(hex, 0.25)} 3px 6px)` : tint(hex, 0.7) }}
+            style={{
+              top: pct(start),
+              height: `max(2px, calc(${pct(end - start)} - 1px))`,
+              background: b.kind === "SLEEP" ? tint(hex, 0.25) : b.fixed ? `repeating-linear-gradient(135deg, ${tint(hex, 0.6)} 0 3px, ${tint(hex, 0.25)} 3px 6px)` : tint(hex, 0.7),
+            }}
           />
         );
       })}
