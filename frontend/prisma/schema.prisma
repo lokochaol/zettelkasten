@@ -594,6 +594,10 @@ model MealPreference {
   /// most effective constraint on whether a plan survives contact with a
   /// Tuesday.
   weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
+  /// Minutes the owner can spend in the kitchen on each weekday, Sunday
+  /// first: [0, 20, 20, 0, 20, 20, 90]. 0 is a day they don't cook. Empty
+  /// until set; then weekdays take weekdayCookMinutes and weekends 90.
+  kitchenMinutes    Json     @default("[]") @map("kitchen_minutes")
   /// 0 = Sunday. The one shopping trip the whole week is planned around.
   shoppingWeekday   Int      @default(1) @map("shopping_weekday")
   /// 0 = Sunday. Which day the seven-day plan starts on. Separate from the
@@ -647,6 +651,8 @@ model MealPlan {
   /// plans that predate these columns.
   targetSaltMaxG    Float    @default(7.5) @map("target_salt_max_g")
   cookSessionsPerWeek Int    @default(2) @map("cook_sessions_per_week")
+  /// The kitchen minutes per weekday the plan was made against (see MealPreference).
+  kitchenMinutes      Json     @default("[]") @map("kitchen_minutes")
   readyMadeMealsPerWeek Int  @default(5) @map("ready_made_meals_per_week")
   weekdayCookMinutes Int     @default(20) @map("weekday_cook_minutes")
   budgetYen         Int      @map("budget_yen")

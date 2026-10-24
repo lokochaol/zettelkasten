@@ -99,7 +99,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
     });
   }
 
-  function savePreference(patch: Partial<MealWeekView["preference"]>) {
+  function savePreference(patch: Partial<Omit<MealWeekView["preference"], "kitchenMinutes">> & { kitchenMinutes?: number[] }) {
     const next = { ...data!.preference, ...patch };
     setData((prev) => (prev ? { ...prev, preference: next } : prev));
     startSaving(async () => {
@@ -115,6 +115,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         dinnerMinutes: next.dinnerMinutes,
         cookSessionsPerWeek: next.cookSessionsPerWeek,
         readyMadeMealsPerWeek: next.readyMadeMealsPerWeek,
+        kitchenMinutes: patch.kitchenMinutes,
       });
       // The preference shapes the rest of the screen: the start day moves
       // which seven days the table shows, the budget and cooking time move
@@ -217,6 +218,16 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
                   {t.meals.weekdayNames[new Date(`${d}T00:00:00Z`).getUTCDay()]}{" "}
                   {formatDateKey(d, localeTag(locale), { month: "numeric", day: "numeric" })}
                 </button>
+                {(() => {
+                  // How much the day leaves for the kitchen: the owner's limit, and the free time before dinner.
+                  const k = data.kitchen.find((x) => x.dateKey === d);
+                  if (!k) return null;
+                  return (
+                    <p className={`font-mono text-[9px] ${k.capMinutes === 0 ? "text-ink-faint" : "text-ink-soft"}`} title={k.free.map((f) => `${minutesToTime(f.start)}–${minutesToTime(f.end % 1440)}`).join(" / ")}>
+                      {k.capMinutes === 0 ? t.meals.kitchenOff : t.meals.kitchenDay(k.capMinutes, k.beforeDinner)}
+                    </p>
+                  );
+                })()}
               </div>
             ))}
           </div>
@@ -366,14 +377,6 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
               className="w-full bg-transparent text-xs text-ink focus:outline-none"
             />
           </PrefField>
-          <PrefField label={t.meals.prefCookMinutes}>
-            <input
-              defaultValue={data.preference.weekdayCookMinutes}
-              onBlur={(e) => savePreference({ weekdayCookMinutes: Number(e.target.value) })}
-              inputMode="numeric"
-              className="w-full bg-transparent text-xs text-ink focus:outline-none"
-            />
-          </PrefField>
           <PrefField label={t.meals.prefCookSessions}>
             <input
               defaultValue={data.preference.cookSessionsPerWeek}
@@ -423,6 +426,32 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
               className="w-full bg-transparent text-xs text-ink focus:outline-none"
             />
           </PrefField>
+        </div>
+        {/* Minutes in the kitchen, day by day — 0 is a day the plan doesn't cook. */}
+        <div className="flex flex-col gap-1">
+          <span className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">{t.meals.prefKitchen}</span>
+          <div className="grid grid-cols-7 gap-1.5">
+            {[1, 2, 3, 4, 5, 6, 0].map((w) => (
+              <label key={w} className="flex flex-col items-center gap-0.5 rounded-md border border-line bg-surface px-1 py-1">
+                <span className="font-mono text-[9.5px] font-semibold text-ink-soft">{t.meals.weekdayNames[w]}</span>
+                <input
+                  key={`${w}:${data.kitchenMinutes[w]}`}
+                  defaultValue={data.kitchenMinutes[w]}
+                  inputMode="numeric"
+                  onBlur={(e) => {
+                    const v = Math.max(0, Math.min(300, Math.round(Number(e.target.value) || 0)));
+                    if (v === data.kitchenMinutes[w]) return;
+                    const next = data.kitchenMinutes.map((x, i) => (i === w ? v : x));
+                    setData((prev) => (prev ? { ...prev, kitchenMinutes: next } : prev));
+                    savePreference({ kitchenMinutes: next });
+                  }}
+                  aria-label={`${t.meals.weekdayNames[w]} ${t.meals.prefKitchen}`}
+                  className="w-full bg-transparent text-center text-xs text-ink focus:outline-none"
+                />
+              </label>
+            ))}
+          </div>
+          <p className="text-[10px] leading-relaxed text-ink-faint">{t.meals.prefKitchenHint}</p>
         </div>
         <div className="grid grid-cols-3 gap-3">
           {(
