@@ -10,8 +10,9 @@ import {
 } from "@/app/settings/actions";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { ConfirmDialog } from "@/components/ConfirmDialog";
-import { todayKey as todayKeyValue } from "@/lib/dateKey";
+import { shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
+import type { IngestReceipt } from "@/lib/healthIngest";
 import { announceChange } from "@/lib/dataSync";
 
 /**
@@ -220,8 +221,17 @@ export function HealthSettings() {
             Authorization: Bearer {data.token ? data.token.token : t.health.tokenNotIssued}
           </code>
           <code className="font-mono text-[10px] break-all text-ink-soft">
-            {`{ "date": "${todayKey}", "weightKg": 68.4, "activeEnergyKcal": 620, "steps": 9210 }`}
+            {`{ "date": "${todayKey}", "weightKg": 68.4, "activeEnergyKcal": 620, "steps": 9210, "weightHistory": "${shiftDateKey(todayKey, -2)} 68.6\\n${shiftDateKey(todayKey, -1)} 68.3" }`}
           </code>
+        </div>
+        <div className="flex flex-col gap-1 rounded-lg border border-line p-3">
+          <p className="text-[11px] font-semibold text-ink">{t.health.historyHeading}</p>
+          <p className="text-[11px] leading-relaxed text-ink-soft">{t.health.historySteps[0]}</p>
+          <ol className="flex list-decimal flex-col gap-1 pl-4 text-[11px] leading-relaxed text-ink-soft">
+            {t.health.historySteps.slice(1).map((s) => (
+              <li key={s}>{s}</li>
+            ))}
+          </ol>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -237,6 +247,7 @@ export function HealthSettings() {
             </span>
           )}
         </div>
+        {data.token?.lastReceipt && <Receipt receipt={data.token.lastReceipt} recent={data.recent} todayKey={todayKey} />}
 
         {data.recent.length > 0 && (
           <div className="flex flex-col gap-1 border-t border-line pt-3">
@@ -260,6 +271,35 @@ export function HealthSettings() {
         onCancel={() => setReissueOpen(false)}
         onConfirm={reissue}
       />
+    </div>
+  );
+}
+
+/**
+ * What the last delivery actually carried. A Shortcut that runs but finds
+ * no weight in Health looks, from the phone, exactly like one that worked;
+ * this is where the difference shows.
+ */
+function Receipt({ receipt, recent, todayKey }: { receipt: IngestReceipt; recent: { dateKey: string; weightKg: number | null }[]; todayKey: string }) {
+  const { t } = useI18n();
+  const h = t.health;
+  const week = Array.from({ length: 7 }, (_, i) => shiftDateKey(todayKey, -i));
+  const gaps = week.filter((d) => !recent.some((m) => m.dateKey === d && m.weightKg !== null)).length;
+  const noWeight = !receipt.fields.includes("weightKg");
+  return (
+    <div className="flex flex-col gap-1.5 font-mono text-[10px] text-ink-soft" data-receipt>
+      <p>
+        {h.receiptFor(receipt.dateKey)} · {h.receiptFields}:{" "}
+        {receipt.fields.length ? receipt.fields.map((f) => h.receiptField[f] ?? f).join("・") : h.receiptNone}
+        {receipt.historyDays > 0 && ` · ${h.receiptHistory(receipt.historyDays)}`}
+        {receipt.filled.length > 0 && ` · ${h.receiptFilled(receipt.filled.map((d) => d.slice(5).replace("-", "/")).join("、"))}`}
+      </p>
+      {(noWeight || gaps >= 3) && (
+        <p className="rounded-r-md border-l-2 border-accent bg-accent-soft px-2.5 py-2 font-sans text-[11px] leading-relaxed text-ink">
+          {gaps >= 3 && `${h.gapsWarning(gaps)} `}
+          {noWeight ? h.receiptNoWeight : receipt.historyDays === 0 ? h.gapsHint : ""}
+        </p>
+      )}
     </div>
   );
 }

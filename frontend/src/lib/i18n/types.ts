@@ -540,6 +540,17 @@ export interface Dictionary {
     reissueConfirmWarning: string;
     lastUsed: (when: string) => string;
     stepsUnit: string;
+    historyHeading: string;
+    historySteps: string[];
+    receiptFor: (dateKey: string) => string;
+    receiptFields: string;
+    receiptNone: string;
+    receiptField: Record<string, string>;
+    receiptFilled: (days: string) => string;
+    receiptHistory: (days: number) => string;
+    receiptNoWeight: string;
+    gapsWarning: (days: number) => string;
+    gapsHint: string;
   };
   discoveryTab: {
     heading: string;

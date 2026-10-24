@@ -548,6 +548,10 @@ model HealthIngestToken {
   /// looked up without decrypting every row.
   tokenPrefix    String   @unique @map("token_prefix")
   lastUsedAt     DateTime? @map("last_used_at")
+  /// What the last delivery carried — which fields, for which day, and
+  /// which earlier days it filled in — so a Shortcut that runs but finds
+  /// no weight in Health shows up as that, not as silence.
+  lastReceipt    Json?    @map("last_receipt")
   createdAt      DateTime @default(now()) @map("created_at")
 
   @@map("health_ingest_token")
