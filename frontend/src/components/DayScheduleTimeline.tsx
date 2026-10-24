@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState, useTransition } from "react";
+import { useCallback, useEffect, useState, useTransition } from "react";
 import {
   addTimeBlockAction,
   getDayScheduleAction,
@@ -12,6 +12,7 @@ import {
 } from "@/app/calendar/actions";
 import { Spinner } from "@/components/LoadingSpinner";
 import { ExpenseQuickEntry } from "@/components/ExpenseQuickEntry";
+import { MealRecipeDialog } from "@/components/MealRecipe";
 import { useEnterKey } from "@/lib/ime";
 import { useI18n } from "@/lib/i18n/LocaleProvider";
 import { localeTag } from "@/lib/i18n/dictionary";
@@ -71,6 +72,9 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
   // line can be read at this scale, and finer would redraw the page for
   // no one's benefit.
   const [now, setNow] = useState<Date | null>(null);
+  // The meal whose recipe is open — the kitchen view of the day.
+  const [recipeFor, setRecipeFor] = useState<string | null>(null);
+  const closeRecipe = useCallback(() => setRecipeFor(null), []);
 
   useEffect(() => {
     const tick = () => setNow(new Date());
@@ -266,10 +270,12 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                 const top = (hourOf(start, timeZone) - from) * HOUR_PX;
                 const height = Math.max(20, (hourOf(end, timeZone) - hourOf(start, timeZone)) * HOUR_PX - 2);
                 return (
-                  <div
+                  <button
                     key={m.id}
-                    title={m.recipe}
-                    className={`absolute right-0 left-0 overflow-hidden rounded-r-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] pr-2 pl-2 ${
+                    type="button"
+                    onClick={() => setRecipeFor(m.id)}
+                    title={`${t.meals.recipe.open}: ${m.recipe}`}
+                    className={`absolute right-0 left-0 overflow-hidden rounded-r-lg border-l-[3px] border-[var(--color-meal)] bg-[var(--color-meal-soft)] pr-2 pl-2 text-left hover:brightness-95 ${
                       height < 40 ? "py-0.5" : "py-1"
                     }`}
                     style={{ top, height }}
@@ -287,7 +293,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                         {m.prepMinutes > 0 ? ` · ${t.daySchedule.prep(m.prepMinutes)}` : ""}
                       </p>
                     )}
-                  </div>
+                  </button>
                 );
               })}
             </div>
@@ -319,7 +325,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
               <Heading label={t.daySchedule.mealsHeading} />
               <ul className="flex flex-col gap-2">
                 {view.meals.map((m) => (
-                  <MealRow key={m.id} meal={m} onLog={logMeal} />
+                  <MealRow key={m.id} meal={m} onLog={logMeal} onRecipe={setRecipeFor} />
                 ))}
               </ul>
             </section>
@@ -396,6 +402,7 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
           </section>
         </div>
       </div>
+      <MealRecipeDialog mealId={recipeFor} onClose={closeRecipe} />
     </div>
   );
 }
@@ -512,7 +519,15 @@ function TimeBlockForm({
  * they mean opposite things for the day's totals. Unanswered stays
  * unanswered: silence is not a skip.
  */
-function MealRow({ meal, onLog }: { meal: DayMeal; onLog: (id: string, status: DayMeal["status"], note?: string) => void }) {
+function MealRow({
+  meal,
+  onLog,
+  onRecipe,
+}: {
+  meal: DayMeal;
+  onLog: (id: string, status: DayMeal["status"], note?: string) => void;
+  onRecipe: (id: string) => void;
+}) {
   const { t } = useI18n();
   const answers: [DayMeal["status"], string][] = [
     ["EATEN", t.daySchedule.logAte],
@@ -538,6 +553,14 @@ function MealRow({ meal, onLog }: { meal: DayMeal; onLog: (id: string, status: D
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-1">
+        {meal.kind !== "READY" && (
+          <button
+            onClick={() => onRecipe(meal.id)}
+            className="rounded-full border border-[var(--color-meal)] px-2 py-0.5 font-mono text-[9px] text-[var(--color-meal)] hover:bg-[var(--color-meal-soft)]"
+          >
+            {t.meals.recipe.open}
+          </button>
+        )}
         {answers.map(([status, label]) => (
           <button
             key={status}

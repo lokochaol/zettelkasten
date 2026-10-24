@@ -678,6 +678,14 @@ model PlannedMeal {
   /// Ingredients and method, as plain text — same "a note is text" stance
   /// the rest of the app takes.
   recipe      String
+  /// The recipe to cook from, written by the model when the owner asks
+  /// for it (src/lib/mealRecipe.ts): ingredients for the portions actually
+  /// made, numbered steps, and how to keep and reheat the rest. Null until
+  /// asked — most meals are read as the short line above and never cooked
+  /// from a screen.
+  recipeDetail Json?   @map("recipe_detail")
+  /// A recipe page the owner chose for this meal, opened while cooking.
+  recipeUrl   String   @default("") @map("recipe_url")
   kcal        Int
   proteinG    Float    @map("protein_g")
   fatG        Float    @map("fat_g")

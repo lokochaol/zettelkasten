@@ -81,6 +81,12 @@ export function translateDomainError(locale: Locale, error: DomainError): string
       return dict.purchaseListNoMeals;
     case "mealChatInvalid":
       return dict.mealChatInvalid;
+    case "mealNotFound":
+      return dict.mealNotFound;
+    case "mealRecipeUrlInvalid":
+      return dict.mealRecipeUrlInvalid;
+    case "mealRecipeEmpty":
+      return dict.mealRecipeEmpty;
     case "mealChatProposalGone":
       return dict.mealChatProposalGone;
     case "timeBlockInvalid":

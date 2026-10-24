@@ -6,6 +6,7 @@ import * as expenses from "@/lib/expenses";
 import * as inventory from "@/lib/inventory";
 import * as mealChat from "@/lib/mealChat";
 import * as purchaseList from "@/lib/purchaseList";
+import * as mealRecipe from "@/lib/mealRecipe";
 import { shiftDateKey } from "@/lib/dateKey";
 import type { MealPlanView, PreferenceInput } from "@/lib/mealPlanning";
 import { AiJsonError } from "@/lib/aiJson";
@@ -271,3 +272,46 @@ export async function syncMealsToCalendarAction(
   }
 }
 
+
+export type RecipeView = mealRecipe.RecipeView;
+
+/** One meal's recipe, for cooking from — from the week here or the day on the calendar. */
+export async function getRecipeAction(mealId: string): Promise<RecipeView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  try {
+    return await mealRecipe.getRecipe(ownerSub, mealId, locale);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    throw e;
+  }
+}
+
+/** Has the model write the full recipe (again, with the owner's request when given). */
+export async function writeRecipeAction(mealId: string, request = ""): Promise<RecipeView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  try {
+    await mealRecipe.writeRecipe(ownerSub, mealId, request);
+    return await mealRecipe.getRecipe(ownerSub, mealId, locale);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    if (e instanceof AiJsonError) {
+      console.error("recipe failed", e.code, e.message);
+      return { error: translateAiError(locale, e) };
+    }
+    throw e;
+  }
+}
+
+export async function setRecipeUrlAction(mealId: string, url: string): Promise<RecipeView | { error: string }> {
+  const ownerSub = await requireOwnerSub();
+  const locale = await getLocale();
+  try {
+    await mealRecipe.setRecipeUrl(ownerSub, mealId, url);
+    return await mealRecipe.getRecipe(ownerSub, mealId, locale);
+  } catch (e) {
+    if (e instanceof ValidationError) return { error: translateDomainError(locale, e) };
+    throw e;
+  }
+}

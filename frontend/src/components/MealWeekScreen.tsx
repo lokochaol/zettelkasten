@@ -12,6 +12,7 @@ import {
 } from "@/app/meals/actions";
 import { LoadingBlock } from "@/components/LoadingSpinner";
 import { MealChatPanel, type MealChatHandle } from "@/components/MealChatPanel";
+import { MealRecipe } from "@/components/MealRecipe";
 import { PurchaseListPanel } from "@/components/PurchaseListPanel";
 import { StockPanel } from "@/components/StockPanel";
 import { formatDateKey, shiftDateKey, todayKey as todayKeyValue } from "@/lib/dateKey";
@@ -260,6 +261,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
                             {kindLabel(meal.kind)}
                           </span>
                           {meal.kcal} kcal · {t.meals.prepMinutes(meal.prepMinutes)}
+                          {(meal.recipeDetail != null || meal.recipeUrl) && <span className="text-[var(--color-meal)]">· {t.meals.recipe.open}</span>}
                         </p>
                       </>
                     ) : (
@@ -312,7 +314,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
                   {meal.kcal} kcal · P {meal.proteinG}g · F {meal.fatG}g · C {meal.carbG}g · {t.health.fiber} {meal.fiberG}g ·{" "}
                   {t.health.salt} {meal.saltG}g
                 </p>
-                <p className="text-xs leading-relaxed whitespace-pre-wrap text-ink-soft">{meal.recipe}</p>
+                <MealRecipe key={meal.id} mealId={meal.id} showTitle={false} />
               </>
             );
           })()}

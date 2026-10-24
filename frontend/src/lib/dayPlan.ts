@@ -62,6 +62,8 @@ export interface DayPlanView {
     steps: { label: string; itemTitle: string; kind: string; dateKey: string; goalId: string | null }[];
     training: { title: string; minutes: number }[];
     calendar: "linked" | "not_linked" | "unavailable";
+    /** The day's planned meals, so a meal block can open its recipe. */
+    meals: { id: string; title: string; kind: string }[];
   };
   goals: { id: string; title: string; hex: string }[];
 }
@@ -183,6 +185,7 @@ async function draft(ownerSub: string, dateKey: string, timeZone: string, routin
     cal,
     plan,
     sessions,
+    meals: meals.map((m) => m.meal),
   };
 }
 
@@ -219,6 +222,7 @@ export async function getDayPlan(ownerSub: string, dateKey: string, timeZone: st
       steps: d.plan.steps.filter((st) => st.dateKey <= shiftDateKey(dateKey, 3)).map((st) => ({ label: st.label, itemTitle: st.itemTitle, kind: st.kind, dateKey: st.dateKey, goalId: st.goalId })),
       training: d.sessions.map((x) => ({ title: x.title, minutes: x.minutes })),
       calendar: d.cal.state,
+      meals: d.meals.map((m) => ({ id: m.id, title: m.title, kind: m.kind })),
     },
     goals: goals.filter((g) => g.status === "ACTIVE").map((g) => ({ id: g.id, title: g.title, hex: g.hex })),
   };
@@ -259,6 +263,9 @@ export async function pushDayPlan(ownerSub: string, dateKey: string, timeZone: s
   const row = await prisma.goalDayPlan.findUnique({ where: { ownerSub_dateKey: { ownerSub, dateKey } } });
   const blocks = view.blocks.filter((b) => b.push && !b.fixed);
   const goalTitle = new Map(view.goals.map((g) => [g.id, g.title]));
+  // A meal block carries the meal's recipe, so the event is enough to cook from.
+  const mealRows = await prisma.plannedMeal.findMany({ where: { id: { in: view.context.meals.map((m) => m.id) } } });
+  const mealOf = (b: DayBlock) => (b.kind === "MEAL" ? mealRows.find((m) => m.title === b.title) : undefined);
   const before = pushedOf(row?.pushed);
   let target: "google" | "app" = view.context.calendar === "linked" ? "google" : "app";
   let written = 0;
@@ -276,7 +283,9 @@ export async function pushDayPlan(ownerSub: string, dateKey: string, timeZone: s
             ownerSub,
             {
               summary: b.title,
-              description: [b.goalId ? goalTitle.get(b.goalId) : "", b.note, "（1日の計画から）"].filter(Boolean).join("\n"),
+              description: [b.goalId ? goalTitle.get(b.goalId) : "", b.note, mealOf(b) ? mealPlanning.mealEventDescription(mealOf(b)!) : "", "（1日の計画から）"]
+                .filter(Boolean)
+                .join("\n"),
               start: localTimeUtc(dateKey, minutesOfTime(b.start), timeZone),
               end: localTimeUtc(dateKey, minutesOfTime(b.end), timeZone),
               timeZone,

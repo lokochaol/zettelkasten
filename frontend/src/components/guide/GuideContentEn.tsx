@@ -473,6 +473,10 @@ export function GuideContentEn() {
                 body: "Set how many days you cook, the kitchen time for each weekday (0 is a day without cooking) and how many meals can be frozen or ready-made, and the plan stays within that. The free time before dinner and breakfast is also worked out from your routine under Goals (work, office days, commute), the standard week and that day’s day plan, so late days and evenings with study get batch or ready-made meals. Days that don’t fit are flagged on the proposal and in the week, and the cooking sits before the meal time on the calendar.",
               },
               {
+                title: "Recipes to cook from",
+                body: "Tap a meal in the week, or a meal block or “Recipe” on the calendar’s day, to open its recipe. “Write the full recipe” turns the plan’s note into amounts (including the portions for later batch meals), numbered steps and how to keep and reheat the rest; tap ingredients and steps to tick them off. A batch meal links to the dish it was cooked as. You can also save a recipe page’s URL, or search for the dish. The saved URL and the full recipe go into the meal’s calendar event too.",
+              },
+              {
                 title: "Where it misses",
                 body: "Each day's energy and protein, and the shopping estimate, are recalculated and flagged if they're off target. Ask the chat to change that day.",
               },
