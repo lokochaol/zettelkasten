@@ -282,6 +282,7 @@ export const planEn: PlanDictionary = {
   importApplying: "Importing…",
   importDone: (c: number, u: number) => `Imported (${c} new area${c === 1 ? "" : "s"}, ${u} updated)`,
   importFailed: "Couldn't read it. Please try again",
+  applyFailed: "Couldn't apply it (the plan is unchanged). Wait a moment and press Apply again",
   startHeading: "Make a plan",
   startIntro: "Talk it through with the advisor: from the vision, where things stand and what's fixed, to a long roadmap, the first 12 weeks and a standard week. Once it's settled it's written out as a plan document, and Apply turns it into goals, the Gantt chart and the timetable. You can also import a plan document you already have.",
   startChat: "Plan it in the chat",

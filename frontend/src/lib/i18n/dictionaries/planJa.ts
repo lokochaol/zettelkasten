@@ -290,6 +290,7 @@ export const planJa = {
   importApplying: "取り込み中…",
   importDone: (c: number, u: number) => `取り込みました（新しい領域${c}件、更新${u}件）`,
   importFailed: "読み取れませんでした。もう一度試してください",
+  applyFailed: "反映できませんでした（計画は変わっていません）。時間をおいてもう一度「反映する」を押してください",
   // planning in the chat, and the plan document
   startHeading: "計画を立てる",
   startIntro: "アドバイザーと話しながら、目指す姿・現在地・制約から、長期のロードマップ、最初の12週間、標準の1週間まで順に決めていけます。まとまったら計画書として書き出され、「反映する」で目標・ガントチャート・時間割になります。手元に計画の文書があれば、取り込むこともできます。",

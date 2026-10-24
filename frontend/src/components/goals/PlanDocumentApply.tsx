@@ -87,13 +87,14 @@ export function PlanDocumentApply({
     try {
       const res = await applyPlanImportAction(draft, todayKey, { archiveOthers: mode === "replace", replace: mode === "replace" }, { markdown, messageId });
       if ("error" in res) {
-        setError(res.error);
+        setError(res.error ?? t.plan.applyFailed);
         return;
       }
       setDraft(null);
       onApplied({ overview: res.overview, messages: res.messages, message: t.plan.importDone(res.counts.goalsCreated, res.counts.goalsUpdated) });
     } catch {
-      setError(t.plan.importFailed);
+      // The request itself didn't come back (cut off, or the connection dropped).
+      setError(t.plan.applyFailed);
     } finally {
       setApplying(false);
     }
