@@ -6,6 +6,8 @@ import { shiftDateKey } from "@/lib/dateKey";
 import { ValidationError } from "@/lib/errors";
 import { currentTargets } from "@/lib/health";
 import { inventoryBrief, listInventory } from "@/lib/inventory";
+import { kitchenLine, kitchenWarnings } from "@/lib/kitchenTime";
+import { kitchenDays } from "@/lib/kitchenSchedule";
 import { getPreference } from "@/lib/mealPlanning";
 import {
   applyPurchaseProposal,
@@ -43,6 +45,9 @@ export type { MealChatMessage };
  * runs out — in the middle of the supermarket.
  */
 
+
+const hhmm = (m: number) => `${String(Math.floor(m / 60)).padStart(2, "0")}:${String(m % 60).padStart(2, "0")}`;
+
 const SLOTS: MealSlot[] = ["BREAKFAST", "LUNCH", "DINNER"];
 const KINDS: MealKind[] = ["COOK", "BATCH", "READY"];
 /** How much of the conversation goes back to the model each turn. Enough to
@@ -73,6 +78,8 @@ export interface ProposedMeal {
 
 export interface Proposal {
   meals: ProposedMeal[];
+  /** Where the week, with these meals in it, asks more of the kitchen than the days allow. */
+  kitchenWarnings?: string[];
   /** A change to the purchase list, applied with the meals. */
   purchase?: PurchaseProposal | null;
 }
@@ -161,7 +168,11 @@ const SYSTEM_PROMPT = `あなたは管理栄養士で、この人の献立の担
 2. 家にある食材（在庫）を優先して使い、使い切る。同じ食材を複数の日・料理に散らして余らせない。
 3. 傷みやすいもの（葉物・生魚・鶏肉）は早めの日に、日持ちするもの（根菜・冷凍・乾物）は後の日に置く。
 4. 週の食費に収まる食材と量にする。
-5. 台所に立つ日は指定された回数まで。その日にまとめて作り、残りの日は作り置きの温め直し（BATCH）か冷凍食品・惣菜（READY）にする。
+5. 台所に立つ日と時間は「日ごとの予定と台所」に合わせる。
+   - 調理（COOK）は、台所の上限が0分の日には置かない。台所に立つ日は週の回数まで。上限の大きい日・夕食前（または朝食前）の空きが多い日を選ぶ。
+   - その日の prepMinutes の合計（温め直しも含む）を、その日の台所の上限以内にする。夕食の COOK の prepMinutes は「夕食前2時間の空き」以内、朝食の COOK は「朝食前2時間の空き」以内にする。
+   - 空きの少ない日（出社で帰宅が遅い・夜に学習の枠がある日など）は、BATCH か READY にして1食10分以内にする。
+   - その日にまとめて作り、残りの日は作り置きの温め直し（BATCH）か冷凍食品・惣菜（READY）にする。作り置きは、空きの少ない日の前に作る。
    - まとめて作る日のCOOKの料理は、後の日のBATCH分も一緒に作る想定で分量を決め、recipeに「○食分作って冷蔵/冷凍」と書く。
    - BATCHの料理には、どの日のどの料理の作り置きかをrecipeに書く。作り置きは冷蔵3日・冷凍1週間を目安にし、それを超える日に置かない。
    - BATCHとREADYのprepMinutesは温め直しにかかる実際の時間（3〜10分）にする。
@@ -271,7 +282,7 @@ export async function sendMessage(
   const content = text.trim().slice(0, MAX_MESSAGE_LENGTH);
   if (!content) throw new ValidationError("mealChatInvalid", "message is empty");
   const dates = Array.from({ length: 7 }, (_, i) => shiftDateKey(weekStartDateKey, i));
-  const [plan, targetsNow, preference, stock, purchase, training, history] = await Promise.all([
+  const [plan, targetsNow, preference, stock, purchase, training, history, kitchen] = await Promise.all([
     findPlan(ownerSub, weekStartDateKey),
     currentTargets(ownerSub, todayKey),
     getPreference(ownerSub),
@@ -282,6 +293,7 @@ export async function sendMessage(
       orderBy: { dateKey: "asc" },
     }),
     prisma.mealChatMessage.findMany({ where: { ownerSub, weekStartDateKey }, orderBy: { createdAt: "desc" }, take: HISTORY_TURNS }),
+    getPreference(ownerSub).then((p) => kitchenDays(ownerSub, dates, p)),
   ]);
   // The targets the week is planned against: the ones the plan was made
   // with once there is one, today's until then.
@@ -308,9 +320,12 @@ export async function sendMessage(
     `  エネルギー ${targets.kcal} kcal（±100 kcal 以内） / たんぱく質 ${targets.proteinG} g 以上 / 食物繊維 ${targets.fiberG} g 以上 / 食塩 ${targets.saltMaxG} g 未満`,
     "",
     `週の食費: ${preference.weeklyBudgetYen} 円以内`,
-    `台所に立つ日: 週 ${preference.cookSessionsPerWeek} 日まで`,
+    `台所に立つ日（COOK の日）: 週 ${preference.cookSessionsPerWeek} 日まで`,
     `冷凍食品・惣菜（READY）: 週 ${preference.readyMadeMealsPerWeek} 食まで`,
-    `まとめ調理の日の調理時間: 1日あたり合計 ${Math.max(preference.weekdayCookMinutes, 60)} 分まで / それ以外の日は1食10分以内`,
+    `食事の時刻: 朝 ${hhmm(preference.breakfastMinutes)} / 昼 ${hhmm(preference.lunchMinutes)} / 夕 ${hhmm(preference.dinnerMinutes)}（調理はこの時刻の前に済ませる）`,
+    "",
+    "日ごとの予定と台所（上限はこの人が決めた、その曜日に台所に立てる分数）:",
+    ...kitchen.map((d) => `  ${kitchenLine(d)}`),
     preference.dislikes ? `苦手: ${preference.dislikes}` : "苦手: 特になし",
     preference.allergies ? `アレルギー（絶対に使わない）: ${preference.allergies}` : "アレルギー: なし",
     "",
@@ -350,6 +365,12 @@ export async function sendMessage(
     // Room for a whole week of meals with recipes in one reply.
     const { value } = await askForJson(ownerSub, SYSTEM_PROMPT, brief, 20000, undefined, onProgress && progressReporter(onProgress, "meals"));
     parsed = parseChatReply(value, changeable, { hasList: purchase !== null, todayKey });
+    if (parsed.proposal.meals.length > 0) {
+      // The week as it would be with these meals in it, checked against the days.
+      const proposed = new Map(parsed.proposal.meals.map((m) => [`${m.dateKey}|${m.slot}`, m]));
+      const week = [...meals.filter((m) => !proposed.has(`${m.dateKey}|${m.slot}`)), ...parsed.proposal.meals];
+      parsed.proposal.kitchenWarnings = kitchenWarnings(week, kitchen);
+    }
     onProgress?.({ stage: "saving", reply: parsed.reply, items: [] });
   } catch (e) {
     await prisma.mealChatMessage.delete({ where: { id: userMessage.id } });
@@ -374,6 +395,7 @@ function readProposal(value: unknown): Proposal | null {
   return {
     meals: Array.isArray(p.meals) ? p.meals : [],
     purchase: p.purchase ?? null,
+    kitchenWarnings: Array.isArray(p.kitchenWarnings) ? p.kitchenWarnings : [],
   };
 }
 
@@ -424,6 +446,7 @@ export async function applyProposal(
       cookSessionsPerWeek: preference.cookSessionsPerWeek,
       readyMadeMealsPerWeek: preference.readyMadeMealsPerWeek,
       weekdayCookMinutes: preference.weekdayCookMinutes,
+      kitchenMinutes: preference.kitchenMinutes as Prisma.InputJsonValue,
       budgetYen: preference.weeklyBudgetYen,
       promptSummary: "",
     };

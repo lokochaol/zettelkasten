@@ -113,7 +113,7 @@ export function GuideContentEn() {
             },
             {
               title: "Meal preferences (/meals)",
-              body: "Weekly food budget, weekday cooking time, shopping day, the day the week starts, dislikes and allergies, how many days you cook.",
+              body: "Weekly food budget, kitchen time for each weekday, shopping day, the day the week starts, dislikes and allergies, how many days you cook.",
             },
             {
               title: "Zotero (/settings, if you work with sources)",
@@ -470,7 +470,7 @@ export function GuideContentEn() {
             items={[
               {
                 title: "Cook, batch, ready-made",
-                body: "Set how many days you cook and how many meals can be frozen or ready-made, and the plan stays within that. Batch-cooked and ready-made meals count only their reheating time, and any weekday over your cooking time is flagged.",
+                body: "Set how many days you cook, the kitchen time for each weekday (0 is a day without cooking) and how many meals can be frozen or ready-made, and the plan stays within that. The free time before dinner and breakfast is also worked out from your routine under Goals (work, office days, commute), the standard week and that day’s day plan, so late days and evenings with study get batch or ready-made meals. Days that don’t fit are flagged on the proposal and in the week, and the cooking sits before the meal time on the calendar.",
               },
               {
                 title: "Where it misses",

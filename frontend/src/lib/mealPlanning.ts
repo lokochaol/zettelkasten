@@ -3,6 +3,8 @@ import { prisma } from "@/lib/db";
 import { localTimeUtc, shiftDateKey } from "@/lib/dateKey";
 import * as googleCalendar from "@/lib/googleCalendar";
 import { ValidationError } from "@/lib/errors";
+import { cleanKitchenMinutes, kitchenWarnings, type KitchenDay } from "@/lib/kitchenTime";
+import { kitchenDays } from "@/lib/kitchenSchedule";
 import type { MealKind, MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
 export type { MealKind, MealPreference, MealStatus, PlannedMeal, ShoppingItem };
@@ -40,6 +42,8 @@ export interface PreferenceInput {
   dinnerMinutes: number;
   cookSessionsPerWeek: number;
   readyMadeMealsPerWeek: number;
+  /** Minutes in the kitchen per weekday, Sunday first; omitted keeps what's stored. */
+  kitchenMinutes?: number[];
 }
 
 export async function savePreference(ownerSub: string, input: PreferenceInput): Promise<MealPreference> {
@@ -68,11 +72,38 @@ export async function savePreference(ownerSub: string, input: PreferenceInput): 
       throw new ValidationError("mealPreferenceInvalid", "Meal times must be within a day");
     }
   }
-  return prisma.mealPreference.upsert({
-    where: { ownerSub },
-    create: { ownerSub, ...input },
-    update: input,
+  let kitchenMinutes: number[] | undefined;
+  if (input.kitchenMinutes !== undefined) {
+    try {
+      kitchenMinutes = cleanKitchenMinutes(input.kitchenMinutes);
+    } catch {
+      throw new ValidationError("mealPreferenceInvalid", "Kitchen minutes must be 0-300 for each of the 7 days");
+    }
+  }
+  const { kitchenMinutes: _k, ...rest } = input;
+  void _k;
+  const data = {
+    ...rest,
+    ...(kitchenMinutes
+      ? {
+          kitchenMinutes: kitchenMinutes as unknown as Prisma.InputJsonValue,
+          // The single weekday figure older plans were checked against: the most any weekday allows.
+          weekdayCookMinutes: Math.max(...kitchenMinutes.slice(1, 6)),
+        }
+      : {}),
+  };
+  const saved = await prisma.mealPreference.upsert({ where: { ownerSub }, create: { ownerSub, ...data }, update: data });
+  // The weeks still ahead are checked against the setting as it is now.
+  await prisma.mealPlan.updateMany({
+    where: { ownerSub, weekStartDateKey: { gte: shiftDateKey(new Date().toISOString().slice(0, 10), -7) } },
+    data: {
+      cookSessionsPerWeek: saved.cookSessionsPerWeek,
+      readyMadeMealsPerWeek: saved.readyMadeMealsPerWeek,
+      weekdayCookMinutes: saved.weekdayCookMinutes,
+      kitchenMinutes: saved.kitchenMinutes as Prisma.InputJsonValue,
+    },
   });
+  return saved;
 }
 
 /* ---------- reading a plan ---------- */
@@ -99,6 +130,8 @@ export interface MealPlanView {
    * only exists in the reply that generated it disappears the moment the
    * owner switches panes. */
   warnings: string[];
+  /** Each day's kitchen limit and free time, as the plan was checked against. */
+  kitchen: KitchenDay[];
 }
 
 /** The week a date belongs to, on the owner's own calendar — their week
@@ -147,12 +180,14 @@ export async function getPlan(ownerSub: string, weekStartDateKey: string): Promi
   });
   if (!plan) return null;
   const { meals, shoppingItems, ...rest } = plan;
-  return buildView(rest as MealPlan, meals, shoppingItems);
+  const dates = Array.from({ length: DAYS_IN_PLAN }, (_, i) => shiftDateKey(weekStartDateKey, i));
+  const kitchen = await kitchenDays(ownerSub, dates, { ...(await getPreference(ownerSub)), kitchenMinutes: plan.kitchenMinutes });
+  return buildView(rest as MealPlan, meals, shoppingItems, kitchen);
 }
 
 /** One place that turns stored rows into what the screen shows, so a plan
  * read back looks exactly like one just generated — warnings included. */
-function buildView(plan: MealPlan, meals: PlannedMeal[], shoppingItems: ShoppingItem[]): MealPlanView {
+function buildView(plan: MealPlan, meals: PlannedMeal[], shoppingItems: ShoppingItem[], kitchen?: KitchenDay[]): MealPlanView {
   const dayTotals = totalsFor(meals);
   const estimatedYen = shoppingItems.reduce((sum, i) => sum + i.estimatedYen, 0);
   const dates = Array.from({ length: DAYS_IN_PLAN }, (_, i) => shiftDateKey(plan.weekStartDateKey, i));
@@ -177,7 +212,10 @@ function buildView(plan: MealPlan, meals: PlannedMeal[], shoppingItems: Shopping
       estimatedYen,
       plan.budgetYen,
       cookingLoadOf(meals),
+      kitchen,
+      meals,
     ),
+    kitchen: kitchen ?? [],
   };
 }
 
@@ -254,6 +292,9 @@ export function checkAgainstBrief(
   estimatedYen: number,
   budgetYen: number,
   load?: CookingLoad,
+  /** Each day's kitchen limit and free time; when given, it replaces the single weekday cap. */
+  kitchen?: KitchenDay[],
+  meals?: Pick<PlannedMeal, "dateKey" | "slot" | "kind" | "prepMinutes" | "title">[],
 ): string[] {
   const warnings: string[] = [];
   if (load) {
@@ -286,10 +327,11 @@ export function checkAgainstBrief(
     // A batch-cooking day is meant to run long — that's the trade. Only
     // the other days are held to the weekday cap.
     const isCookDay = load ? load.cookDays.includes(t.dateKey) : false;
-    if (!isCookDay && weekday >= 1 && weekday <= 5 && t.prepMinutes > target.weekdayCookMinutes) {
+    if (!kitchen && !isCookDay && weekday >= 1 && weekday <= 5 && t.prepMinutes > target.weekdayCookMinutes) {
       warnings.push(`${t.dateKey}: 調理 ${t.prepMinutes}分（平日の上限 ${target.weekdayCookMinutes}分 超過）`);
     }
   }
+  if (kitchen && meals) warnings.push(...kitchenWarnings(meals, kitchen));
   if (estimatedYen > budgetYen) {
     warnings.push(`買い物リストの概算 ${estimatedYen.toLocaleString()}円（週予算 ${budgetYen.toLocaleString()}円 超過）`);
   }
@@ -301,6 +343,19 @@ export function checkAgainstBrief(
 /** Minutes past midnight for each slot, from the owner's preference. */
 export function slotMinutes(preference: MealPreference, slot: MealSlot): number {
   return slot === "BREAKFAST" ? preference.breakfastMinutes : slot === "LUNCH" ? preference.lunchMinutes : preference.dinnerMinutes;
+}
+
+/**
+ * When a meal takes the owner's time: the cooking (or reheating) comes
+ * before the meal, which is at the time they eat, and then twenty minutes
+ * to eat it. A sixty-minute batch cook for a seven o'clock dinner starts at
+ * six, not seven.
+ */
+export function mealSpan<M extends Pick<PlannedMeal, "slot" | "prepMinutes">>(meal: M, dateKey: string, preference: MealPreference, timeZone: string) {
+  const eatAt = slotMinutes(preference, meal.slot);
+  const prep = Math.max(0, meal.prepMinutes);
+  const start = localTimeUtc(dateKey, Math.max(0, eatAt - prep), timeZone);
+  return { meal, start, end: localTimeUtc(dateKey, eatAt + 20, timeZone) };
 }
 
 /** How long the block on the timeline is: the cooking the plan asked for,
@@ -325,10 +380,7 @@ export async function scheduledMealsForDay(
 ): Promise<ScheduledMeal[]> {
   const preference = await getPreference(ownerSub);
   const meals = await getMealsForDay(ownerSub, dateKey, preference);
-  return meals.map((meal) => {
-    const start = localTimeUtc(dateKey, slotMinutes(preference, meal.slot), timeZone);
-    return { meal, start, end: new Date(start.getTime() + slotDurationMinutes(meal.prepMinutes) * 60_000) };
-  });
+  return meals.map((meal) => mealSpan(meal, dateKey, preference, timeZone));
 }
 
 /**
@@ -357,8 +409,7 @@ export async function syncWeekToCalendar(
   let written = 0;
   let failed = 0;
   for (const meal of plan.meals) {
-    const start = localTimeUtc(meal.dateKey, slotMinutes(preference, meal.slot), timeZone);
-    const end = new Date(start.getTime() + slotDurationMinutes(meal.prepMinutes) * 60_000);
+    const { start, end } = mealSpan(meal, meal.dateKey, preference, timeZone);
     try {
       const eventId = await googleCalendar.upsertEvent(
         ownerSub,

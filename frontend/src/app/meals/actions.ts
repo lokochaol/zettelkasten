@@ -18,6 +18,8 @@ import { requireOwnerSub } from "@/lib/session";
 import { ValidationError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
+import { kitchenDays } from "@/lib/kitchenSchedule";
+import { kitchenMinutesOf, type KitchenDay } from "@/lib/kitchenTime";
 import { translateAiError, translateDomainError } from "@/lib/i18n/errors";
 
 export interface MealWeekView {
@@ -29,17 +31,23 @@ export interface MealWeekView {
    * before the week; this is the answer, and the two side by side are how
    * the next week's budget gets set honestly. */
   foodSpentYen: number;
+  /** Each day's kitchen limit and free time (src/lib/kitchenTime.ts), with or without a plan. */
+  kitchen: KitchenDay[];
+  /** The kitchen minutes per weekday as set, Sunday first. */
+  kitchenMinutes: number[];
 }
 
 export async function getMealWeekAction(dateKey: string): Promise<MealWeekView> {
   const ownerSub = await requireOwnerSub();
   const preference = await mealPlanning.getPreference(ownerSub);
   const weekStartDateKey = mealPlanning.weekStartFor(dateKey, preference.weekStartWeekday);
-  const [view, foodSpentYen] = await Promise.all([
+  const dates = Array.from({ length: 7 }, (_, i) => shiftDateKey(weekStartDateKey, i));
+  const [view, foodSpentYen, kitchen] = await Promise.all([
     mealPlanning.getPlan(ownerSub, weekStartDateKey),
     expenses.sumForRange(ownerSub, weekStartDateKey, shiftDateKey(weekStartDateKey, 6), expenses.FOOD_CATEGORY),
+    kitchenDays(ownerSub, dates, preference),
   ]);
-  return { weekStartDateKey, preference, view, foodSpentYen };
+  return { weekStartDateKey, preference, view, foodSpentYen, kitchen, kitchenMinutes: kitchenMinutesOf(preference) };
 }
 
 export async function saveMealPreferenceAction(input: PreferenceInput): Promise<{ ok: true } | { error: string }> {

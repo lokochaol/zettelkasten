@@ -363,6 +363,11 @@ export interface Dictionary {
     prefHeading: string;
     prefBudget: string;
     prefCookMinutes: string;
+    prefKitchen: string;
+    prefKitchenHint: string;
+    kitchenDay: (cap: number, freeBeforeDinner: number | null) => string;
+    kitchenOff: string;
+    kitchenWarningsHeading: string;
     prefShoppingDay: string;
     prefWeekStart: string;
     prefDislikes: string;

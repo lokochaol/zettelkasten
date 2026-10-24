@@ -333,6 +333,17 @@ function ProposalCard({
         </div>
       )}
 
+      {proposal.kitchenWarnings && proposal.kitchenWarnings.length > 0 && (
+        <div className="flex flex-col gap-0.5 rounded-md bg-accent/10 px-2.5 py-1.5">
+          <p className="font-mono text-[9px] tracking-wider text-accent">{t.meals.kitchenWarningsHeading}</p>
+          {proposal.kitchenWarnings.map((w) => (
+            <p key={w} className="font-mono text-[10.5px] text-ink">
+              {w}
+            </p>
+          ))}
+        </div>
+      )}
+
       {proposal.purchase && <PurchaseChange purchase={proposal.purchase} locale={locale} />}
 
       {state === "applied" ? (
