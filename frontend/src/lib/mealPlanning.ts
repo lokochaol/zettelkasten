@@ -5,6 +5,7 @@ import * as googleCalendar from "@/lib/googleCalendar";
 import { ValidationError } from "@/lib/errors";
 import { cleanKitchenMinutes, kitchenWarnings, type KitchenDay } from "@/lib/kitchenTime";
 import { kitchenDays } from "@/lib/kitchenSchedule";
+import { recipeText, toRecipeDetail } from "@/lib/mealRecipeText";
 import type { MealKind, MealPlan, MealPreference, MealSlot, MealStatus, PlannedMeal, ShoppingItem } from "@/generated/prisma/client";
 
 export type { MealKind, MealPreference, MealStatus, PlannedMeal, ShoppingItem };
@@ -415,7 +416,7 @@ export async function syncWeekToCalendar(
         ownerSub,
         {
           summary: `${slotLabelJa(meal.slot)} ${meal.title}`,
-          description: `${meal.kcal} kcal / P ${meal.proteinG}g F ${meal.fatG}g C ${meal.carbG}g\n\n${meal.recipe}`,
+          description: mealEventDescription(meal),
           start,
           end,
           timeZone,
@@ -431,6 +432,18 @@ export async function syncWeekToCalendar(
     }
   }
   return { written, failed };
+}
+
+/** What the meal's calendar event says: enough to cook from on a phone, without opening the app. */
+export function mealEventDescription(meal: PlannedMeal): string {
+  const detail = toRecipeDetail(meal.recipeDetail);
+  return [
+    `${meal.kcal} kcal / P ${meal.proteinG}g F ${meal.fatG}g C ${meal.carbG}g`,
+    meal.recipeUrl ? `レシピ: ${meal.recipeUrl}` : "",
+    detail ? recipeText(detail) : meal.recipe,
+  ]
+    .filter(Boolean)
+    .join("\n\n");
 }
 
 function slotLabelJa(slot: MealSlot): string {

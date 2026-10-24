@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyDayProposalAction,
   clearDayMessagesAction,
@@ -14,6 +14,7 @@ import {
 import type { DayBlock, DayMessageView, DayPlanView } from "@/lib/dayPlan";
 import { ChatThinking } from "@/components/ChatThinking";
 import { Spinner } from "@/components/LoadingSpinner";
+import { MealRecipeDialog } from "@/components/MealRecipe";
 import { postChatStream } from "@/lib/chatStreamClient";
 import type { ChatProgress } from "@/lib/chatProgress";
 import { tint } from "@/lib/goalColors";
@@ -57,6 +58,8 @@ export function DayPlanPanel({ dateKey, todayKey, onGoToDay }: { dateKey: string
   const [busy, setBusy] = useState<"push" | "redraft" | "apply" | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [recipeFor, setRecipeFor] = useState<string | null>(null);
+  const closeRecipe = useCallback(() => setRecipeFor(null), []);
   const [chatOpen, setChatOpen] = useState(false);
   const [hour, setHour] = useState<number | null>(null);
 
@@ -179,6 +182,7 @@ export function DayPlanPanel({ dateKey, todayKey, onGoToDay }: { dateKey: string
         </p>
       )}
       {notice && <p className="text-[11.5px] text-meal">{notice}</p>}
+      <MealRecipeDialog mealId={recipeFor} onClose={closeRecipe} />
       {error && <p className="text-[11px] text-accent">{error}</p>}
 
       <div className="grid gap-3 sm:grid-cols-[3.5rem_1fr]">
@@ -211,6 +215,20 @@ export function DayPlanPanel({ dateKey, todayKey, onGoToDay }: { dateKey: string
                   <span className="ml-1.5 font-mono text-[9.5px] text-ink-faint">{b.fixed ? d.fixed : d.kind[b.kind]}</span>
                   {b.note && <span className="block text-[11px] leading-snug text-ink-soft">{b.note}</span>}
                 </button>
+                {(() => {
+                  const meal = b.kind === "MEAL" ? plan.context.meals.find((m) => m.title === b.title && m.kind !== "READY") : undefined;
+                  return (
+                    meal && (
+                      <button
+                        type="button"
+                        onClick={() => setRecipeFor(meal.id)}
+                        className="shrink-0 rounded-full border border-[var(--color-meal)] px-2 py-0.5 font-mono text-[9.5px] text-[var(--color-meal)] hover:bg-[var(--color-meal-soft)]"
+                      >
+                        {t.meals.recipe.open}
+                      </button>
+                    )
+                  );
+                })()}
                 {!b.fixed && (
                   <label className="flex shrink-0 items-center gap-1 pt-0.5 font-mono text-[9.5px] text-ink-faint" title={d.pushCol}>
                     <input

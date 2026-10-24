@@ -474,6 +474,9 @@ export async function applyProposal(
       // and re-creating is a replace. The calendar event id is carried over,
       // so the next sync updates the existing event instead of adding one.
       const eventIds = new Map((existing?.meals ?? []).map((m) => [`${m.dateKey}|${m.slot}`, m.googleEventId]));
+      // The same dish in the same slot keeps the recipe written for it and
+      // the page the owner pinned; a different dish starts without them.
+      const kept = new Map((existing?.meals ?? []).map((m) => [`${m.dateKey}|${m.slot}|${m.title}`, m]));
       await tx.plannedMeal.deleteMany({
         where: { planId: planId!, OR: meals.map((m) => ({ dateKey: m.dateKey, slot: m.slot })) },
       });
@@ -493,6 +496,8 @@ export async function applyProposal(
           saltG: m.saltG,
           prepMinutes: m.prepMinutes,
           googleEventId: eventIds.get(`${m.dateKey}|${m.slot}`) ?? null,
+          recipeDetail: (kept.get(`${m.dateKey}|${m.slot}|${m.title}`)?.recipeDetail ?? undefined) as Prisma.InputJsonValue | undefined,
+          recipeUrl: kept.get(`${m.dateKey}|${m.slot}|${m.title}`)?.recipeUrl ?? "",
         })),
       });
     }
