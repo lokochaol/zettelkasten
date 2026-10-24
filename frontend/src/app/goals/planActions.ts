@@ -8,6 +8,7 @@ import * as subPlan from "@/lib/goalSubPlan";
 import { requireOwnerSub } from "@/lib/session";
 import { DomainError } from "@/lib/errors";
 import { getLocale } from "@/lib/i18n/locale";
+import { getDictionary } from "@/lib/i18n/dictionary";
 import { translateDomainError } from "@/lib/i18n/errors";
 
 type Result<T> = T | { error: string };
@@ -162,18 +163,26 @@ export async function applyPlanImportAction(
   source?: { markdown: string; messageId?: string },
 ) {
   return run(async (o) => {
-    const markdown = source?.messageId ? await advisor.openDocument(o, source.messageId) : source?.markdown;
-    const counts = await planImport.applyPlanImport(o, draft, todayKey, {
-      archiveOthers: mode.archiveOthers,
-      replace: mode.replace,
-      document: markdown ? { markdown, source: source?.messageId ? "ADVISOR" : "IMPORT" } : undefined,
-    });
-    if (source?.messageId) await advisor.markApplied(o, source.messageId);
-    return {
-      counts,
-      overview: await plan.getPlanOverview(o, todayKey),
-      messages: source?.messageId ? (await advisor.listMessages(o)).map(advisor.toMessageView) : null,
-    };
+    try {
+      const markdown = source?.messageId ? await advisor.openDocument(o, source.messageId) : source?.markdown;
+      const counts = await planImport.applyPlanImport(o, draft, todayKey, {
+        archiveOthers: mode.archiveOthers,
+        replace: mode.replace,
+        document: markdown ? { markdown, source: source?.messageId ? "ADVISOR" : "IMPORT" } : undefined,
+      });
+      if (source?.messageId) await advisor.markApplied(o, source.messageId);
+      return {
+        counts,
+        overview: await plan.getPlanOverview(o, todayKey),
+        messages: source?.messageId ? (await advisor.listMessages(o)).map(advisor.toMessageView) : null,
+      };
+    } catch (e) {
+      if (e instanceof DomainError) throw e;
+      // Said, not thrown: an unexpected failure would otherwise reach the
+      // screen as "couldn't read it", about a document that was read fine.
+      console.error("plan import apply failed", e);
+      return { error: getDictionary(await getLocale()).plan.applyFailed };
+    }
   });
 }
 

@@ -6,6 +6,11 @@ import { getLocale } from "@/lib/i18n/locale";
 import { getDictionary } from "@/lib/i18n/dictionary";
 import { getTodayKey } from "@/lib/preferences/preferences";
 
+// Applying a plan document is a Server Action on this page, and a detailed
+// plan is dozens of writes to the hosted database; the platform's default
+// limit cut it off before the transaction finished.
+export const maxDuration = 300;
+
 export default async function GoalsPage() {
   const session = await requireSession();
   const dict = getDictionary(await getLocale());

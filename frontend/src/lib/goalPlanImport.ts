@@ -1,3 +1,4 @@
+import { randomUUID } from "node:crypto";
 import type { Prisma } from "@/generated/prisma/client";
 import { prisma } from "@/lib/db";
 import { askForJson, AiJsonError } from "@/lib/aiJson";
@@ -775,6 +776,8 @@ export async function applyPlanImport(ownerSub: string, input: unknown, todayKey
   return counts;
 }
 
+const ITEM_FIELDS = ["group", "code", "title", "kind", "size", "status", "record", "periodLabel", "fromDateKey", "toDateKey", "note"] as const satisfies readonly (keyof DraftItem)[];
+
 const BLANK_GOAL: DraftGoal = { title: "", statement: "", approach: "", weeklyHours: 0, commuteHours: 0, budgetNote: "", keepRecord: "", improveCheck: "", phases: [] };
 
 /**
@@ -794,7 +797,7 @@ async function writeSubPlan(tx: Prisma.TransactionClient, ownerSub: string, goal
     ...(sp.days.length > 0 ? { days: sp.days as unknown as Prisma.InputJsonValue } : {}),
   };
   let planId: string;
-  let items: { id: string; code: string; title: string; sortOrder: number }[] = [];
+  let items: (DraftItem & { id: string; sortOrder: number })[] = [];
   let steps: { itemId: string | null; label: string; dateKey: string }[] = [];
   if (same) {
     planId = same.id;
@@ -811,24 +814,47 @@ async function writeSubPlan(tx: Prisma.TransactionClient, ownerSub: string, goal
     planId = (await tx.goalSubPlan.create({ data: { ownerSub, goalId, ...fields, sortOrder: (last?.sortOrder ?? -1) + 1 } })).id;
     counts.subPlans++;
   }
+  // The ledger is written in two statements, whatever its length: on the
+  // hosted database every query is a network round trip, and one per item
+  // ran a 30-course ledger past the request's time limit.
   const key = (code: string, title: string) => (code ? `c:${code}` : `t:${titleKey(title)}`);
-  const byKey = new Map(items.map((i) => [key(i.code, i.title), i.id]));
+  const byKey = new Map(items.map((i) => [key(i.code, i.title), i]));
   let order = items.reduce((m, i) => Math.max(m, i.sortOrder), -1) + 1;
+  const created: (DraftItem & { id: string; subPlanId: string; sortOrder: number })[] = [];
+  const changedById = new Map<string, DraftItem & { id: string }>();
   for (const it of sp.items) {
     const k = key(it.code, it.title);
     const found = byKey.get(k) ?? byKey.get(key("", it.title));
     if (found) {
-      await tx.goalItem.update({ where: { id: found }, data: it });
-      byKey.set(k, found);
+      // Only what the document actually changed is written back.
+      const next = { ...found, ...it };
+      if (changedById.has(found.id) || ITEM_FIELDS.some((f) => found[f] !== it[f])) changedById.set(found.id, next);
+      byKey.set(k, next);
     } else {
-      const id = (await tx.goalItem.create({ data: { subPlanId: planId, ...it, sortOrder: order++ } })).id;
-      byKey.set(k, id);
-      byKey.set(key("", it.title), id);
+      const row = { ...it, id: randomUUID(), subPlanId: planId, sortOrder: order++ };
+      created.push(row);
+      byKey.set(k, row);
+      byKey.set(key("", it.title), row);
     }
     counts.items++;
   }
+  if (created.length > 0) await tx.goalItem.createMany({ data: created });
+  const changed = [...changedById.values()];
+  if (changed.length > 0) {
+    const col = <K extends keyof DraftItem>(f: K) => changed.map((c) => c[f]);
+    await tx.$executeRaw`
+      UPDATE goal_item AS g SET
+        "group" = v.grp, code = v.code, title = v.title, kind = v.kind, size = v.size, status = v.status,
+        record = v.record, period_label = v.period_label, from_date_key = v.from_date_key, to_date_key = v.to_date_key, note = v.note
+      FROM unnest(
+        ${changed.map((c) => c.id)}::text[], ${col("group")}::text[], ${col("code")}::text[], ${col("title")}::text[], ${col("kind")}::text[],
+        ${col("size")}::float8[], ${col("status")}::text[], ${col("record")}::text[], ${col("periodLabel")}::text[],
+        ${col("fromDateKey")}::text[], ${col("toDateKey")}::text[], ${col("note")}::text[]
+      ) AS v(id, grp, code, title, kind, size, status, record, period_label, from_date_key, to_date_key, note)
+      WHERE g.id = v.id AND g.sub_plan_id = ${planId}`;
+  }
   // A step names its item by code or title, as the document does.
-  const all = await tx.goalItem.findMany({ where: { subPlanId: planId }, select: { id: true, code: true, title: true } });
+  const all = [...new Map([...byKey.values()].map((i) => [i.id, i])).values()];
   const itemOf = (name: string | null) => {
     if (!name) return null;
     const n = titleKey(name);
