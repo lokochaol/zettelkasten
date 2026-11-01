@@ -21,10 +21,10 @@ export function RotateDeviceGate() {
           viewBox="0 0 52 52"
           fill="none"
           aria-hidden="true"
-          className="relative animate-rotate-device"
+          className="relative animate-rotate-device text-accent"
         >
-          <rect x="16" y="6" width="20" height="34" rx="4" stroke="#ff3d1a" strokeWidth="2.4" />
-          <line x1="26" y1="34" x2="26" y2="34.5" stroke="#ff3d1a" strokeWidth="2.4" strokeLinecap="round" />
+          <rect x="16" y="6" width="20" height="34" rx="4" stroke="currentColor" strokeWidth="2.4" />
+          <line x1="26" y1="34" x2="26" y2="34.5" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round" />
         </svg>
       </div>
       <div className="flex flex-col gap-2">

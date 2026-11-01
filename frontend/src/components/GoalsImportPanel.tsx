@@ -169,7 +169,7 @@ export function GoalsImportPanel({
           </div>
         </div>
       )}
-      {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+      {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
       {done && <p className="text-[11px] text-ink">{done}</p>}
     </section>
   );

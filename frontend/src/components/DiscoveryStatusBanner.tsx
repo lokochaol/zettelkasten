@@ -26,9 +26,9 @@ export function DiscoveryStatusBanner({
   });
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border border-accent/50 bg-accent-soft px-3 py-2">
+    <div className="flex items-center justify-between gap-3 rounded-lg border border-alert/50 bg-alert-soft px-3 py-2">
       <span className="font-mono text-[10.5px] text-ink">
-        <span className="text-accent">⚠</span> {t.discovery.runErrorLabel}: {message}{" "}
+        <span className="text-alert">⚠</span> {t.discovery.runErrorLabel}: {message}{" "}
         <span className="text-ink-faint">{t.discovery.runErrorAt(formatted)}</span>
       </span>
       <Link

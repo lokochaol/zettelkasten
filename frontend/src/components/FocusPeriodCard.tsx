@@ -175,7 +175,7 @@ export function FocusPeriodCard({
       </div>
 
       <div className="flex items-center gap-2">
-        {error && <p className="text-[11px] text-accent">{error}</p>}
+        {error && <p className="text-[11px] text-alert">{error}</p>}
         <button type="button" onClick={() => setConfirmDelete(true)} className={`${PILL} ml-auto`}>
           {t.common.delete}
         </button>

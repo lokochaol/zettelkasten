@@ -217,7 +217,7 @@ export function MealChatPanel({
       </div>
 
       {notice && <p className="font-mono text-[10.5px] text-accent">{notice}</p>}
-      {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+      {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
 
       {/* Starting points, for typing on a phone: tap one, then fill in the 〇〇. */}
       <div className="flex flex-wrap gap-1.5">
@@ -334,8 +334,8 @@ function ProposalCard({
       )}
 
       {proposal.kitchenWarnings && proposal.kitchenWarnings.length > 0 && (
-        <div className="flex flex-col gap-0.5 rounded-md bg-accent/10 px-2.5 py-1.5">
-          <p className="font-mono text-[9px] tracking-wider text-accent">{t.meals.kitchenWarningsHeading}</p>
+        <div className="flex flex-col gap-0.5 rounded-md bg-alert-soft px-2.5 py-1.5">
+          <p className="font-mono text-[9px] tracking-wider text-alert">{t.meals.kitchenWarningsHeading}</p>
           {proposal.kitchenWarnings.map((w) => (
             <p key={w} className="font-mono text-[10.5px] text-ink">
               {w}

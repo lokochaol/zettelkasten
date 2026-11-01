@@ -146,7 +146,7 @@ function StockList({ inventory, onChange }: { inventory: InventoryItem[]; onChan
           {t.meals.stockAdd}
         </button>
       </div>
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
     </div>
   );
 }

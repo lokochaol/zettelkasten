@@ -85,7 +85,7 @@ export function TodayGoalsStrip({ focus, plan, todayKey }: { focus: TodayFocus |
             const overdue = s.dateKey < todayKey;
             return (
               <li key={s.id} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-                <span className={`font-mono text-[10px] ${overdue ? "font-semibold text-accent" : "text-ink-soft"}`}>{day(s.dateKey)}</span>
+                <span className={`font-mono text-[10px] ${overdue ? "font-semibold text-alert" : "text-ink-soft"}`}>{day(s.dateKey)}</span>
                 <span className="rounded px-1 font-mono text-[9px] text-ink-soft" style={{ background: tint(goal(s.goalId)?.hex ?? "#94a3b8", 0.16) }}>
                   {t.plan.stepKind[s.kind] ?? s.kind}
                 </span>
@@ -139,7 +139,7 @@ export function TodayGoalsStrip({ focus, plan, todayKey }: { focus: TodayFocus |
         <ul className="flex flex-col gap-0.5 border-t border-accent/20 pt-2">
           {focus.upcoming.map((s, i) => (
             <li key={i} className="flex flex-wrap items-baseline gap-x-2 text-[11.5px]">
-              <span className={`font-mono text-[10px] ${s.overdue ? "font-semibold text-accent" : "text-ink-soft"}`}>
+              <span className={`font-mono text-[10px] ${s.overdue ? "font-semibold text-alert" : "text-ink-soft"}`}>
                 {s.overdue ? t.goals.todayOverdue(day(s.dueDateKey)) : day(s.dueDateKey)}
               </span>
               <span className="text-ink">

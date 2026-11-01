@@ -15,7 +15,7 @@ export function OfflineBanner() {
   if (!isOffline) return null;
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-accent/50 bg-accent-soft px-3 py-2">
+    <div className="flex items-center gap-2 rounded-lg border border-alert/50 bg-alert-soft px-3 py-2">
       <span className="text-accent">⚠</span>
       <span className="font-mono text-[10.5px] text-ink">{t.common.offlineBanner}</span>
     </div>

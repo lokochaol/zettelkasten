@@ -247,7 +247,7 @@ export function GoalCard({
           </button>
         </div>
       </div>
-      {error && <p className="text-[11px] text-accent sm:pl-8">{error}</p>}
+      {error && <p className="text-[11px] text-alert sm:pl-8">{error}</p>}
 
       {open && (
         <div className="flex flex-col gap-4 sm:pl-8">
@@ -446,7 +446,7 @@ function MilestoneRow({
             value={milestone.dueDateKey ?? ""}
             onChange={(e) => void onPatch({ dueDateKey: e.target.value || null })}
             aria-label={t.goals.stepDue}
-            className={`${INPUT} ${overdue ? "border-accent text-accent" : ""}`}
+            className={`${INPUT} ${overdue ? "border-alert text-alert" : ""}`}
           />
           <button type="button" onClick={() => onMove(-1)} disabled={isFirst} aria-label={t.goals.moveUp} className={PILL}>
             ↑

@@ -192,7 +192,7 @@ export function AdvisorDrawer({
         </div>
 
         <footer className="flex flex-col gap-2 border-t border-line px-4 py-3">
-          {error && <p className="text-[11px] text-accent">{error}</p>}
+          {error && <p className="text-[11px] text-alert">{error}</p>}
           {messages && messages.length === 0 && !pending && (
             <div className="flex flex-wrap gap-1.5">
               {(planEmpty ? t.plan.advisorPlanSuggestions : [...t.plan.advisorSuggestions, t.plan.advisorPlanSuggestions[1]]).map((s) => (

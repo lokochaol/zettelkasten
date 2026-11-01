@@ -79,7 +79,7 @@ export function DiscoveryTopicsSection({
           {t.discoveryTab.topicAdd}
         </button>
       </form>
-      {error && <p className="text-[11px] text-accent">{error}</p>}
+      {error && <p className="text-[11px] text-alert">{error}</p>}
 
       {topics.map((topic) => (
         <TopicCard

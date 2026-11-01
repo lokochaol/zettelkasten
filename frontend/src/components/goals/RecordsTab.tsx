@@ -213,7 +213,7 @@ function WeekSummary({ active, hexes, rec }: TabProps & { rec: WeekRecords }) {
                 <span className="text-right font-mono text-[10.5px] whitespace-nowrap text-ink-soft sm:w-28">
                   {round1(actual)} / {planned}h
                   {row?.rate != null && (
-                    <span className={`ml-1.5 font-semibold ${row.rate < 0.8 ? "text-accent" : "text-ink"}`}>{Math.round(row.rate * 100)}%</span>
+                    <span className={`ml-1.5 font-semibold ${row.rate < 0.8 ? "text-alert" : "text-ink"}`}>{Math.round(row.rate * 100)}%</span>
                   )}
                 </span>
               </div>
@@ -940,7 +940,7 @@ function ExperimentRow({
   const goal = goals.find((g) => g.id === x.goalId);
   const sHex = EXP_COLOR[x.status];
   return (
-    <li className={`rounded-lg border p-2.5 ${due ? "border-accent" : "border-line"}`}>
+    <li className={`rounded-lg border p-2.5 ${due ? "border-alert" : "border-line"}`}>
       <details open={x.status === "RUNNING"}>
         <summary className="flex cursor-pointer flex-wrap items-center gap-2">
           <span className="rounded-full px-2 py-0.5 font-mono text-[9.5px] font-semibold" style={{ background: tint(sHex, 0.15), color: sHex }}>
@@ -949,7 +949,7 @@ function ExperimentRow({
           {goal && <GoalChip goal={goal} hex={hex} />}
           <span className="min-w-0 flex-1 text-[12.5px] font-semibold text-ink">{x.change}</span>
           {x.reviewDateKey && (
-            <span className={`font-mono text-[10px] ${due ? "font-semibold text-accent" : "text-ink-faint"}`}>{day.short(x.reviewDateKey)}</span>
+            <span className={`font-mono text-[10px] ${due ? "font-semibold text-alert" : "text-ink-faint"}`}>{day.short(x.reviewDateKey)}</span>
           )}
         </summary>
         <div className="mt-2 flex flex-col gap-2">

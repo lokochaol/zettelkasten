@@ -8,7 +8,7 @@ const DARK_THEME_VARIABLES = {
   background: "#121212",
   primaryColor: "#1c1c1c",
   primaryTextColor: "#f5f5f5",
-  primaryBorderColor: "#ff3d1a",
+  primaryBorderColor: "#f5f5f5",
   lineColor: "#8a8a8a",
   secondaryColor: "#1c1c1c",
   tertiaryColor: "#1c1c1c",
@@ -18,7 +18,7 @@ const LIGHT_THEME_VARIABLES = {
   background: "#ffffff",
   primaryColor: "#eceef2",
   primaryTextColor: "#15161a",
-  primaryBorderColor: "#ff3d1a",
+  primaryBorderColor: "#15161a",
   lineColor: "#63656d",
   secondaryColor: "#eceef2",
   tertiaryColor: "#eceef2",
@@ -61,7 +61,7 @@ export function MermaidPreview({ source }: { source: string }) {
   }, [source, id, t, theme]);
 
   if (!source.trim()) return null;
-  if (error) return <p className="text-xs text-accent">{error}</p>;
+  if (error) return <p className="text-xs text-alert">{error}</p>;
   if (!svg) return null;
 
   return <div className="flex justify-center overflow-x-auto py-2" dangerouslySetInnerHTML={{ __html: svg }} />;

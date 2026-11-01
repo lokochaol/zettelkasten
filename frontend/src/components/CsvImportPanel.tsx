@@ -177,7 +177,7 @@ export function CsvImportPanel({ categories, onImported }: { categories: string[
       />
 
       {readingPdf && <p className="font-mono text-[10.5px] text-ink-soft">{t.money.pdfReading}</p>}
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
       {result && <p className="font-mono text-[10.5px] text-accent">{result}</p>}
 
       {preview?.pdf && <PdfCheck pdf={preview.pdf} />}
