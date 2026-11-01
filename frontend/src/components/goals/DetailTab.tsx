@@ -356,7 +356,7 @@ function Upcoming({ plan, put, todayKey, onError, hex }: PlanProps & { hex: stri
         {list.map((s) => {
           const overdue = s.dateKey < todayKey;
           return (
-            <li key={s.id} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${overdue ? "bg-accent/10" : ""}`}>
+            <li key={s.id} className={`flex items-start gap-2 rounded-md px-2 py-1.5 ${overdue ? "bg-alert/10" : ""}`}>
               <input
                 type="checkbox"
                 checked={false}
@@ -372,7 +372,7 @@ function Upcoming({ plan, put, todayKey, onError, hex }: PlanProps & { hex: stri
               </span>
               <div className="min-w-0 flex-1">
                 <p className="text-[12px] leading-snug text-ink">
-                  <span className={`mr-1.5 font-mono text-[10.5px] ${overdue ? "font-semibold text-accent" : "text-ink-soft"}`}>{day.withWeekday(s.dateKey)}</span>
+                  <span className={`mr-1.5 font-mono text-[10.5px] ${overdue ? "font-semibold text-alert" : "text-ink-soft"}`}>{day.withWeekday(s.dateKey)}</span>
                   {itemName(plan, s.itemId) && <span className="font-semibold">{itemName(plan, s.itemId)} </span>}
                   {s.label}
                 </p>
@@ -475,7 +475,7 @@ function Timeline({ plan, todayKey, hex }: PlanProps & { hex: string }) {
       {ticks.map((tk) => (
         <div key={tk.n} aria-hidden="true" className={`absolute inset-y-0 border-l ${tk.month ? "border-line-strong/70" : "border-line/50"}`} style={{ left: `${x(tk.n)}%` }} />
       ))}
-      <div aria-hidden="true" className="absolute inset-y-0 z-[1] border-l-2 border-accent" style={{ left: `${x(today)}%` }} />
+      <div aria-hidden="true" className="absolute inset-y-0 z-[1] border-l-2 border-alert" style={{ left: `${x(today)}%` }} />
     </>
   );
 
@@ -746,7 +746,7 @@ function ItemRow({
         </button>
         {item.periodLabel && <span className="max-w-56 truncate rounded px-1.5 py-0.5 font-mono text-[9.5px] text-ink-soft" style={{ background: tint(hex, 0.12) }}>{item.periodLabel}</span>}
         {next && (
-          <span className={`flex items-center gap-1 font-mono text-[9.5px] ${next.dateKey < todayKey ? "font-semibold text-accent" : "text-ink-soft"}`} title={next.label}>
+          <span className={`flex items-center gap-1 font-mono text-[9.5px] ${next.dateKey < todayKey ? "font-semibold text-alert" : "text-ink-soft"}`} title={next.label}>
             <StepMark kind={next.kind} hex={hex} size={8} />
             {day.short(next.dateKey)}
           </span>
@@ -820,7 +820,7 @@ function StepList({
             <BlurText value={s.label} onSave={(label) => (label.trim() ? save(s, { label }) : undefined)} className={s.done ? "line-through" : ""} />
           </div>
           {s.kind === "WORK" && <DateInput value={s.startDateKey} onChange={(startDateKey) => void save(s, { startDateKey })} label={t.plan.stepStart} />}
-          <DateInput value={s.dateKey} onChange={(v) => v && void save(s, { dateKey: v })} label={t.plan.stepDate} className={!s.done && s.kind === "DUE" && s.dateKey < todayKey ? "border-accent text-accent" : ""} />
+          <DateInput value={s.dateKey} onChange={(v) => v && void save(s, { dateKey: v })} label={t.plan.stepDate} className={!s.done && s.kind === "DUE" && s.dateKey < todayKey ? "border-alert text-alert" : ""} />
           {s.kind === "DUE" && <DateInput value={s.backupDateKey} onChange={(backupDateKey) => void save(s, { backupDateKey })} label={t.plan.stepBackup} className="opacity-70" />}
           <button
             type="button"

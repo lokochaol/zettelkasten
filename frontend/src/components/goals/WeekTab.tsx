@@ -121,7 +121,7 @@ function BudgetCard({ ov, setOv, active, hexes, onError }: TabProps) {
                   <td className="py-1 text-right">
                     <HoursInput value={g.commuteHours} label={t.plan.commute} onSave={(h) => void patch(g, { commuteHours: h })} />
                   </td>
-                  <td className={`py-1 text-right font-mono ${off ? "font-semibold text-accent" : "text-ink-soft"}`} title={`${t.plan.budgetDesk} ${desk}h / ${t.plan.budgetCommuteCol} ${commute}h`}>
+                  <td className={`py-1 text-right font-mono ${off ? "font-semibold text-alert" : "text-ink-soft"}`} title={`${t.plan.budgetDesk} ${desk}h / ${t.plan.budgetCommuteCol} ${commute}h`}>
                     {slots}h
                   </td>
                   <td className="py-1 pl-2 text-[10.5px] text-ink-faint">{g.budgetNote}</td>
@@ -132,7 +132,7 @@ function BudgetCard({ ov, setOv, active, hexes, onError }: TabProps) {
               <td className="py-1.5">{t.plan.total}</td>
               <td className="py-1.5 pr-1 text-right">{totalBudget}h</td>
               <td className="py-1.5 pr-1 text-right">{round1(active.reduce((a, g) => a + g.commuteHours, 0))}h</td>
-              <td className={`py-1.5 text-right ${Math.abs(totalSlots - totalBudget) >= 0.25 ? "text-accent" : ""}`}>{totalSlots}h</td>
+              <td className={`py-1.5 text-right ${Math.abs(totalSlots - totalBudget) >= 0.25 ? "text-alert" : ""}`}>{totalSlots}h</td>
               <td />
             </tr>
           </tbody>
@@ -162,7 +162,7 @@ function LifeCard({ ov, setOv, onError }: TabProps) {
     setDirty(false);
   }
   return (
-    <Card title={t.plan.lifeHeading} action={<span className={`font-mono text-[10px] ${total > 168 ? "text-accent" : "text-ink-faint"}`}>{t.plan.lifeTotal(total)}</span>}>
+    <Card title={t.plan.lifeHeading} action={<span className={`font-mono text-[10px] ${total > 168 ? "text-alert" : "text-ink-faint"}`}>{t.plan.lifeTotal(total)}</span>}>
       <div className="flex h-3 overflow-hidden rounded-full bg-surface-alt">
         {lines.map((l, i) => (
           <div key={i} title={`${l.label} ${l.hours}h`} style={{ width: `${(Math.max(0, l.hours) / Math.max(168, total)) * 100}%`, background: LIFE_COLORS[i % LIFE_COLORS.length] }} />

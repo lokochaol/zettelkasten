@@ -62,10 +62,10 @@ export function HeaderMenu({ children, signedIn = true }: { children: ReactNode;
           }`}
         >
           <span aria-hidden="true" className="animate-breathe-scale absolute inset-0 rounded-full border border-accent/50" />
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="relative">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true" className="relative text-accent">
             <path
               d="M1.5 3.5H12.5M1.5 7H12.5M1.5 10.5H12.5"
-              stroke="#ff3d1a"
+              stroke="currentColor"
               strokeWidth="1.4"
               strokeLinecap="round"
             />

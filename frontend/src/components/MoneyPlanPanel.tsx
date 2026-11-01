@@ -85,7 +85,7 @@ export function MoneyPlanPanel({
 
   return (
     <div className="flex flex-col gap-6">
-      {error && <p className="rounded-lg bg-accent-soft px-3 py-2 text-xs whitespace-pre-line text-accent">{error}</p>}
+      {error && <p className="rounded-lg bg-alert-soft px-3 py-2 text-xs whitespace-pre-line text-alert">{error}</p>}
 
       {/* ① 手取りと前提 */}
       <Section heading={t.money.planHeading} note={t.money.planIntro}>
@@ -165,7 +165,7 @@ export function MoneyPlanPanel({
             />
           ))}
         </ul>
-        <p className={`font-mono text-[10px] ${unallocated < 0 ? "text-accent" : "text-ink-faint"}`}>
+        <p className={`font-mono text-[10px] ${unallocated < 0 ? "text-alert" : "text-ink-faint"}`}>
           {t.money.monthPlanLeft(unallocated)}
         </p>
         <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.money.paceNote}</p>
@@ -244,7 +244,7 @@ export function MoneyPlanPanel({
                   <td className="py-1 font-mono text-[10px] text-ink-soft">{m.month}</td>
                   <td className="py-1 text-right font-mono text-[10.5px] text-ink-soft">¥{m.commitmentYen.toLocaleString()}</td>
                   <td className="py-1 text-right font-mono text-[10.5px] text-ink-soft">¥{m.savingYen.toLocaleString()}</td>
-                  <td className={`py-1 text-right font-mono text-[10.5px] font-semibold ${m.belowMinimum ? "text-accent" : "text-ink"}`}>
+                  <td className={`py-1 text-right font-mono text-[10.5px] font-semibold ${m.belowMinimum ? "text-alert" : "text-ink"}`}>
                     ¥{m.discretionaryYen.toLocaleString()}
                     {m.belowMinimum && <span className="ml-1 text-[9px]">{t.money.belowMinimum}</span>}
                   </td>
@@ -494,7 +494,7 @@ function Figure({ label, yen, strong, tone }: { label: string; yen: number; stro
   return (
     <span className="flex flex-col gap-0.5">
       <span className="font-mono text-[9px] tracking-wider text-ink-faint uppercase">{label}</span>
-      <span className={`font-mono ${strong ? "text-[13px] font-bold" : "text-[11px]"} ${tone === "warn" ? "text-accent" : "text-ink"}`}>
+      <span className={`font-mono ${strong ? "text-[13px] font-bold" : "text-[11px]"} ${tone === "warn" ? "text-alert" : "text-ink"}`}>
         ¥{value.toLocaleString()}
       </span>
     </span>
@@ -554,7 +554,7 @@ function BudgetRow({
       <div className="relative h-1.5 overflow-hidden rounded-full bg-surface-alt">
         {ratio !== null && (
           <div
-            className={`h-full rounded-full ${over ? "bg-accent" : "bg-[var(--color-meal)]"}`}
+            className={`h-full rounded-full ${over ? "bg-alert" : "bg-[var(--color-meal)]"}`}
             style={{ width: `${Math.min(ratio, 1) * 100}%` }}
           />
         )}

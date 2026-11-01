@@ -195,7 +195,7 @@ export function GoalGantt({
       {cycleBand && (
         <div aria-hidden="true" className="absolute inset-y-0 bg-accent/[0.06]" style={{ left: `${cycleBand.left}%`, width: `${cycleBand.right - cycleBand.left}%` }} />
       )}
-      {today >= from && today <= to && <div aria-hidden="true" className="absolute inset-y-0 z-[1] border-l-2 border-accent" style={{ left: `${x(today)}%` }} />}
+      {today >= from && today <= to && <div aria-hidden="true" className="absolute inset-y-0 z-[1] border-l-2 border-alert" style={{ left: `${x(today)}%` }} />}
     </>
   );
 
@@ -272,7 +272,7 @@ export function GoalGantt({
             ))}
         </div>
         <span className="ml-auto flex items-center gap-1 font-mono text-[9.5px] text-ink-faint">
-          <span className="inline-block h-2.5 w-0.5 bg-accent" /> {t.plan.today} {todayKey.slice(5).replace("-", "/")}
+          <span className="inline-block h-2.5 w-0.5 bg-alert" /> {t.plan.today} {todayKey.slice(5).replace("-", "/")}
         </span>
       </div>
 

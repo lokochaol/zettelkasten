@@ -72,7 +72,7 @@ export function ConfirmDialog({
       >
         <p className="text-sm font-bold text-ink">{title}</p>
         {warning && (
-          <p className="mt-2 mb-4 rounded-r-md border-l-2 border-accent bg-accent-soft px-2.5 py-2 text-xs leading-relaxed text-ink-soft">
+          <p className="mt-2 mb-4 rounded-r-md border-l-2 border-alert bg-alert-soft px-2.5 py-2 text-xs leading-relaxed text-ink-soft">
             {warning}
           </p>
         )}

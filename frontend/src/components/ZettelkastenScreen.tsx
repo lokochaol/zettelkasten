@@ -626,7 +626,7 @@ function NoteDetailOverlay({
             ) : (
               <EmbeddedContentPreview content={detail.content} />
             )}
-            {error && <p className="mt-1.5 text-[10.5px] text-accent">{error}</p>}
+            {error && <p className="mt-1.5 text-[10.5px] text-alert">{error}</p>}
 
             <div className="mt-4 border-t border-line pt-3">
               <h3 className="mb-2 font-mono text-[9.5px] font-semibold tracking-[0.2em] text-ink-soft uppercase">
@@ -668,7 +668,7 @@ function NoteDetailOverlay({
               autoFocus
               className="w-full rounded-md border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-accent focus:outline-none"
             />
-            {error && <p className="mt-1.5 text-[10.5px] text-accent">{error}</p>}
+            {error && <p className="mt-1.5 text-[10.5px] text-alert">{error}</p>}
           </div>
         </ConfirmDialog>
 

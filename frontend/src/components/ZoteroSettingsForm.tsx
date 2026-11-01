@@ -111,7 +111,7 @@ export function ZoteroSettingsForm({ initial }: { initial: ZoteroCredentialSumma
         </div>
       </div>
 
-      {error && <p className="font-mono text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="font-mono text-[10.5px] text-alert">{error}</p>}
 
       <div className="flex justify-end">
         <button

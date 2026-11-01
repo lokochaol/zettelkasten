@@ -95,7 +95,7 @@ export function ProjectGoalsSection({ projectId, initialGoals }: { projectId: st
         ))}
       </div>
       {problems.length > 0 && <p className="font-mono text-[10px] text-accent">{problems.join(" / ")}</p>}
-      {error && <p className="font-mono text-[10px] text-accent">{error}</p>}
+      {error && <p className="font-mono text-[10px] text-alert">{error}</p>}
       <div className="flex items-center justify-end gap-2">
         {hasAnyGoal(savedGoals) && (
           <button

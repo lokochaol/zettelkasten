@@ -183,7 +183,7 @@ export function DayPlanPanel({ dateKey, todayKey, onGoToDay }: { dateKey: string
       )}
       {notice && <p className="text-[11.5px] text-meal">{notice}</p>}
       <MealRecipeDialog mealId={recipeFor} onClose={closeRecipe} />
-      {error && <p className="text-[11px] text-accent">{error}</p>}
+      {error && <p className="text-[11px] text-alert">{error}</p>}
 
       <div className="grid gap-3 sm:grid-cols-[3.5rem_1fr]">
         <DayRibbon blocks={plan.blocks} hexOf={hexOf} />
@@ -552,7 +552,7 @@ function DayChat({
         )}
         <div ref={bottom} />
       </div>
-      {error && <p className="text-[11px] text-accent">{error}</p>}
+      {error && <p className="text-[11px] text-alert">{error}</p>}
       {messages.length === 0 && !pending && (
         <div className="flex flex-wrap gap-1.5">
           {d.suggestions.map((sug) => (

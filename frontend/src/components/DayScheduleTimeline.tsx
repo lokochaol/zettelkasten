@@ -305,9 +305,9 @@ export function DayScheduleTimeline({ dateKey, timeZone }: { dateKey: string; ti
                 className="pointer-events-none absolute right-0 left-9 z-10 flex items-center"
                 style={{ top: nowTop }}
               >
-                <span className="-ml-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-accent" />
-                <span className="h-px flex-1 bg-accent" />
-                <span className="ml-1 rounded bg-accent px-1 font-mono text-[8.5px] text-on-accent">{timeLabel(now)}</span>
+                <span className="-ml-[3px] h-1.5 w-1.5 shrink-0 rounded-full bg-alert" />
+                <span className="h-px flex-1 bg-alert" />
+                <span className="ml-1 rounded bg-alert px-1 font-mono text-[8.5px] text-white">{timeLabel(now)}</span>
               </div>
             )}
 
@@ -505,7 +505,7 @@ function TimeBlockForm({
           {t.common.add}
         </button>
       </div>
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
     </div>
   );
 }

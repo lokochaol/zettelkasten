@@ -406,7 +406,7 @@ export function MarkdownNoteEditor({
           in and out shifts everything below it, which reads as the whole page
           jumping around while you type. */}
       <div className="flex h-6 items-center justify-end gap-2">
-        <span className={`font-mono text-[9.5px] tracking-wide ${status === "failed" ? "text-accent" : "text-ink-faint"}`}>
+        <span className={`font-mono text-[9.5px] tracking-wide ${status === "failed" ? "text-alert" : "text-ink-faint"}`}>
           {statusLabel}
         </span>
         {!live && (

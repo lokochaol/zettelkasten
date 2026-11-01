@@ -130,7 +130,7 @@ export function AiSettingsForm({ initial }: { initial: AiCredentialSummary | nul
         </HudFrame>
       </div>
 
-      {error && <p className="font-mono text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="font-mono text-[10.5px] text-alert">{error}</p>}
 
       <div className="flex justify-end">
         <button

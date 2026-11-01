@@ -204,7 +204,7 @@ export function TrainerChatPanel({
       </div>
 
       {notice && <p className="font-mono text-[10.5px] text-accent">{notice}</p>}
-      {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+      {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
 
       <div className="flex flex-wrap gap-1.5">
         {(hasSessions ? t.training.chatSuggestions : t.training.chatStartSuggestions).map((s) => (

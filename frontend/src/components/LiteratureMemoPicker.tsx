@@ -99,7 +99,7 @@ export function LiteratureMemoPicker({ onPick }: { onPick: (selection: Literatur
           {t.literaturePicker.unconfiguredMessageSuffix}
         </p>
       )}
-      {state === "error" && <p className="font-mono text-[10.5px] text-accent">{errorMessage}</p>}
+      {state === "error" && <p className="font-mono text-[10.5px] text-alert">{errorMessage}</p>}
 
       {query.trim() && results && results.length > 0 && (
         <div className="flex flex-col gap-1 rounded-lg border border-line bg-surface p-1.5">
@@ -152,7 +152,7 @@ export function LiteratureMemoPicker({ onPick }: { onPick: (selection: Literatur
               <LabeledInput label={t.literaturePicker.creatorLabel} value={createCreator} onChange={setCreateCreator} />
               <LabeledInput label={t.literaturePicker.dateLabel} value={createDate} onChange={setCreateDate} placeholder="2024" />
               <LabeledInput label={t.literaturePicker.urlLabel} value={createUrl} onChange={setCreateUrl} placeholder="https://…" />
-              {createError && <p className="font-mono text-[10.5px] text-accent">{createError}</p>}
+              {createError && <p className="font-mono text-[10.5px] text-alert">{createError}</p>}
               <div className="flex justify-end gap-3">
                 <button
                   onClick={() => setCreating(false)}

@@ -190,7 +190,7 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
       {syncMessage && <p className="rounded-lg bg-surface-alt px-3 py-2 font-mono text-[11px] text-ink-soft">{syncMessage}</p>}
 
       {warnings.length > 0 && (
-        <section className="flex flex-col gap-2 rounded-xl border border-accent/40 bg-accent-soft p-4">
+        <section className="flex flex-col gap-2 rounded-xl border border-alert/40 bg-alert-soft p-4">
           <p className="font-mono text-[10px] font-semibold tracking-[0.2em] text-accent uppercase">{t.meals.warningsHeading}</p>
           <p className="text-[11px] text-ink-soft">{t.meals.warningsIntro}</p>
           <ul className="flex flex-col gap-1">
@@ -347,11 +347,11 @@ export function MealWeekScreen({ initialWeek }: { /** ?week= — the week being 
         // the next budget a real number rather than a wish.
         <div className="flex flex-col gap-0.5">
           {view.shoppingItems.length > 0 && (
-            <p className={`font-mono text-[10.5px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
+            <p className={`font-mono text-[10.5px] font-semibold ${view.estimatedYen > view.plan.budgetYen ? "text-alert" : "text-ink-soft"}`}>
               {t.meals.shoppingTotal(view.estimatedYen, view.plan.budgetYen)}
             </p>
           )}
-          <p className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-accent" : "text-ink-soft"}`}>
+          <p className={`font-mono text-[10px] ${data.foodSpentYen > view.plan.budgetYen ? "text-alert" : "text-ink-soft"}`}>
             {t.meals.foodSpent(data.foodSpentYen, view.plan.budgetYen)}
           </p>
           <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.meals.foodSpentNote}</p>

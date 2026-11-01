@@ -138,7 +138,7 @@ export function PurchaseListPanel({
         >
           {creating ? t.meals.purchaseCreating : t.meals.purchaseCreate}
         </button>
-        {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+        {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
       </section>
     );
   }
@@ -305,7 +305,7 @@ export function PurchaseListPanel({
           {t.meals.purchaseFinish}
         </button>
       </div>
-      {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+      {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
     </section>
   );
 }

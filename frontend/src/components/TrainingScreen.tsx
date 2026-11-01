@@ -160,7 +160,7 @@ export function TrainingScreen({ initialWeek }: { initialWeek?: string }) {
           )}
         </div>
         {!data.week.plan && !generating && <p className="text-[11.5px] leading-relaxed text-ink-soft">{t.training.intro}</p>}
-        {error && <p className="text-[11px] whitespace-pre-line text-accent">{error}</p>}
+        {error && <p className="text-[11px] whitespace-pre-line text-alert">{error}</p>}
 
         {data.week.plan && (
           <div className="flex flex-col gap-1.5 rounded-lg bg-surface-alt p-3">
@@ -323,7 +323,7 @@ function CompositionPanel({
         </button>
       </div>
       <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.training.targetNote}</p>
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
     </section>
   );
 }
@@ -391,9 +391,9 @@ function HistoryPanel({ history }: { history: TrainingOverview["history"] }) {
 }
 
 const KIND_STYLE: Record<TrainingKind, string> = {
-  STRENGTH: "bg-accent-soft text-accent",
-  CARDIO: "bg-surface-alt text-ink",
-  MOBILITY: "bg-surface-alt text-ink-soft",
+  STRENGTH: "bg-train-strength/15 text-train-strength",
+  CARDIO: "bg-train-cardio/15 text-train-cardio",
+  MOBILITY: "bg-train-mobility/15 text-train-mobility",
 };
 
 /** One session: what to do, and — under it — how it went. */
@@ -512,7 +512,7 @@ function SessionCard({
             placeholder={t.training.logPlaceholder}
             className="resize-y rounded-md border border-line bg-surface px-2.5 py-1.5 text-[11.5px] leading-relaxed text-ink focus:border-accent focus:outline-none"
           />
-          {error && <p className="text-[10.5px] text-accent">{error}</p>}
+          {error && <p className="text-[10.5px] text-alert">{error}</p>}
         </div>
       )}
     </div>
@@ -627,7 +627,7 @@ function PreferencePanel({ data, onSaved }: { data: TrainingOverview; onSaved: (
         </button>
         {saved && <span className="font-mono text-[10px] text-ink-soft">{t.common.saved}</span>}
       </div>
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
     </section>
   );
 }

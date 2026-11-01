@@ -151,7 +151,7 @@ export function GoalsScreen({ initial, todayKey }: { initial: PlanOverview; toda
         />
       )}
       {error && (
-        <p className="flex items-center gap-2 text-[11px] text-accent">
+        <p className="flex items-center gap-2 text-[11px] text-alert">
           {error}
           <button type="button" onClick={() => setError(null)} className="font-mono text-ink-faint hover:text-accent" aria-label={t.plan.close}>
             ×

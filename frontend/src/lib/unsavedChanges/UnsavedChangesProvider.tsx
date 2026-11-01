@@ -147,7 +147,7 @@ export function UnsavedChangesProvider({ children }: { children: ReactNode }) {
               <p className="font-mono text-xs font-bold tracking-[0.15em] text-accent uppercase">
                 {t.unsavedChanges.title}
               </p>
-              <p className="rounded-r-md border-l-2 border-accent bg-accent-soft px-3 py-2 text-xs leading-relaxed text-ink-soft">
+              <p className="rounded-r-md border-l-2 border-alert bg-alert-soft px-3 py-2 text-xs leading-relaxed text-ink-soft">
                 {t.unsavedChanges.body}
               </p>
               <div className="flex flex-wrap justify-end gap-2">

@@ -137,7 +137,7 @@ export function ExpenseQuickEntry({
           {t.common.add}
         </button>
       </div>
-      {error && <p className="text-[10.5px] text-accent">{error}</p>}
+      {error && <p className="text-[10.5px] text-alert">{error}</p>}
 
       {view && view.today.length > 0 && (
         <ul className="flex flex-col gap-1">

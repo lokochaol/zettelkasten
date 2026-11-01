@@ -91,14 +91,14 @@ function ChecksCard({ ov, setOv, todayKey, active, hexes, onError }: TabProps) {
     const overdue = !c.done && !!c.dueDateKey && c.dueDateKey < todayKey;
     const goal = active.find((g) => g.id === c.goalId);
     return (
-      <li key={c.id} className={`flex flex-col gap-1.5 rounded-lg border p-2.5 ${overdue ? "border-accent" : "border-line"} ${c.done ? "opacity-70" : ""}`}>
+      <li key={c.id} className={`flex flex-col gap-1.5 rounded-lg border p-2.5 ${overdue ? "border-alert" : "border-line"} ${c.done ? "opacity-70" : ""}`}>
         <div className="flex flex-wrap items-center gap-2">
           <input type="checkbox" checked={c.done} onChange={(e) => void save(c, { done: e.target.checked }).catch(() => {})} aria-label={t.plan.done} className="h-4 w-4 accent-[var(--color-accent)]" />
           {goal && <GoalChip goal={goal} hex={hexes.get(goal.id) ?? NO_GOAL_HEX} />}
           <div className="min-w-0 flex-1">
             <BlurText value={c.question} onSave={(question) => (question.trim() ? save(c, { question }) : undefined)} className={`font-semibold ${c.done ? "line-through" : ""}`} />
           </div>
-          <DateInput value={c.dueDateKey} onChange={(dueDateKey) => void save(c, { dueDateKey }).catch(() => {})} label={t.plan.checkDue} className={overdue ? "border-accent text-accent" : ""} />
+          <DateInput value={c.dueDateKey} onChange={(dueDateKey) => void save(c, { dueDateKey }).catch(() => {})} label={t.plan.checkDue} className={overdue ? "border-alert text-alert" : ""} />
           <button
             type="button"
             onClick={() => {

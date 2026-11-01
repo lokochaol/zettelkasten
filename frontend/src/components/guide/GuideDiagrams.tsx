@@ -1,4 +1,5 @@
-const ACCENT = "#ff3d1a";
+// Drawn in the text colour of the svg (text-accent): the ink of the theme.
+const ACCENT = "currentColor";
 const MUTED = "#454545";
 const INK = "#8a8a8a";
 
@@ -35,7 +36,7 @@ export function LinkedNotesDiagram({ leftLabel, rightLabel }: { leftLabel: strin
     [305, 30],
   ];
   return (
-    <svg viewBox="0 0 400 130" className="w-full" role="img" aria-hidden="true">
+    <svg viewBox="0 0 400 130" className="w-full text-accent" role="img" aria-hidden="true">
       <line x1="180" y1="10" x2="180" y2="100" stroke={MUTED} strokeWidth="1" strokeDasharray="2 4" />
       {isolated.map(([x, y], i) => (
         <circle key={i} cx={x} cy={y} r="5" fill={MUTED} />
@@ -61,7 +62,7 @@ export function LinkedNotesDiagram({ leftLabel, rightLabel }: { leftLabel: strin
 export function TwoStageFlowDiagram({ fleetingLabel, arrowLabel, permanentLabel }: { fleetingLabel: string; arrowLabel: string; permanentLabel: string }) {
   const fleeting = [18, 52, 86];
   return (
-    <svg viewBox="0 0 400 150" className="w-full" role="img" aria-hidden="true">
+    <svg viewBox="0 0 400 150" className="w-full text-accent" role="img" aria-hidden="true">
       {fleeting.map((y, i) => (
         <rect key={i} x="30" y={y} width="70" height="22" rx="5" fill="none" stroke={MUTED} strokeWidth="1.3" />
       ))}
@@ -95,7 +96,7 @@ export function TwoStageFlowDiagram({ fleetingLabel, arrowLabel, permanentLabel 
 export function InsertionDiagram({ label }: { label: string }) {
   const points = [50, 150, 250, 350];
   return (
-    <svg viewBox="0 0 400 110" className="w-full" role="img" aria-hidden="true">
+    <svg viewBox="0 0 400 110" className="w-full text-accent" role="img" aria-hidden="true">
       <line x1="40" y1="45" x2="360" y2="45" stroke={MUTED} strokeWidth="1.3" />
       {points.map((x, i) => (
         <circle key={i} cx={x} cy="45" r="6" fill={MUTED} />
@@ -112,7 +113,7 @@ export function InsertionDiagram({ label }: { label: string }) {
  * hand-picked entry points into whatever has actually accumulated. */
 export function NoFoldersDiagram({ folderLabel, indexLabel }: { folderLabel: string; indexLabel: string }) {
   return (
-    <svg viewBox="0 0 400 130" className="w-full" role="img" aria-hidden="true">
+    <svg viewBox="0 0 400 130" className="w-full text-accent" role="img" aria-hidden="true">
       <g opacity="0.5">
         <path d="M65 40h20l6 8h34a4 4 0 0 1 4 4v34a4 4 0 0 1-4 4H65a4 4 0 0 1-4-4V44a4 4 0 0 1 4-4Z" fill="none" stroke={MUTED} strokeWidth="1.4" />
         <line x1="55" y1="30" x2="135" y2="90" stroke={ACCENT} strokeWidth="2" />
@@ -150,7 +151,7 @@ export function AppMapDiagram({
   promoteLabel: string;
 }) {
   return (
-    <svg viewBox="0 0 400 170" className="w-full" role="img" aria-hidden="true">
+    <svg viewBox="0 0 400 170" className="w-full text-accent" role="img" aria-hidden="true">
       <rect x="57.5" y="20" width="110" height="46" rx="7" fill="none" stroke={ACCENT} strokeWidth="1.6" />
       <line x1="72.5" y1="35" x2="142.5" y2="35" stroke={MUTED} strokeWidth="1.1" />
       <line x1="72.5" y1="45" x2="132.5" y2="45" stroke={MUTED} strokeWidth="1.1" />

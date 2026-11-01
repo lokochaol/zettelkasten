@@ -208,7 +208,7 @@ export function BlurText({
 
   // A faint outline while empty, so an unfilled field still reads as one.
   const common = `w-full min-w-0 rounded-md border px-2 py-1 text-ink placeholder:text-ink-faint hover:border-line focus:border-accent focus:bg-surface focus:outline-none ${
-    failed ? "border-accent" : text ? "border-transparent bg-transparent" : "border-dashed border-line bg-surface/40"
+    failed ? "border-alert" : text ? "border-transparent bg-transparent" : "border-dashed border-line bg-surface/40"
   } ${mono ? "font-mono text-[11px]" : "text-[12.5px] leading-relaxed"} ${className}`;
   const field =
     rows === 1 ? (

@@ -253,7 +253,7 @@ export function PlanDocumentApply({
           </div>
         </div>
       )}
-      {error && <p className="text-[11px] text-accent">{error}</p>}
+      {error && <p className="text-[11px] text-alert">{error}</p>}
     </div>
   );
 }

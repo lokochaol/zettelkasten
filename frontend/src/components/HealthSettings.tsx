@@ -158,7 +158,7 @@ export function HealthSettings() {
             />
           </Field>
         </div>
-        {error && <p className="text-[10.5px] text-accent">{error}</p>}
+        {error && <p className="text-[10.5px] text-alert">{error}</p>}
         <button
           onClick={save}
           disabled={pending}
@@ -202,7 +202,7 @@ export function HealthSettings() {
           {targets.bodyBasis === "lean" && (
             <p className="font-mono text-[9.5px] leading-relaxed text-ink-faint">{t.health.leanBasis}</p>
           )}
-          {targets.deficitLimited && <p className="text-[10.5px] text-accent">{t.health.deficitLimited}</p>}
+          {targets.deficitLimited && <p className="text-[10.5px] text-alert">{t.health.deficitLimited}</p>}
           <p className="font-mono text-[9px] leading-relaxed text-ink-faint">{t.health.disclaimer}</p>
         </div>
       )}
@@ -295,7 +295,7 @@ function Receipt({ receipt, recent, todayKey }: { receipt: IngestReceipt; recent
         {receipt.filled.length > 0 && ` · ${h.receiptFilled(receipt.filled.map((d) => d.slice(5).replace("-", "/")).join("、"))}`}
       </p>
       {(noWeight || gaps >= 3) && (
-        <p className="rounded-r-md border-l-2 border-accent bg-accent-soft px-2.5 py-2 font-sans text-[11px] leading-relaxed text-ink">
+        <p className="rounded-r-md border-l-2 border-alert bg-alert-soft px-2.5 py-2 font-sans text-[11px] leading-relaxed text-ink">
           {gaps >= 3 && `${h.gapsWarning(gaps)} `}
           {noWeight ? h.receiptNoWeight : receipt.historyDays === 0 ? h.gapsHint : ""}
         </p>

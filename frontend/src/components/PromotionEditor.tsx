@@ -157,7 +157,7 @@ export function PromotionEditor({
               ? t.promotionEditor.summaryIncomplete(drafts.length, incompleteCount)
               : t.promotionEditor.summaryComplete}
         </span>
-        {completeError && <span className="font-mono text-[10px] text-accent">{completeError}</span>}
+        {completeError && <span className="font-mono text-[10px] text-alert">{completeError}</span>}
         <button
           disabled={!allValid || completing}
           onClick={onComplete}
